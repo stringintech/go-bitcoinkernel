@@ -19,3 +19,12 @@ package kernel
 #cgo LDFLAGS: -L../depend/bitcoin/build/lib -lbitcoinkernel -Wl,-rpath,../depend/bitcoin/build/lib
 */
 import "C"
+
+// ReverseBytes reverses bytes for display (Bitcoin hashes are displayed in reverse order)
+func ReverseBytes(data []byte) []byte {
+	result := make([]byte, len(data))
+	for i, b := range data {
+		result[len(data)-1-i] = b
+	}
+	return result
+}

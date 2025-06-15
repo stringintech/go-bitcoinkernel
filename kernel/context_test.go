@@ -1,8 +1,6 @@
 package kernel
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestDefaultContext(t *testing.T) {
 	ctx, err := NewDefaultContext()
