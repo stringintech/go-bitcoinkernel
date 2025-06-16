@@ -115,8 +115,8 @@ func (b *Block) destroy() {
 	}
 }
 
-// Close explicitly destroys the block and removes the finalizer
-func (b *Block) Close() {
+// Destroy explicitly destroys the block and removes the finalizer
+func (b *Block) Destroy() {
 	runtime.SetFinalizer(b, nil)
 	b.destroy()
 }
@@ -169,8 +169,8 @@ func (bi *BlockIndex) destroy() {
 	}
 }
 
-// Close explicitly destroys the block index and removes the finalizer
-func (bi *BlockIndex) Close() {
+// Destroy explicitly destroys the block index and removes the finalizer
+func (bi *BlockIndex) Destroy() {
 	runtime.SetFinalizer(bi, nil)
 	bi.destroy()
 }
@@ -183,8 +183,8 @@ func (bh *BlockHash) destroy() {
 	}
 }
 
-// Close explicitly destroys the block hash and removes the finalizer
-func (bh *BlockHash) Close() {
+// Destroy explicitly destroys the block hash and removes the finalizer
+func (bh *BlockHash) Destroy() {
 	runtime.SetFinalizer(bh, nil)
 	bh.destroy()
 }

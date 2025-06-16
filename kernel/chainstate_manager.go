@@ -96,8 +96,8 @@ func (opts *ChainstateManagerOptions) destroy() {
 	}
 }
 
-// Close explicitly destroys the chainstate manager options and removes the finalizer
-func (opts *ChainstateManagerOptions) Close() {
+// Destroy explicitly destroys the chainstate manager options and removes the finalizer
+func (opts *ChainstateManagerOptions) Destroy() {
 	runtime.SetFinalizer(opts, nil)
 	opts.destroy()
 }
@@ -306,8 +306,8 @@ func (cm *ChainstateManager) destroy() {
 	}
 }
 
-// Close explicitly destroys the chainstate manager and removes the finalizer
-func (cm *ChainstateManager) Close() {
+// Destroy explicitly destroys the chainstate manager and removes the finalizer
+func (cm *ChainstateManager) Destroy() {
 	runtime.SetFinalizer(cm, nil)
 	cm.destroy()
 }

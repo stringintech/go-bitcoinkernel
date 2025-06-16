@@ -23,14 +23,14 @@ func TestChainstateManagerCreation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewDefaultContext() error = %v", err)
 	}
-	defer ctx.Close()
+	defer ctx.Destroy()
 
 	// Create chainstate manager options
 	opts, err := NewChainstateManagerOptions(ctx, dataDir, blocksDir)
 	if err != nil {
 		t.Fatalf("NewChainstateManagerOptions() error = %v", err)
 	}
-	defer opts.Close()
+	defer opts.Destroy()
 
 	// Set some options
 	opts.SetWorkerThreads(1)
@@ -42,14 +42,14 @@ func TestChainstateManagerCreation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewChainstateManager() error = %v", err)
 	}
-	defer manager.Close()
+	defer manager.Destroy()
 
 	// Test getting genesis block index
 	genesisIndex, err := manager.GetBlockIndexFromGenesis()
 	if err != nil {
 		t.Fatalf("GetBlockIndexFromGenesis() error = %v", err)
 	}
-	defer genesisIndex.Close()
+	defer genesisIndex.Destroy()
 
 	// Test getting genesis block height
 	height := genesisIndex.Height()
@@ -62,7 +62,7 @@ func TestChainstateManagerCreation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BlockIndex.Hash() error = %v", err)
 	}
-	defer genesisHash.Close()
+	defer genesisHash.Destroy()
 
 	hashBytes := genesisHash.Bytes()
 	if len(hashBytes) != 32 {
@@ -90,14 +90,14 @@ func TestLoadAndValidateBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewDefaultContext() error = %v", err)
 	}
-	defer ctx.Close()
+	defer ctx.Destroy()
 
 	// Create chainstate manager options
 	opts, err := NewChainstateManagerOptions(ctx, dataDir, blocksDir)
 	if err != nil {
 		t.Fatalf("NewChainstateManagerOptions() error = %v", err)
 	}
-	defer opts.Close()
+	defer opts.Destroy()
 
 	// Configure for in-memory operation
 	opts.SetWorkerThreads(1)
@@ -109,7 +109,7 @@ func TestLoadAndValidateBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewChainstateManager() error = %v", err)
 	}
-	defer manager.Close()
+	defer manager.Destroy()
 
 	// Initialize empty databases
 	err = manager.ImportBlocks(nil)
@@ -123,7 +123,7 @@ func TestLoadAndValidateBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetBlockIndexFromGenesis() error = %v", err)
 	}
-	defer genesisIndex.Close()
+	defer genesisIndex.Destroy()
 
 	height := genesisIndex.Height()
 	t.Logf("Genesis block height: %d", height)
@@ -137,14 +137,14 @@ func TestLoadAndValidateBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadBlockFromDisk() error = %v", err)
 	}
-	defer genesisBlock.Close()
+	defer genesisBlock.Destroy()
 
 	// Get block hash
 	blockHash, err := genesisBlock.Hash()
 	if err != nil {
 		t.Fatalf("Block.Hash() error = %v", err)
 	}
-	defer blockHash.Close()
+	defer blockHash.Destroy()
 	t.Logf("Genesis block hash: %x", ReverseBytes(blockHash.Bytes()))
 
 	// Test 3: Process/validate a new block
@@ -161,7 +161,7 @@ func TestLoadAndValidateBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewBlockFromRaw() error = %v", err)
 	}
-	defer testBlock.Close()
+	defer testBlock.Destroy()
 
 	// Process the block (validate it)
 	success, isNewBlock, err := manager.ProcessBlock(testBlock)
@@ -180,7 +180,7 @@ func TestLoadAndValidateBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetBlockIndexFromTip() error = %v", err)
 	}
-	defer tipIndex.Close()
+	defer tipIndex.Destroy()
 	t.Logf("Current tip height: %d", tipIndex.Height())
 
 	// Get block by height
@@ -188,13 +188,13 @@ func TestLoadAndValidateBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetBlockIndexFromHeight(0) error = %v", err)
 	}
-	defer blockAt0.Close()
+	defer blockAt0.Destroy()
 	t.Logf("Block at height 0: %d", blockAt0.Height())
 
 	// Test previous block navigation (should be nil for genesis)
 	prevBlock := genesisIndex.Previous()
 	if prevBlock != nil {
-		defer prevBlock.Close()
+		defer prevBlock.Destroy()
 		t.Error("Expected no previous block for genesis, but got one")
 	}
 
@@ -204,7 +204,7 @@ func TestLoadAndValidateBlock(t *testing.T) {
 		t.Fatalf("GetNextBlockIndex() error = %v", err)
 	}
 	if nextBlock != nil {
-		defer nextBlock.Close()
+		defer nextBlock.Destroy()
 		t.Logf("Next block height: %d", nextBlock.Height())
 	} else {
 		t.Log("No next block (genesis is tip)")

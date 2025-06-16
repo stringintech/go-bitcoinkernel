@@ -64,8 +64,8 @@ func (cp *ChainParameters) destroy() {
 	}
 }
 
-// Close explicitly destroys the chain parameters and removes the finalizer
-func (cp *ChainParameters) Close() {
+// Destroy explicitly destroys the chain parameters and removes the finalizer
+func (cp *ChainParameters) Destroy() {
 	runtime.SetFinalizer(cp, nil)
 	cp.destroy()
 }

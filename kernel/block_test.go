@@ -31,14 +31,14 @@ func TestBlockFromRaw(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewBlockFromRaw() error = %v", err)
 	}
-	defer block.Close()
+	defer block.Destroy()
 
 	// Test getting block hash
 	hash, err := block.Hash()
 	if err != nil {
 		t.Fatalf("Block.Hash() error = %v", err)
 	}
-	defer hash.Close()
+	defer hash.Destroy()
 
 	hashBytes := hash.Bytes()
 	if len(hashBytes) != 32 {

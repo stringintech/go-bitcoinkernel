@@ -7,7 +7,7 @@ func TestDefaultContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewDefaultContext() error = %v", err)
 	}
-	defer ctx.Close()
+	defer ctx.Destroy()
 
 	if !ctx.IsValid() {
 		t.Error("Context should be valid after creation")

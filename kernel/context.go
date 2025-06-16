@@ -43,8 +43,8 @@ func (opts *ContextOptions) destroy() {
 	}
 }
 
-// Close explicitly destroys the context options and removes the finalizer
-func (opts *ContextOptions) Close() {
+// Destroy explicitly destroys the context options and removes the finalizer
+func (opts *ContextOptions) Destroy() {
 	runtime.SetFinalizer(opts, nil)
 	opts.destroy()
 }
@@ -83,7 +83,7 @@ func NewDefaultContext() (*Context, error) {
 		return nil, err
 	}
 	// Safe to defer: C++ kernel copies data from options during context creation
-	defer opts.Close()
+	defer opts.Destroy()
 
 	// Create mainnet chain parameters
 	params, err := NewChainParameters(ChainTypeMainnet)
@@ -91,7 +91,7 @@ func NewDefaultContext() (*Context, error) {
 		return nil, err
 	}
 	// Safe to defer: C++ kernel copies chain params when set on options
-	defer params.Close()
+	defer params.Destroy()
 
 	// Set chain parameters on options (C++ makes internal copy)
 	opts.SetChainParams(params)
@@ -116,8 +116,8 @@ func (ctx *Context) destroy() {
 	}
 }
 
-// Close explicitly destroys the context and removes the finalizer
-func (ctx *Context) Close() {
+// Destroy explicitly destroys the context and removes the finalizer
+func (ctx *Context) Destroy() {
 	runtime.SetFinalizer(ctx, nil)
 	ctx.destroy()
 }
