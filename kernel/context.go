@@ -26,7 +26,9 @@ func NewContextOptions() (*ContextOptions, error) {
 	return opts, nil
 }
 
-// SetChainParams sets the chain parameters for these context options
+// SetChainParams sets the chain parameters for these context options.
+// The C++ kernel makes a copy of the chain parameters, so the caller can
+// safely free the chainParams object after this call returns.
 func (opts *ContextOptions) SetChainParams(chainParams *ChainParameters) {
 	if opts.ptr != nil && chainParams.ptr != nil {
 		C.kernel_context_options_set_chainparams(opts.ptr, chainParams.ptr)
@@ -52,7 +54,9 @@ type Context struct {
 	ptr *C.kernel_Context
 }
 
-// NewContext creates a new kernel context with the specified options
+// NewContext creates a new kernel context with the specified options.
+// The C++ kernel copies all necessary data from the options during context creation,
+// so the caller can safely free the options object after this call returns.
 func NewContext(options *ContextOptions) (*Context, error) {
 	if options == nil {
 		return nil, errors.New("context options cannot be nil")
@@ -68,13 +72,17 @@ func NewContext(options *ContextOptions) (*Context, error) {
 	return ctx, nil
 }
 
-// NewDefaultContext creates a new kernel context with default mainnet parameters
+// NewDefaultContext creates a new kernel context with default mainnet parameters.
+// The defer statements are safe here because the C++ kernel copies all necessary
+// data during context creation, allowing us to free the temporary options and
+// parameters objects immediately after the context is created.
 func NewDefaultContext() (*Context, error) {
 	// Create default options for mainnet
 	opts, err := NewContextOptions()
 	if err != nil {
 		return nil, err
 	}
+	// Safe to defer: C++ kernel copies data from options during context creation
 	defer opts.Close()
 
 	// Create mainnet chain parameters
@@ -82,12 +90,13 @@ func NewDefaultContext() (*Context, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Safe to defer: C++ kernel copies chain params when set on options
 	defer params.Close()
 
-	// Set chain parameters on options
+	// Set chain parameters on options (C++ makes internal copy)
 	opts.SetChainParams(params)
 
-	// Create context with configured options
+	// Create context with configured options (C++ copies all needed data)
 	return NewContext(opts)
 }
 

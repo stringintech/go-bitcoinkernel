@@ -12,7 +12,8 @@ import (
 
 // ChainstateManagerOptions wraps the C kernel_ChainstateManagerOptions
 type ChainstateManagerOptions struct {
-	ptr *C.kernel_ChainstateManagerOptions
+	ptr     *C.kernel_ChainstateManagerOptions
+	context *Context
 }
 
 // ChainstateManager wraps the C kernel_ChainstateManager
@@ -21,7 +22,8 @@ type ChainstateManager struct {
 	context *Context
 }
 
-// NewChainstateManagerOptions creates new chainstate manager options
+// NewChainstateManagerOptions creates new chainstate manager options.
+// The context must remain valid for the entire lifetime of the returned options.
 func NewChainstateManagerOptions(context *Context, dataDir, blocksDir string) (*ChainstateManagerOptions, error) {
 	if context == nil || context.ptr == nil {
 		return nil, ErrContextCreation
@@ -44,7 +46,10 @@ func NewChainstateManagerOptions(context *Context, dataDir, blocksDir string) (*
 		return nil, ErrChainstateManagerOptionsCreation
 	}
 
-	opts := &ChainstateManagerOptions{ptr: ptr}
+	opts := &ChainstateManagerOptions{
+		ptr:     ptr,
+		context: context,
+	}
 	runtime.SetFinalizer(opts, (*ChainstateManagerOptions).destroy)
 	return opts, nil
 }
@@ -87,6 +92,7 @@ func (opts *ChainstateManagerOptions) destroy() {
 	if opts.ptr != nil {
 		C.kernel_chainstate_manager_options_destroy(opts.ptr)
 		opts.ptr = nil
+		opts.context = nil
 	}
 }
 
@@ -96,7 +102,10 @@ func (opts *ChainstateManagerOptions) Close() {
 	opts.destroy()
 }
 
-// NewChainstateManager creates a new chainstate manager
+// NewChainstateManager creates a new chainstate manager.
+// The C++ ChainstateManager copies all necessary data from the options during construction,
+// so the caller can safely free the options object after this call returns successfully.
+// However, the context must remain valid for the entire lifetime of the returned ChainstateManager.
 func NewChainstateManager(context *Context, options *ChainstateManagerOptions) (*ChainstateManager, error) {
 	if context == nil || context.ptr == nil {
 		return nil, ErrContextCreation
