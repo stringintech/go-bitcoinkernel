@@ -17,4 +17,6 @@ var (
 	ErrInvalidBlockIndex                = errors.New("invalid block index")
 	ErrBlockProcessing                  = errors.New("failed to process block")
 	ErrBlockRead                        = errors.New("failed to read block from disk")
+	ErrInvalidCallback                  = errors.New("invalid callback function")
+	ErrLoggingConnectionCreation        = errors.New("failed to create logging connection")
 )
