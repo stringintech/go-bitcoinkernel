@@ -19,7 +19,6 @@ This document lists the remaining C API functions and data structures from `bitc
 ## Missing Data Structures
 
 ### Core Transaction Types
-- **`kernel_Transaction`** - Transaction handling
 - **`kernel_ScriptPubkey`** - Script public key operations  
 - **`kernel_TransactionOutput`** - Transaction output operations
 - **`kernel_BlockPointer`** - Non-owned block pointers (from callbacks)
@@ -27,10 +26,6 @@ This document lists the remaining C API functions and data structures from `bitc
 - **`kernel_ByteArray`** - Helper for serialized data
 
 ## Missing Functions by Category
-
-### Transaction Operations
-- [ ] `kernel_transaction_create()` - Create transaction from serialized data
-- [ ] `kernel_transaction_destroy()` - Cleanup transaction
 
 ### Script Operations
 - [ ] `kernel_script_pubkey_create()` - Create script pubkey
@@ -55,9 +50,6 @@ This document lists the remaining C API functions and data structures from `bitc
 - [ ] `kernel_get_undo_output_height_by_index()` - Get output block height
 - [ ] `kernel_get_undo_output_by_index()` - Get specific undo output
 - [ ] `kernel_block_undo_destroy()` - Cleanup undo data
-
-### Utility Operations
-- [ ] `kernel_byte_array_destroy()` - Cleanup byte arrays
 
 ### Callback Support
 - [ ] **Notification callbacks** - Full integration of kernel notification system

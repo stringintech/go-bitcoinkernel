@@ -19,4 +19,6 @@ var (
 	ErrBlockRead                        = errors.New("failed to read block from disk")
 	ErrInvalidCallback                  = errors.New("invalid callback function")
 	ErrLoggingConnectionCreation        = errors.New("failed to create logging connection")
+	ErrTransactionCreation              = errors.New("failed to create transaction from raw data")
+	ErrInvalidTransactionData           = errors.New("invalid transaction data")
 )
