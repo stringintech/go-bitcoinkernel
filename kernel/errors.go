@@ -21,4 +21,8 @@ var (
 	ErrLoggingConnectionCreation        = errors.New("failed to create logging connection")
 	ErrTransactionCreation              = errors.New("failed to create transaction from raw data")
 	ErrInvalidTransactionData           = errors.New("invalid transaction data")
+	ErrScriptPubkeyCreation             = errors.New("failed to create script pubkey from raw data")
+	ErrInvalidScriptPubkeyData          = errors.New("invalid script pubkey data")
+	ErrInvalidScriptPubkey              = errors.New("invalid script pubkey")
+	ErrScriptPubkeyDataCopy             = errors.New("failed to copy script pubkey data")
 )

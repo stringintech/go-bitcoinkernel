@@ -19,18 +19,13 @@ This document lists the remaining C API functions and data structures from `bitc
 ## Missing Data Structures
 
 ### Core Transaction Types
-- **`kernel_ScriptPubkey`** - Script public key operations  
 - **`kernel_TransactionOutput`** - Transaction output operations
 - **`kernel_BlockPointer`** - Non-owned block pointers (from callbacks)
 - **`kernel_BlockUndo`** - Block undo data operations
-- **`kernel_ByteArray`** - Helper for serialized data
 
 ## Missing Functions by Category
 
 ### Script Operations
-- [ ] `kernel_script_pubkey_create()` - Create script pubkey
-- [ ] `kernel_script_pubkey_destroy()` - Cleanup script pubkey  
-- [ ] `kernel_copy_script_pubkey_data()` - Get serialized script data
 - [ ] `kernel_verify_script()` - **Script verification (IMPORTANT!)**
 
 ### Transaction Output Operations
