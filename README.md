@@ -65,7 +65,7 @@ In your Go project directory, add a replace directive to point to your local cop
 go mod init your-project-name
 
 # Add replace directive to use local go-bitcoinkernel
-go mod edit -replace github.com/stringintech/go-bitcoinkernel=../path/to/go-bitcoinkernel
+go mod edit -replace github.com/stringintech/go-bitcoinkernel=/path/to/go-bitcoinkernel
 
 # Add the dependency
 go get github.com/stringintech/go-bitcoinkernel/kernel
@@ -78,9 +78,9 @@ module your-project-name
 
 go 1.23.3
 
-require github.com/stringintech/go -bitcoinkernel/kernel v0.0.0-00010101000000-000000000000
+require github.com/stringintech/go-bitcoinkernel/kernel v0.0.0-00010101000000-000000000000
 
-replace github.com/stringintech/go -bitcoinkernel = >../path/to/go-bitcoinkernel
+replace github.com/stringintech/go-bitcoinkernel => /path/to/go-bitcoinkernel
 ```
 
 ## Important Notes
@@ -89,3 +89,7 @@ replace github.com/stringintech/go -bitcoinkernel = >../path/to/go-bitcoinkernel
 
 The library handles memory management automatically through Go's finalizers, but it's highly recommended to explicitly
 call `Destroy()` methods when you're done with objects to free resources immediately.
+
+### Runtime Dependencies
+
+Your Go application will have a runtime dependency on the shared `libbitcoinkernel` library produced by `make build-kernel` in `/path/to/go-bitcoinkernel/depend/bitcoin/build`. Do not delete or move these built library files as your application needs them to run.
