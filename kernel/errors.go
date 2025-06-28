@@ -25,4 +25,7 @@ var (
 	ErrInvalidScriptPubkeyData          = errors.New("invalid script pubkey data")
 	ErrInvalidScriptPubkey              = errors.New("invalid script pubkey")
 	ErrScriptPubkeyDataCopy             = errors.New("failed to copy script pubkey data")
+	ErrTransactionOutputCreation        = errors.New("failed to create transaction output")
+	ErrInvalidTransactionOutput         = errors.New("invalid transaction output")
+	ErrScriptPubkeyCopyFromOutput       = errors.New("failed to copy script pubkey from output")
 )

@@ -1,25 +1,10 @@
 # Bitcoin Kernel Go Wrapper - TODO
 
-This document lists the remaining C API functions and data structures from `bitcoinkernel.h` that haven't been wrapped yet in the Go kernel package.
-
-## Current Status
-
-✅ **Implemented:**
-- Chain parameters and context management
-- Block and block index operations
-- Chainstate manager functionality
-- Basic logging support
-
-❌ **Missing:**
-- Transaction processing pipeline
-- Script validation system
-- Block undo data handling
-- Complete callback system integration
+This document lists the remaining C API functions and data structures from [`bitcoinkernel.h`](./depend/bitcoin/src/kernel/bitcoinkernel.h) that haven't been wrapped yet in the Go kernel package.
 
 ## Missing Data Structures
 
 ### Core Transaction Types
-- **`kernel_TransactionOutput`** - Transaction output operations
 - **`kernel_BlockPointer`** - Non-owned block pointers (from callbacks)
 - **`kernel_BlockUndo`** - Block undo data operations
 
@@ -27,12 +12,6 @@ This document lists the remaining C API functions and data structures from `bitc
 
 ### Script Operations
 - [ ] `kernel_verify_script()` - **Script verification (IMPORTANT!)**
-
-### Transaction Output Operations
-- [ ] `kernel_transaction_output_create()` - Create transaction output
-- [ ] `kernel_transaction_output_destroy()` - Cleanup transaction output
-- [ ] `kernel_copy_script_pubkey_from_output()` - Extract script from output
-- [ ] `kernel_get_transaction_output_amount()` - Get output amount
 
 ### Block Operations (Additional)
 - [ ] `kernel_block_pointer_get_hash()` - Get hash from block pointer
