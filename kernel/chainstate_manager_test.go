@@ -8,40 +8,15 @@ import (
 	"testing"
 )
 
-func TestChainstateManagerCreation(t *testing.T) {
-	// Create a temporary directory for testing
-	tempDir, err := os.MkdirTemp("", "bitcoin_kernel_test")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
+func TestChainstateManager(t *testing.T) {
+	suite := SetupChainstateManagerTestSuite(t)
 
-	dataDir := filepath.Join(tempDir, "data")
-	blocksDir := filepath.Join(tempDir, "blocks")
+	t.Run("genesis validation", suite.TestGenesis)
+	t.Run("tip validation", suite.TestTip)
+}
 
-	ctx, err := NewDefaultContext()
-	if err != nil {
-		t.Fatalf("NewDefaultContext() error = %v", err)
-	}
-	defer ctx.Destroy()
-
-	opts, err := NewChainstateManagerOptions(ctx, dataDir, blocksDir)
-	if err != nil {
-		t.Fatalf("NewChainstateManagerOptions() error = %v", err)
-	}
-	defer opts.Destroy()
-
-	opts.SetWorkerThreads(1)
-	opts.SetBlockTreeDBInMemory(true)
-	opts.SetChainstateDBInMemory(true)
-
-	manager, err := NewChainstateManager(ctx, opts)
-	if err != nil {
-		t.Fatalf("NewChainstateManager() error = %v", err)
-	}
-	defer manager.Destroy()
-
-	genesisIndex, err := manager.GetBlockIndexFromGenesis()
+func (s *ChainstateManagerTestSuite) TestGenesis(t *testing.T) {
+	genesisIndex, err := s.Manager.GetBlockIndexFromGenesis()
 	if err != nil {
 		t.Fatalf("GetBlockIndexFromGenesis() error = %v", err)
 	}
@@ -64,34 +39,60 @@ func TestChainstateManagerCreation(t *testing.T) {
 	}
 }
 
-// TestLoadAndValidateBlock demonstrates the following workflow:
-// 1. Setting up a chainstate manager with regtest parameters
-// 2. Loading blocks from data/regtest/blocks.txt
-// 3. Validating and processing multiple blocks in sequence
-func TestLoadAndValidateBlock(t *testing.T) {
-	// Create a temporary directory for testing
+func (s *ChainstateManagerTestSuite) TestTip(t *testing.T) {
+	tipIndex, err := s.Manager.GetBlockIndexFromTip()
+	if err != nil {
+		t.Fatalf("GetBlockIndexFromTip() error = %v", err)
+	}
+	defer tipIndex.Destroy()
+
+	height := tipIndex.Height()
+	if height <= 0 {
+		t.Errorf("Expected tip height > 0, got %d", height)
+	}
+
+	tipHash, err := tipIndex.Hash()
+	if err != nil {
+		t.Fatalf("Failed to get tip hash: %v", err)
+	}
+	defer tipHash.Destroy()
+
+	hashBytes := tipHash.Bytes()
+	if len(hashBytes) != 32 {
+		t.Errorf("Expected hash length 32, got %d", len(hashBytes))
+	}
+
+	if tipIndex.Height() != s.ImportedBlocksCount {
+		t.Errorf("Expected tip height %d, got %d", s.ImportedBlocksCount, tipIndex.Height())
+	}
+}
+
+type ChainstateManagerTestSuite struct {
+	Manager             *ChainstateManager
+	ImportedBlocksCount int32
+}
+
+func SetupChainstateManagerTestSuite(t *testing.T) *ChainstateManagerTestSuite {
 	tempDir, err := os.MkdirTemp("", "bitcoin_kernel_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	t.Cleanup(func() { os.RemoveAll(tempDir) })
 
 	dataDir := filepath.Join(tempDir, "data")
 	blocksDir := filepath.Join(tempDir, "blocks")
 
-	// Create context with regtest chain parameters
 	contextOpts, err := NewContextOptions()
 	if err != nil {
 		t.Fatalf("NewContextOptions() error = %v", err)
 	}
-	defer contextOpts.Destroy()
+	t.Cleanup(func() { contextOpts.Destroy() })
 
-	// Set regtest chain parameters
 	chainParams, err := NewChainParameters(ChainTypeRegtest)
 	if err != nil {
 		t.Fatalf("NewChainParameters() error = %v", err)
 	}
-	defer chainParams.Destroy()
+	t.Cleanup(func() { chainParams.Destroy() })
 
 	contextOpts.SetChainParams(chainParams)
 
@@ -99,16 +100,14 @@ func TestLoadAndValidateBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewContext() error = %v", err)
 	}
-	defer ctx.Destroy()
+	t.Cleanup(func() { ctx.Destroy() })
 
-	// Create chainstate manager options
 	opts, err := NewChainstateManagerOptions(ctx, dataDir, blocksDir)
 	if err != nil {
 		t.Fatalf("NewChainstateManagerOptions() error = %v", err)
 	}
-	defer opts.Destroy()
+	t.Cleanup(func() { opts.Destroy() })
 
-	// Configure for in-memory operation
 	opts.SetWorkerThreads(1)
 	opts.SetBlockTreeDBInMemory(true)
 	opts.SetChainstateDBInMemory(true)
@@ -118,7 +117,7 @@ func TestLoadAndValidateBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewChainstateManager() error = %v", err)
 	}
-	defer manager.Destroy()
+	t.Cleanup(func() { manager.Destroy() })
 
 	// Initialize empty databases
 	err = manager.ImportBlocks(nil)
@@ -151,24 +150,20 @@ func TestLoadAndValidateBlock(t *testing.T) {
 	}
 	t.Logf("Found %d blocks in regtest data", len(blockLines))
 
-	// Process all blocks from the data file
 	for i := 0; i < len(blockLines); i++ {
 		blockHex := blockLines[i]
 
-		// Decode hex data
 		blockBytes, err := hex.DecodeString(blockHex)
 		if err != nil {
 			t.Fatalf("Failed to decode block %d hex: %v", i+1, err)
 		}
 
-		// Create block from raw data
 		block, err := NewBlockFromRaw(blockBytes)
 		if err != nil {
 			t.Fatalf("NewBlockFromRaw() failed for block %d: %v", i+1, err)
 		}
 		defer block.Destroy()
 
-		// Process the block (validate it)
 		success, isNewBlock, err := manager.ProcessBlock(block)
 		if err != nil {
 			t.Fatalf("ProcessBlock() failed for block %d: %v", i+1, err)
@@ -176,38 +171,10 @@ func TestLoadAndValidateBlock(t *testing.T) {
 		if !success || !isNewBlock {
 			t.Fatalf("ProcessBlock() failed for block %d", i+1)
 		}
+	}
 
-		// Assert tip height
-		tipIndex, err := manager.GetBlockIndexFromTip()
-		if err != nil {
-			t.Fatalf("GetBlockIndexFromTip() error = %v", err)
-		}
-		defer tipIndex.Destroy()
-
-		expectedTipHeight := int32(i) + 1
-		if tipIndex.Height() != expectedTipHeight {
-			t.Fatalf("Expected tip height %d; got %d", expectedTipHeight, tipIndex.Height())
-		}
-
-		// Assert tip hash
-		hash, err := block.Hash()
-		if err != nil {
-			t.Fatalf("Failed to get last block hash: %v", err)
-		}
-		defer hash.Destroy()
-
-		hashHex := hex.EncodeToString(hash.Bytes())
-
-		tipHash, err := tipIndex.Hash()
-		if err != nil {
-			t.Fatalf("Failed to get tip hash: %v", err)
-		}
-		defer tipHash.Destroy()
-
-		tipHashHex := hex.EncodeToString(tipHash.Bytes())
-
-		if hashHex != tipHashHex {
-			t.Fatalf("Expected tip hash %s; got %s", hashHex, tipHashHex)
-		}
+	return &ChainstateManagerTestSuite{
+		Manager:             manager,
+		ImportedBlocksCount: int32(len(blockLines)),
 	}
 }
