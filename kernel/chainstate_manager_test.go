@@ -13,6 +13,7 @@ func TestChainstateManager(t *testing.T) {
 
 	t.Run("genesis validation", suite.TestGenesis)
 	t.Run("tip validation", suite.TestTip)
+	t.Run("block undo", suite.TestBlockUndo)
 }
 
 func (s *ChainstateManagerTestSuite) TestGenesis(t *testing.T) {
@@ -64,6 +65,44 @@ func (s *ChainstateManagerTestSuite) TestTip(t *testing.T) {
 
 	if tipIndex.Height() != s.ImportedBlocksCount {
 		t.Errorf("Expected tip height %d, got %d", s.ImportedBlocksCount, tipIndex.Height())
+	}
+}
+
+func (s *ChainstateManagerTestSuite) TestBlockUndo(t *testing.T) {
+	blockIndex, err := s.Manager.GetBlockIndexFromHeight(202)
+	if err != nil {
+		t.Fatalf("GetBlockIndexFromHeight(202) error = %v", err)
+	}
+	defer blockIndex.Destroy()
+
+	blockUndo, err := s.Manager.ReadBlockUndoFromDisk(blockIndex)
+	if err != nil {
+		t.Fatalf("ReadBlockUndoFromDisk() error = %v", err)
+	}
+	defer blockUndo.Destroy()
+
+	// Test transaction count
+	txCount := blockUndo.Size()
+	if txCount != 20 {
+		t.Errorf("Expected 20 transactions, got %d", txCount)
+	}
+
+	// Verify each transaction is a valid TransactionUndo
+	for i := uint64(0); i < txCount; i++ {
+		undoSize := blockUndo.GetTransactionUndoSize(i)
+		if undoSize != 1 {
+			t.Errorf("Expected transaction undo size 1, got %d", undoSize)
+		}
+
+		_, err := blockUndo.GetUndoOutputByIndex(i, 0)
+		if err != nil {
+			t.Fatalf("GetUndoOutputByIndex() error = %v", err)
+		}
+
+		height := blockUndo.GetUndoOutputHeightByIndex(i, 0)
+		if height <= 0 {
+			t.Fatalf("GetUndoOutputHeightByIndex() height %d, want > 0", height)
+		}
 	}
 }
 

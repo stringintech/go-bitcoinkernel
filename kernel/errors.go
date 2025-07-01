@@ -28,4 +28,7 @@ var (
 	ErrTransactionOutputCreation        = errors.New("failed to create transaction output")
 	ErrInvalidTransactionOutput         = errors.New("invalid transaction output")
 	ErrScriptPubkeyCopyFromOutput       = errors.New("failed to copy script pubkey from output")
+	ErrBlockUndoRead                    = errors.New("failed to read block undo from disk")
+	ErrInvalidBlockUndo                 = errors.New("invalid block undo")
+	ErrUndoOutputRetrieval              = errors.New("failed to retrieve undo output")
 )

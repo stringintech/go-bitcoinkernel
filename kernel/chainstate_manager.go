@@ -60,6 +60,25 @@ func (cm *ChainstateManager) ReadBlockFromDisk(blockIndex *BlockIndex) (*Block, 
 	return block, nil
 }
 
+// ReadBlockUndoFromDisk reads block undo data from disk for a given block index
+func (cm *ChainstateManager) ReadBlockUndoFromDisk(blockIndex *BlockIndex) (*BlockUndo, error) {
+	if cm.ptr == nil || cm.context == nil || cm.context.ptr == nil {
+		return nil, ErrChainstateManagerCreation
+	}
+	if blockIndex == nil || blockIndex.ptr == nil {
+		return nil, ErrInvalidBlockIndex
+	}
+
+	ptr := C.kernel_read_block_undo_from_disk(cm.context.ptr, cm.ptr, blockIndex.ptr)
+	if ptr == nil {
+		return nil, ErrBlockUndoRead
+	}
+
+	blockUndo := &BlockUndo{ptr: ptr}
+	runtime.SetFinalizer(blockUndo, (*BlockUndo).destroy)
+	return blockUndo, nil
+}
+
 // ProcessBlock processes and validates a block
 func (cm *ChainstateManager) ProcessBlock(block *Block) (bool, bool, error) {
 	if cm.ptr == nil || cm.context == nil || cm.context.ptr == nil {
