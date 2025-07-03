@@ -9,9 +9,18 @@ import (
 	"unsafe"
 )
 
+var _ cManagedResource = &BlockHash{}
+
 // BlockHash wraps the C kernel_BlockHash
 type BlockHash struct {
 	ptr *C.kernel_BlockHash
+}
+
+// Bytes returns the raw hash bytes
+func (bh *BlockHash) Bytes() []byte {
+	checkReady(bh)
+	// BlockHash is a 32-byte array in the C struct
+	return C.GoBytes(unsafe.Pointer(&bh.ptr.hash[0]), 32)
 }
 
 func (bh *BlockHash) destroy() {
@@ -26,11 +35,10 @@ func (bh *BlockHash) Destroy() {
 	bh.destroy()
 }
 
-// Bytes returns the raw hash bytes
-func (bh *BlockHash) Bytes() []byte {
-	if bh.ptr == nil {
-		return nil
-	}
-	// BlockHash is a 32-byte array in the C struct
-	return C.GoBytes(unsafe.Pointer(&bh.ptr.hash[0]), 32)
+func (bh *BlockHash) isReady() bool {
+	return bh != nil && bh.ptr != nil
+}
+
+func (bh *BlockHash) uninitializedError() error {
+	return ErrBlockHashUninitialized
 }

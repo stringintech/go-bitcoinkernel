@@ -9,6 +9,8 @@ import (
 	"unsafe"
 )
 
+var _ cManagedResource = &ScriptPubkey{}
+
 // ScriptPubkey wraps the C kernel_ScriptPubkey
 type ScriptPubkey struct {
 	ptr *C.kernel_ScriptPubkey
@@ -17,12 +19,11 @@ type ScriptPubkey struct {
 // NewScriptPubkeyFromRaw creates a new script pubkey from raw serialized data
 func NewScriptPubkeyFromRaw(rawScriptPubkey []byte) (*ScriptPubkey, error) {
 	if len(rawScriptPubkey) == 0 {
-		return nil, ErrInvalidScriptPubkeyData
+		return nil, ErrEmptyScriptPubkeyData
 	}
-
 	ptr := C.kernel_script_pubkey_create((*C.uchar)(unsafe.Pointer(&rawScriptPubkey[0])), C.size_t(len(rawScriptPubkey)))
 	if ptr == nil {
-		return nil, ErrScriptPubkeyCreation
+		return nil, ErrKernelScriptPubkeyCreate
 	}
 
 	scriptPubkey := &ScriptPubkey{ptr: ptr}
@@ -32,13 +33,11 @@ func NewScriptPubkeyFromRaw(rawScriptPubkey []byte) (*ScriptPubkey, error) {
 
 // Data returns the serialized script pubkey data
 func (s *ScriptPubkey) Data() ([]byte, error) {
-	if s.ptr == nil {
-		return nil, ErrInvalidScriptPubkey
-	}
+	checkReady(s)
 
 	byteArray := C.kernel_copy_script_pubkey_data(s.ptr)
 	if byteArray == nil {
-		return nil, ErrScriptPubkeyDataCopy
+		return nil, ErrKernelCopyScriptPubkeyData
 	}
 	defer C.kernel_byte_array_destroy(byteArray)
 
@@ -62,4 +61,12 @@ func (s *ScriptPubkey) destroy() {
 func (s *ScriptPubkey) Destroy() {
 	runtime.SetFinalizer(s, nil)
 	s.destroy()
+}
+
+func (s *ScriptPubkey) isReady() bool {
+	return s != nil && s.ptr != nil
+}
+
+func (s *ScriptPubkey) uninitializedError() error {
+	return ErrScriptPubkeyUninitialized
 }

@@ -6,16 +6,7 @@ package kernel
 import "C"
 import "runtime"
 
-// ChainType represents the Bitcoin network type
-type ChainType int
-
-const (
-	ChainTypeMainnet ChainType = iota
-	ChainTypeTestnet
-	ChainTypeTestnet4
-	ChainTypeSignet
-	ChainTypeRegtest
-)
+var _ cManagedResource = &ChainParameters{}
 
 // ChainParameters wraps the C kernel_ChainParameters
 type ChainParameters struct {
@@ -42,7 +33,7 @@ func NewChainParameters(chainType ChainType) (*ChainParameters, error) {
 
 	ptr := C.kernel_chain_parameters_create(cChainType)
 	if ptr == nil {
-		return nil, ErrChainParametersCreation
+		return nil, ErrKernelChainParametersCreate
 	}
 
 	cp := &ChainParameters{ptr: ptr}
@@ -61,3 +52,22 @@ func (cp *ChainParameters) Destroy() {
 	runtime.SetFinalizer(cp, nil)
 	cp.destroy()
 }
+
+func (cp *ChainParameters) isReady() bool {
+	return cp != nil && cp.ptr != nil
+}
+
+func (cp *ChainParameters) uninitializedError() error {
+	return ErrChainParametersUninitialized
+}
+
+// ChainType represents the Bitcoin network type
+type ChainType int
+
+const (
+	ChainTypeMainnet ChainType = iota
+	ChainTypeTestnet
+	ChainTypeTestnet4
+	ChainTypeSignet
+	ChainTypeRegtest
+)

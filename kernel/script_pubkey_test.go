@@ -9,8 +9,8 @@ import (
 func TestInvalidScriptPubkeyData(t *testing.T) {
 	// Test with empty data
 	_, err := NewScriptPubkeyFromRaw([]byte{})
-	if !errors.Is(err, ErrInvalidScriptPubkeyData) {
-		t.Errorf("Expected ErrInvalidScriptPubkeyData, got %v", err)
+	if !errors.Is(err, ErrEmptyScriptPubkeyData) {
+		t.Errorf("Expected ErrEmptyScriptPubkeyData, got %v", err)
 	}
 }
 

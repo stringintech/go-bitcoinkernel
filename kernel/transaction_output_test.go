@@ -8,13 +8,13 @@ import (
 
 func TestInvalidTransactionOutput(t *testing.T) {
 	_, err := NewTransactionOutput(nil, 1000)
-	if !errors.Is(err, ErrInvalidScriptPubkey) {
-		t.Errorf("Expected ErrInvalidScriptPubkey, got %v", err)
+	if !errors.Is(err, ErrScriptPubkeyUninitialized) {
+		t.Errorf("Expected ErrScriptPubkeyUninitialized, got %v", err)
 	}
 
 	_, err = NewTransactionOutput(&ScriptPubkey{ptr: nil}, 1000)
-	if !errors.Is(err, ErrInvalidScriptPubkey) {
-		t.Errorf("Expected ErrInvalidScriptPubkey, got %v", err)
+	if !errors.Is(err, ErrScriptPubkeyUninitialized) {
+		t.Errorf("Expected ErrScriptPubkeyUninitialized, got %v", err)
 	}
 }
 
@@ -62,19 +62,5 @@ func TestTransactionOutputCreation(t *testing.T) {
 	scriptHexGot := hex.EncodeToString(scriptData)
 	if scriptHexGot != scriptHex {
 		t.Errorf("Expected script hex: %s, got %s", scriptHex, scriptHexGot)
-	}
-}
-
-func TestTransactionOutputNilOperations(t *testing.T) {
-	output := &TransactionOutput{ptr: nil}
-
-	amount := output.Amount()
-	if amount != 0 {
-		t.Errorf("Expected amount 0 for nil ptr, got %d", amount)
-	}
-
-	_, err := output.ScriptPubkey()
-	if !errors.Is(err, ErrInvalidTransactionOutput) {
-		t.Errorf("Expected ErrInvalidTransactionOutput, got %v", err)
 	}
 }

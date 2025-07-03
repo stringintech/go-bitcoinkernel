@@ -1,7 +1,6 @@
 package kernel
 
 import (
-	"errors"
 	"testing"
 )
 
@@ -35,7 +34,7 @@ func TestNewContext(t *testing.T) {
 				return nil
 			},
 			wantErr: true,
-			errType: errors.New("context options cannot be nil"),
+			errType: ErrContextOptionsUninitialized,
 		},
 	}
 
@@ -94,25 +93,5 @@ func TestNewDefaultContext(t *testing.T) {
 
 	if ctx.ptr == nil {
 		t.Error("Context has nil pointer")
-	}
-}
-
-func TestContextInterrupt(t *testing.T) {
-	ctx, err := NewDefaultContext()
-	if err != nil {
-		t.Fatalf("Failed to create default context: %v", err)
-	}
-	defer ctx.Destroy()
-
-	// Test interrupt on valid context
-	result := ctx.Interrupt()
-	// Result can be true or false, both could be valid
-	t.Logf("Context interrupt result: %v", result)
-
-	// Destroy and test interrupt on destroyed context
-	ctx.Destroy()
-	result = ctx.Interrupt()
-	if result {
-		t.Error("Interrupt() should return false after context is destroyed")
 	}
 }

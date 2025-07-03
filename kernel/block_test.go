@@ -9,14 +9,14 @@ import (
 func TestInvalidBlockData(t *testing.T) {
 	// Test with empty data
 	_, err := NewBlockFromRaw([]byte{})
-	if !errors.Is(err, ErrInvalidBlockData) {
-		t.Errorf("Expected ErrInvalidBlockData, got %v", err)
+	if !errors.Is(err, ErrEmptyBlockData) {
+		t.Errorf("Expected ErrEmptyBlockData, got %v", err)
 	}
 
 	// Test with invalid data
 	_, err = NewBlockFromRaw([]byte{0x00, 0x01, 0x02})
-	if !errors.Is(err, ErrBlockCreation) {
-		t.Errorf("Expected ErrBlockCreation, got %v", err)
+	if !errors.Is(err, ErrKernelBlockCreate) {
+		t.Errorf("Expected ErrKernelBlockCreate, got %v", err)
 	}
 }
 

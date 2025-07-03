@@ -5,9 +5,10 @@ package kernel
 */
 import "C"
 import (
-	"errors"
 	"runtime"
 )
+
+var _ cManagedResource = &Context{}
 
 // Context wraps the C kernel_Context
 // Once other validation objects are instantiated from it, the context needs to be kept in
@@ -22,13 +23,13 @@ type Context struct {
 // Kernel copies all necessary data from the options during context creation,
 // so the caller can safely free the options object after this call returns.
 func NewContext(options *ContextOptions) (*Context, error) {
-	if options == nil {
-		return nil, errors.New("context options cannot be nil")
+	if err := validateReady(options); err != nil {
+		return nil, err
 	}
 
 	ptr := C.kernel_context_create(options.ptr)
 	if ptr == nil {
-		return nil, ErrContextCreation
+		return nil, ErrKernelContextCreate
 	}
 
 	ctx := &Context{ptr: ptr}
@@ -59,9 +60,7 @@ func NewDefaultContext() (*Context, error) {
 
 // Interrupt can be used to halt long-running validation functions
 func (ctx *Context) Interrupt() bool {
-	if ctx.ptr == nil {
-		return false
-	}
+	checkReady(ctx)
 	return bool(C.kernel_context_interrupt(ctx.ptr))
 }
 
@@ -75,4 +74,12 @@ func (ctx *Context) destroy() {
 func (ctx *Context) Destroy() {
 	runtime.SetFinalizer(ctx, nil)
 	ctx.destroy()
+}
+
+func (ctx *Context) isReady() bool {
+	return ctx != nil && ctx.ptr != nil
+}
+
+func (ctx *Context) uninitializedError() error {
+	return ErrContextUninitialized
 }

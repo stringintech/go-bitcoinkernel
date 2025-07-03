@@ -8,6 +8,8 @@ import (
 	"runtime"
 )
 
+var _ cManagedResource = &ContextOptions{}
+
 // ContextOptions wraps the C kernel_ContextOptions
 type ContextOptions struct {
 	ptr *C.kernel_ContextOptions
@@ -16,7 +18,7 @@ type ContextOptions struct {
 func NewContextOptions() (*ContextOptions, error) {
 	ptr := C.kernel_context_options_create()
 	if ptr == nil {
-		return nil, ErrContextOptionsCreation
+		return nil, ErrKernelContextOptionsCreate
 	}
 
 	opts := &ContextOptions{ptr: ptr}
@@ -28,11 +30,9 @@ func NewContextOptions() (*ContextOptions, error) {
 // Kernel makes a copy of the chain parameters, so the caller can
 // safely free the chainParams object after this call returns.
 func (opts *ContextOptions) SetChainParams(chainParams *ChainParameters) {
-	if opts.ptr == nil {
-		panic("ContextOptions pointer is nil")
-	}
-	if chainParams.ptr == nil {
-		panic("ChainParameters pointer is nil")
+	checkReady(opts)
+	if chainParams == nil || chainParams.ptr == nil {
+		panic(ErrChainParametersUninitialized)
 	}
 	C.kernel_context_options_set_chainparams(opts.ptr, chainParams.ptr)
 }
@@ -47,4 +47,12 @@ func (opts *ContextOptions) destroy() {
 func (opts *ContextOptions) Destroy() {
 	runtime.SetFinalizer(opts, nil)
 	opts.destroy()
+}
+
+func (opts *ContextOptions) isReady() bool {
+	return opts != nil && opts.ptr != nil
+}
+
+func (opts *ContextOptions) uninitializedError() error {
+	return ErrContextOptionsUninitialized
 }

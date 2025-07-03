@@ -23,43 +23,10 @@ import (
 	"unsafe"
 )
 
-// LogLevel represents the logging level
-type LogLevel int
-
-const (
-	LogLevelTrace LogLevel = iota
-	LogLevelDebug
-	LogLevelInfo
-)
-
-// LogCategory represents a logging category
-type LogCategory int
-
-const (
-	LogAll LogCategory = iota
-	LogBench
-	LogBlockStorage
-	LogCoinDB
-	LogLevelDB
-	LogMempool
-	LogPrune
-	LogRand
-	LogReindex
-	LogValidation
-	LogKernel
-)
-
 // LogCallback is the Go callback function type for log messages.
 type LogCallback func(message string)
 
-// LoggingOptions configures the format of log messages
-type LoggingOptions struct {
-	LogTimestamps            bool // Prepend a timestamp to log messages
-	LogTimeMicros            bool // Log timestamps in microsecond precision
-	LogThreadNames           bool // Prepend the name of the thread to log messages
-	LogSourceLocations       bool // Prepend the source location to log messages
-	AlwaysPrintCategoryLevel bool // Prepend the log category and level to log messages
-}
+var _ cManagedResource = &LoggingConnection{}
 
 // LoggingConnection wraps the C kernel_LoggingConnection.
 // Functions changing the logging settings are global and change
@@ -84,7 +51,7 @@ func go_log_callback_bridge(user_data unsafe.Pointer, message *C.char, message_l
 
 func NewLoggingConnection(callback LogCallback, options LoggingOptions) (*LoggingConnection, error) {
 	if callback == nil {
-		return nil, ErrInvalidCallback
+		return nil, ErrLoggingConnectionUninitialized //FIXME
 	}
 
 	// Create a handle for the callback - this prevents garbage collection
@@ -102,7 +69,7 @@ func NewLoggingConnection(callback LogCallback, options LoggingOptions) (*Loggin
 	ptr := C.create_logging_connection_wrapper(C.uintptr_t(handle), cOptions)
 	if ptr == nil {
 		handle.Delete()
-		return nil, ErrLoggingConnectionCreation
+		return nil, ErrKernelLoggingConnectionCreate
 	}
 
 	connection := &LoggingConnection{
@@ -129,6 +96,14 @@ func (lc *LoggingConnection) destroy() {
 func (lc *LoggingConnection) Destroy() {
 	runtime.SetFinalizer(lc, nil)
 	lc.destroy()
+}
+
+func (lc *LoggingConnection) isReady() bool {
+	return lc != nil && lc.ptr != nil && lc.handle != 0
+}
+
+func (lc *LoggingConnection) uninitializedError() error {
+	return ErrLoggingConnectionUninitialized
 }
 
 // DisableLogging permanently disables the global internal logger.
@@ -159,4 +134,39 @@ func DisableLogCategory(category LogCategory) {
 	loggingMutex.Lock()
 	defer loggingMutex.Unlock()
 	C.kernel_disable_log_category(C.kernel_LogCategory(category))
+}
+
+// LogLevel represents the logging level
+type LogLevel int
+
+const (
+	LogLevelTrace LogLevel = iota
+	LogLevelDebug
+	LogLevelInfo
+)
+
+// LogCategory represents a logging category
+type LogCategory int
+
+const (
+	LogAll LogCategory = iota
+	LogBench
+	LogBlockStorage
+	LogCoinDB
+	LogLevelDB
+	LogMempool
+	LogPrune
+	LogRand
+	LogReindex
+	LogValidation
+	LogKernel
+)
+
+// LoggingOptions configures the format of log messages
+type LoggingOptions struct {
+	LogTimestamps            bool // Prepend a timestamp to log messages
+	LogTimeMicros            bool // Log timestamps in microsecond precision
+	LogThreadNames           bool // Prepend the name of the thread to log messages
+	LogSourceLocations       bool // Prepend the source location to log messages
+	AlwaysPrintCategoryLevel bool // Prepend the log category and level to log messages
 }

@@ -9,6 +9,8 @@ import (
 	"unsafe"
 )
 
+var _ cManagedResource = &Block{}
+
 // Block wraps the C kernel_Block
 type Block struct {
 	ptr *C.kernel_Block
@@ -17,27 +19,27 @@ type Block struct {
 // NewBlockFromRaw creates a new block from raw serialized data
 func NewBlockFromRaw(rawBlock []byte) (*Block, error) {
 	if len(rawBlock) == 0 {
-		return nil, ErrInvalidBlockData
+		return nil, ErrEmptyBlockData
 	}
-
 	ptr := C.kernel_block_create((*C.uchar)(unsafe.Pointer(&rawBlock[0])), C.size_t(len(rawBlock)))
 	if ptr == nil {
-		return nil, ErrBlockCreation
+		return nil, ErrKernelBlockCreate
 	}
+	return newBlockFromPtr(ptr), nil
+}
 
+func newBlockFromPtr(ptr *C.kernel_Block) *Block {
 	block := &Block{ptr: ptr}
 	runtime.SetFinalizer(block, (*Block).destroy)
-	return block, nil
+	return block
 }
 
 func (b *Block) Hash() (*BlockHash, error) {
-	if b.ptr == nil {
-		return nil, ErrInvalidBlock
-	}
+	checkReady(b)
 
 	ptr := C.kernel_block_get_hash(b.ptr)
 	if ptr == nil {
-		return nil, ErrHashCalculation
+		return nil, ErrKernelBlockGetHash
 	}
 
 	hash := &BlockHash{ptr: ptr}
@@ -47,13 +49,11 @@ func (b *Block) Hash() (*BlockHash, error) {
 
 // Data returns the serialized block data
 func (b *Block) Data() ([]byte, error) {
-	if b.ptr == nil {
-		return nil, ErrInvalidBlock
-	}
+	checkReady(b)
 
 	byteArray := C.kernel_copy_block_data(b.ptr)
 	if byteArray == nil {
-		return nil, ErrBlockDataCopy
+		return nil, ErrKernelCopyBlockData
 	}
 	defer C.kernel_byte_array_destroy(byteArray)
 
@@ -77,4 +77,12 @@ func (b *Block) destroy() {
 func (b *Block) Destroy() {
 	runtime.SetFinalizer(b, nil)
 	b.destroy()
+}
+
+func (b *Block) isReady() bool {
+	return b != nil && b.ptr != nil
+}
+
+func (b *Block) uninitializedError() error {
+	return ErrBlockUninitialized
 }

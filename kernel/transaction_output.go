@@ -8,19 +8,21 @@ import (
 	"runtime"
 )
 
+var _ cManagedResource = &TransactionOutput{}
+
 // TransactionOutput wraps the C kernel_TransactionOutput
 type TransactionOutput struct {
 	ptr *C.kernel_TransactionOutput
 }
 
 func NewTransactionOutput(scriptPubkey *ScriptPubkey, amount int64) (*TransactionOutput, error) {
-	if scriptPubkey == nil || scriptPubkey.ptr == nil {
-		return nil, ErrInvalidScriptPubkey
+	if err := validateReady(scriptPubkey); err != nil {
+		return nil, err
 	}
 
 	ptr := C.kernel_transaction_output_create(scriptPubkey.ptr, C.int64_t(amount))
 	if ptr == nil {
-		return nil, ErrTransactionOutputCreation
+		return nil, ErrKernelTransactionOutputCreate
 	}
 
 	output := &TransactionOutput{ptr: ptr}
@@ -30,13 +32,11 @@ func NewTransactionOutput(scriptPubkey *ScriptPubkey, amount int64) (*Transactio
 
 // ScriptPubkey returns a copy of the script pubkey from this transaction output
 func (t *TransactionOutput) ScriptPubkey() (*ScriptPubkey, error) {
-	if t.ptr == nil {
-		return nil, ErrInvalidTransactionOutput
-	}
+	checkReady(t)
 
 	ptr := C.kernel_copy_script_pubkey_from_output(t.ptr)
 	if ptr == nil {
-		return nil, ErrScriptPubkeyCopyFromOutput
+		return nil, ErrKernelCopyScriptPubkeyFromOutput
 	}
 
 	scriptPubkey := &ScriptPubkey{ptr: ptr}
@@ -45,10 +45,7 @@ func (t *TransactionOutput) ScriptPubkey() (*ScriptPubkey, error) {
 }
 
 func (t *TransactionOutput) Amount() int64 {
-	if t.ptr == nil {
-		return 0
-	}
-
+	checkReady(t)
 	return int64(C.kernel_get_transaction_output_amount(t.ptr))
 }
 
@@ -62,4 +59,12 @@ func (t *TransactionOutput) destroy() {
 func (t *TransactionOutput) Destroy() {
 	runtime.SetFinalizer(t, nil)
 	t.destroy()
+}
+
+func (t *TransactionOutput) isReady() bool {
+	return t != nil && t.ptr != nil
+}
+
+func (t *TransactionOutput) uninitializedError() error {
+	return ErrTransactionOutputUninitialized
 }

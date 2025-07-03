@@ -9,14 +9,14 @@ import (
 func TestInvalidTransactionData(t *testing.T) {
 	// Test with empty data
 	_, err := NewTransactionFromRaw([]byte{})
-	if !errors.Is(err, ErrInvalidTransactionData) {
-		t.Errorf("Expected ErrInvalidTransactionData, got %v", err)
+	if !errors.Is(err, ErrEmptyTransactionData) {
+		t.Errorf("Expected ErrEmptyTransactionData, got %v", err)
 	}
 
 	// Test with invalid data
 	_, err = NewTransactionFromRaw([]byte{0x00, 0x01, 0x02})
-	if !errors.Is(err, ErrTransactionCreation) {
-		t.Errorf("Expected ErrTransactionCreation, got %v", err)
+	if !errors.Is(err, ErrKernelTransactionCreate) {
+		t.Errorf("Expected ErrKernelTransactionCreate, got %v", err)
 	}
 }
 

@@ -1,8 +1,7 @@
 // Package kernel provides Go bindings for the Bitcoin Core kernel library.
 //
 // Resource Management:
-// All types that wrap C resources (Context, ContextOptions, ChainParameters, etc.)
-// follow a dual cleanup pattern:
+// All types that implement the cManagedResource interface follow a dual cleanup pattern:
 //  1. Explicit cleanup via Destroy() methods (preferred)
 //  2. Finalizers as safety net for forgotten cleanup
 package kernel
