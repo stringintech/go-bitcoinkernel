@@ -14,24 +14,11 @@ type ChainParameters struct {
 }
 
 func NewChainParameters(chainType ChainType) (*ChainParameters, error) {
-	var cChainType C.kernel_ChainType
-
-	switch chainType {
-	case ChainTypeMainnet:
-		cChainType = C.kernel_CHAIN_TYPE_MAINNET
-	case ChainTypeTestnet:
-		cChainType = C.kernel_CHAIN_TYPE_TESTNET
-	case ChainTypeTestnet4:
-		cChainType = C.kernel_CHAIN_TYPE_TESTNET_4
-	case ChainTypeSignet:
-		cChainType = C.kernel_CHAIN_TYPE_SIGNET
-	case ChainTypeRegtest:
-		cChainType = C.kernel_CHAIN_TYPE_REGTEST
-	default:
-		return nil, ErrInvalidChainType
+	cType, err := chainType.c()
+	if err != nil {
+		return nil, err
 	}
-
-	ptr := C.kernel_chain_parameters_create(cChainType)
+	ptr := C.kernel_chain_parameters_create(cType)
 	if ptr == nil {
 		return nil, ErrKernelChainParametersCreate
 	}
@@ -71,3 +58,10 @@ const (
 	ChainTypeSignet
 	ChainTypeRegtest
 )
+
+func (t ChainType) c() (C.kernel_ChainType, error) {
+	if t < ChainTypeMainnet || t > ChainTypeRegtest {
+		return 0, ErrInvalidChainType
+	}
+	return C.kernel_ChainType(t), nil
+}

@@ -119,21 +119,21 @@ var loggingMutex = sync.RWMutex{}
 func AddLogLevelCategory(category LogCategory, level LogLevel) {
 	loggingMutex.Lock()
 	defer loggingMutex.Unlock()
-	C.kernel_add_log_level_category(C.kernel_LogCategory(category), C.kernel_LogLevel(level))
+	C.kernel_add_log_level_category(category.mustC(), level.mustC())
 }
 
 // EnableLogCategory enables logging for a specific category or all categories
 func EnableLogCategory(category LogCategory) {
 	loggingMutex.Lock()
 	defer loggingMutex.Unlock()
-	C.kernel_enable_log_category(C.kernel_LogCategory(category))
+	C.kernel_enable_log_category(category.mustC())
 }
 
 // DisableLogCategory disables logging for a specific category or all categories
 func DisableLogCategory(category LogCategory) {
 	loggingMutex.Lock()
 	defer loggingMutex.Unlock()
-	C.kernel_disable_log_category(C.kernel_LogCategory(category))
+	C.kernel_disable_log_category(category.mustC())
 }
 
 // LogLevel represents the logging level
@@ -144,6 +144,21 @@ const (
 	LogLevelDebug
 	LogLevelInfo
 )
+
+func (l LogLevel) mustC() C.kernel_LogLevel {
+	c, err := l.c()
+	if err != nil {
+		panic(err)
+	}
+	return c
+}
+
+func (l LogLevel) c() (C.kernel_LogLevel, error) {
+	if l < LogLevelTrace || l > LogLevelInfo {
+		return 0, ErrInvalidLogLevel
+	}
+	return C.kernel_LogLevel(l), nil
+}
 
 // LogCategory represents a logging category
 type LogCategory int
@@ -161,6 +176,21 @@ const (
 	LogValidation
 	LogKernel
 )
+
+func (c LogCategory) mustC() C.kernel_LogCategory {
+	cType, err := c.c()
+	if err != nil {
+		panic(err)
+	}
+	return cType
+}
+
+func (c LogCategory) c() (C.kernel_LogCategory, error) {
+	if c < LogAll || c > LogKernel {
+		return 0, ErrInvalidLogCategory
+	}
+	return C.kernel_LogCategory(c), nil
+}
 
 // LoggingOptions configures the format of log messages
 type LoggingOptions struct {

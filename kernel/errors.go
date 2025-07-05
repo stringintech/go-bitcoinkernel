@@ -42,6 +42,8 @@ var (
 	ErrKernelContextOptionsCreate                   = &KernelError{Operation: "kernel_context_options_create"}
 
 	ErrInvalidChainType      = errors.New("invalid chain type")
+	ErrInvalidLogLevel       = errors.New("invalid log level")
+	ErrInvalidLogCategory    = errors.New("invalid log category")
 	ErrEmptyBlockData        = errors.New("empty block data")
 	ErrEmptyScriptPubkeyData = errors.New("empty script pubkey data")
 	ErrEmptyTransactionData  = errors.New("empty transaction data")
