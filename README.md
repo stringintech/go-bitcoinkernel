@@ -4,7 +4,7 @@ A Go wrapper for Bitcoin Core's [`libbitcoinkernel`](https://github.com/bitcoin/
 
 ## ⚠️ Work in Progress
 
-This library is currently under active development. Check [TODO.md](./TODO.md) for current status and missing wrappers.
+This library is currently under active development. Check [TODO.md](./TODO.md) for missing wrappers.
 
 ## Overview
 

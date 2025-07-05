@@ -41,12 +41,20 @@ var (
 	ErrKernelChainParametersCreate                  = &KernelError{Operation: "kernel_chain_parameters_create"}
 	ErrKernelContextOptionsCreate                   = &KernelError{Operation: "kernel_context_options_create"}
 
-	ErrInvalidChainType      = errors.New("invalid chain type")
-	ErrInvalidLogLevel       = errors.New("invalid log level")
-	ErrInvalidLogCategory    = errors.New("invalid log category")
-	ErrEmptyBlockData        = errors.New("empty block data")
-	ErrEmptyScriptPubkeyData = errors.New("empty script pubkey data")
-	ErrEmptyTransactionData  = errors.New("empty transaction data")
+	ErrScriptVerify                        = &KernelError{Operation: "kernel_verify_script"}
+	ErrScriptVerifyTxInputIndex            = &KernelError{Operation: "kernel_verify_script", Detail: "the provided input index is out of range of the actual number of inputs of the transaction"}
+	ErrScriptVerifyInvalidFlags            = &KernelError{Operation: "kernel_verify_script", Detail: "the provided bitfield for the flags was invalid"}
+	ErrScriptVerifyInvalidFlagsCombination = &KernelError{Operation: "kernel_verify_script", Detail: "the flags were combined in an invalid way"}
+	ErrScriptVerifySpentOutputsRequired    = &KernelError{Operation: "kernel_verify_script", Detail: "the taproot flag was set, so valid spent_outputs have to be provided"}
+	ErrScriptVerifySpentOutputsMismatch    = &KernelError{Operation: "kernel_verify_script", Detail: "the number of spent outputs does not match the number of inputs of the transaction"}
+
+	ErrInvalidChainType          = errors.New("invalid chain type")
+	ErrInvalidLogLevel           = errors.New("invalid log level")
+	ErrInvalidLogCategory        = errors.New("invalid log category")
+	ErrInvalidScriptVerifyStatus = errors.New("invalid script verify status")
+	ErrEmptyBlockData            = errors.New("empty block data")
+	ErrEmptyScriptPubkeyData     = errors.New("empty script pubkey data")
+	ErrEmptyTransactionData      = errors.New("empty transaction data")
 )
 
 // UninitializedError is returned when an operation is attempted on a
@@ -65,8 +73,12 @@ func (e *UninitializedError) Error() string {
 type KernelError struct {
 	// Operation describes the C-level action that failed
 	Operation string
+	Detail    string
 }
 
 func (e *KernelError) Error() string {
+	if e.Detail != "" {
+		return fmt.Sprintf("kernel error during '%s': %s", e.Operation, e.Detail)
+	}
 	return fmt.Sprintf("kernel error during '%s'", e.Operation)
 }
