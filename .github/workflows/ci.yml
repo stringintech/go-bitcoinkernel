@@ -1,0 +1,74 @@
+name: Go CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ubuntu:
+    name: Build and Test on Ubuntu
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23.3'
+
+    - name: Install Boost library
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libboost-all-dev
+
+    - name: Build Kernel
+      run: make build-kernel
+
+    - name: Build
+      run: make build
+
+    - name: Run tests
+      run: make test
+
+  macos:
+    name: Build and Test on macOS
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.3'
+
+      - name: Install Boost library
+        run: |
+          brew install boost
+
+      - name: Build Kernel
+        run: make build-kernel
+
+      - name: Build
+        run: make build
+
+      - name: Run tests
+        run: make test
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23.3'
+
+    - name: Run linter
+      uses: golangci/golangci-lint-action@v4
+      with:
+        version: latest
