@@ -12,6 +12,7 @@ func TestChainstateManager(t *testing.T) {
 	suite := ChainstateManagerTestSuite{
 		MaxBlockHeightToImport: 0,   // load all blocks from data/regtest/block.txt
 		NotificationCallbacks:  nil, // no notification callbacks
+		ValidationCallbacks:    nil, // no validation callbacks
 	}
 	suite.Setup(t)
 
@@ -113,6 +114,7 @@ func (s *ChainstateManagerTestSuite) TestBlockUndo(t *testing.T) {
 type ChainstateManagerTestSuite struct {
 	MaxBlockHeightToImport int32 // leave zero to load all blocks
 	NotificationCallbacks  *NotificationCallbacks
+	ValidationCallbacks    *ValidationInterfaceCallbacks
 
 	Manager             *ChainstateManager
 	ImportedBlocksCount int32
@@ -146,6 +148,13 @@ func (s *ChainstateManagerTestSuite) Setup(t *testing.T) {
 		err = contextOpts.SetNotifications(s.NotificationCallbacks)
 		if err != nil {
 			t.Fatalf("SetNotifications() error = %v", err)
+		}
+	}
+
+	if s.ValidationCallbacks != nil {
+		err = contextOpts.SetValidationInterface(s.ValidationCallbacks)
+		if err != nil {
+			t.Fatalf("SetValidationInterface() error = %v", err)
 		}
 	}
 
@@ -204,7 +213,6 @@ func (s *ChainstateManagerTestSuite) Setup(t *testing.T) {
 	if len(blockLines) == 0 {
 		t.Fatal("No block data found in blocks.txt")
 	}
-	t.Logf("Found %d blocks in regtest data", len(blockLines))
 
 	for i := 0; i < len(blockLines); i++ {
 		blockHex := blockLines[i]

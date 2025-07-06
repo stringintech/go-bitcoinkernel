@@ -48,14 +48,15 @@ var (
 	ErrScriptVerifySpentOutputsRequired    = &KernelError{Operation: "kernel_verify_script", Detail: "the taproot flag was set, so valid spent_outputs have to be provided"}
 	ErrScriptVerifySpentOutputsMismatch    = &KernelError{Operation: "kernel_verify_script", Detail: "the number of spent outputs does not match the number of inputs of the transaction"}
 
-	ErrInvalidChainType          = errors.New("invalid chain type")
-	ErrInvalidLogLevel           = errors.New("invalid log level")
-	ErrInvalidLogCategory        = errors.New("invalid log category")
-	ErrInvalidScriptVerifyStatus = errors.New("invalid script verify status")
-	ErrEmptyBlockData            = errors.New("empty block data")
-	ErrEmptyScriptPubkeyData     = errors.New("empty script pubkey data")
-	ErrEmptyTransactionData      = errors.New("empty transaction data")
-	ErrNilNotificationCallbacks  = errors.New("nil notification callbacks")
+	ErrInvalidChainType                = errors.New("invalid chain type")
+	ErrInvalidLogLevel                 = errors.New("invalid log level")
+	ErrInvalidLogCategory              = errors.New("invalid log category")
+	ErrInvalidScriptVerifyStatus       = errors.New("invalid script verify status")
+	ErrEmptyBlockData                  = errors.New("empty block data")
+	ErrEmptyScriptPubkeyData           = errors.New("empty script pubkey data")
+	ErrEmptyTransactionData            = errors.New("empty transaction data")
+	ErrNilNotificationCallbacks        = errors.New("nil notification callbacks")
+	ErrNilValidationInterfaceCallbacks = errors.New("nil validation interface callbacks")
 )
 
 // UninitializedError is returned when an operation is attempted on a

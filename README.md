@@ -4,7 +4,7 @@ A Go wrapper for Bitcoin Core's [`libbitcoinkernel`](https://github.com/bitcoin/
 
 ## ⚠️ Work in Progress
 
-This library is currently under active development. Check [TODO.md](./TODO.md) for missing wrappers.
+This library is experimental and not production-ready. The underlying C API is subject to change, which may cause breaking changes in this wrapper. The wrapper itself may also change based on user feedback, which is welcome and appreciated. Feel free to open issues to help make this wrapper more useful for everyone.
 
 ## Overview
 
@@ -33,13 +33,7 @@ cd go-bitcoinkernel
 make build-kernel
 ```
 
-This command will:
-
-- Configure Bitcoin Core's CMake build system
-- Build only the `libbitcoinkernel` library
-- Use parallel compilation for faster builds
-
-Refer to Bitcoin Core's build documentation to for the minimum requirements to compile `libbitcoinkernel` from source:
+This command will configure Bitcoin Core's CMake build system and build only the `libbitcoinkernel` shared library. Refer to Bitcoin Core's build documentation to for the minimum requirements to compile `libbitcoinkernel` from source:
 ([Unix](./depend/bitcoin/doc/build-unix.md),
 [macOS](./depend/bitcoin/doc/build-osx.md),
 [Windows](./depend/bitcoin/doc/build-windows.md))

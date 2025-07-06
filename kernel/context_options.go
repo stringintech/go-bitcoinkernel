@@ -14,6 +14,7 @@ extern void go_notify_warning_set_bridge(void* user_data, kernel_Warning warning
 extern void go_notify_warning_unset_bridge(void* user_data, kernel_Warning warning);
 extern void go_notify_flush_error_bridge(void* user_data, char* message, size_t message_len);
 extern void go_notify_fatal_error_bridge(void* user_data, char* message, size_t message_len);
+extern void go_validation_interface_block_checked_bridge(void* user_data, const kernel_BlockPointer* block, const kernel_BlockValidationState* state);
 
 // Wrapper function: C helper to set notifications with Go callbacks
 // Converts Handle ID to void* and passes to C library
@@ -30,6 +31,16 @@ static inline void set_notifications_wrapper(kernel_ContextOptions* opts, uintpt
     };
     kernel_context_options_set_notifications(opts, callbacks);
 }
+
+// Wrapper function: C helper to set validation interface with Go callbacks
+// Converts Handle ID to void* and passes to C library
+static inline void set_validation_interface_wrapper(kernel_ContextOptions* opts, uintptr_t handle) {
+    kernel_ValidationInterfaceCallbacks callbacks = {
+        .user_data = (void*)handle,
+        .block_checked = (kernel_ValidationInterfaceBlockChecked)go_validation_interface_block_checked_bridge,
+    };
+    kernel_context_options_set_validation_interface(opts, callbacks);
+}
 */
 import "C"
 import (
@@ -43,6 +54,7 @@ var _ cManagedResource = &ContextOptions{}
 type ContextOptions struct {
 	ptr                *C.kernel_ContextOptions
 	notificationHandle cgo.Handle // Prevents notification callbacks GC until Destroy() called
+	validationHandle   cgo.Handle // Prevents validation callbacks GC until Destroy() called
 }
 
 func NewContextOptions() (*ContextOptions, error) {
@@ -87,6 +99,26 @@ func (opts *ContextOptions) SetNotifications(callbacks *NotificationCallbacks) e
 	return nil
 }
 
+// SetValidationInterface sets the validation interface callbacks for these context options.
+// The context created with these options will be configured with these validation callbacks.
+func (opts *ContextOptions) SetValidationInterface(callbacks *ValidationInterfaceCallbacks) error {
+	checkReady(opts)
+	if callbacks == nil {
+		return ErrNilValidationInterfaceCallbacks
+	}
+
+	// Create a handle for the callbacks - this prevents garbage collection
+	// and provides a stable ID that can be passed through C code safely
+	handle := cgo.NewHandle(callbacks)
+
+	// Call the C wrapper function to set all validation interface callbacks
+	C.set_validation_interface_wrapper(opts.ptr, C.uintptr_t(handle))
+
+	// Store the handle to prevent GC and allow cleanup
+	opts.validationHandle = handle
+	return nil
+}
+
 func (opts *ContextOptions) destroy() {
 	if opts.ptr != nil {
 		C.kernel_context_options_destroy(opts.ptr)
@@ -96,6 +128,11 @@ func (opts *ContextOptions) destroy() {
 		// Delete exposes notification callbacks to garbage collection
 		opts.notificationHandle.Delete()
 		opts.notificationHandle = 0
+	}
+	if opts.validationHandle != 0 {
+		// Delete exposes validation callbacks to garbage collection
+		opts.validationHandle.Delete()
+		opts.validationHandle = 0
 	}
 }
 
