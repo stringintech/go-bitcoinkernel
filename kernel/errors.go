@@ -55,6 +55,7 @@ var (
 	ErrEmptyBlockData            = errors.New("empty block data")
 	ErrEmptyScriptPubkeyData     = errors.New("empty script pubkey data")
 	ErrEmptyTransactionData      = errors.New("empty transaction data")
+	ErrNilNotificationCallbacks  = errors.New("nil notification callbacks")
 )
 
 // UninitializedError is returned when an operation is attempted on a

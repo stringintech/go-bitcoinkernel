@@ -9,7 +9,11 @@ import (
 )
 
 func TestChainstateManager(t *testing.T) {
-	suite := SetupChainstateManagerTestSuite(t)
+	suite := ChainstateManagerTestSuite{
+		MaxBlockHeightToImport: 0,   // load all blocks from data/regtest/block.txt
+		NotificationCallbacks:  nil, // no notification callbacks
+	}
+	suite.Setup(t)
 
 	t.Run("genesis validation", suite.TestGenesis)
 	t.Run("tip validation", suite.TestTip)
@@ -107,11 +111,14 @@ func (s *ChainstateManagerTestSuite) TestBlockUndo(t *testing.T) {
 }
 
 type ChainstateManagerTestSuite struct {
+	MaxBlockHeightToImport int32 // leave zero to load all blocks
+	NotificationCallbacks  *NotificationCallbacks
+
 	Manager             *ChainstateManager
 	ImportedBlocksCount int32
 }
 
-func SetupChainstateManagerTestSuite(t *testing.T) *ChainstateManagerTestSuite {
+func (s *ChainstateManagerTestSuite) Setup(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "bitcoin_kernel_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
@@ -134,6 +141,13 @@ func SetupChainstateManagerTestSuite(t *testing.T) *ChainstateManagerTestSuite {
 	t.Cleanup(func() { chainParams.Destroy() })
 
 	contextOpts.SetChainParams(chainParams)
+
+	if s.NotificationCallbacks != nil {
+		err = contextOpts.SetNotifications(s.NotificationCallbacks)
+		if err != nil {
+			t.Fatalf("SetNotifications() error = %v", err)
+		}
+	}
 
 	ctx, err := NewContext(contextOpts)
 	if err != nil {
@@ -183,6 +197,9 @@ func SetupChainstateManagerTestSuite(t *testing.T) *ChainstateManagerTestSuite {
 		if line != "" {
 			blockLines = append(blockLines, line)
 		}
+		if s.MaxBlockHeightToImport != 0 && len(blockLines) >= int(s.MaxBlockHeightToImport) {
+			break
+		}
 	}
 	if len(blockLines) == 0 {
 		t.Fatal("No block data found in blocks.txt")
@@ -212,8 +229,6 @@ func SetupChainstateManagerTestSuite(t *testing.T) *ChainstateManagerTestSuite {
 		}
 	}
 
-	return &ChainstateManagerTestSuite{
-		Manager:             manager,
-		ImportedBlocksCount: int32(len(blockLines)),
-	}
+	s.Manager = manager
+	s.ImportedBlocksCount = int32(len(blockLines))
 }
