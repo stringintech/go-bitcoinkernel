@@ -1,5 +1,11 @@
 # go-bitcoinkernel
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/stringintech/go-bitcoinkernel.svg)](https://pkg.go.dev/github.com/stringintech/go-bitcoinkernel@v0.1.0-alpha.1)
+[![Go Report Card](https://goreportcard.com/badge/github.com/stringintech/go-bitcoinkernel)](https://goreportcard.com/report/github.com/stringintech/go-bitcoinkernel)
+[![License](https://img.shields.io/github/license/stringintech/go-bitcoinkernel)](https://github.com/stringintech/go-bitcoinkernel/blob/main/LICENSE)
+[![GitHub Actions](https://github.com/stringintech/go-bitcoinkernel/actions/workflows/ci.yml/badge.svg)](https://github.com/stringintech/go-bitcoinkernel/actions)
+[![GitHub release](https://img.shields.io/github/v/release/stringintech/go-bitcoinkernel?include_prereleases)](https://github.com/stringintech/go-bitcoinkernel/releases)
+
 A Go wrapper for Bitcoin Core's [`libbitcoinkernel`](https://github.com/bitcoin/bitcoin/pull/30595) library.
 
 ## ⚠️ Work in Progress
