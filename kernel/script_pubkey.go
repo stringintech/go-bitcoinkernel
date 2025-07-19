@@ -35,7 +35,7 @@ func NewScriptPubkeyFromRaw(rawScriptPubkey []byte) (*ScriptPubkey, error) {
 func (s *ScriptPubkey) Data() ([]byte, error) {
 	checkReady(s)
 
-	byteArray := C.kernel_copy_script_pubkey_data(s.ptr)
+	byteArray := C.kernel_script_pubkey_copy_data(s.ptr)
 	if byteArray == nil {
 		return nil, ErrKernelCopyScriptPubkeyData
 	}

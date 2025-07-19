@@ -43,30 +43,30 @@ func NewChainstateManager(context *Context, options *ChainstateManagerOptions) (
 	return manager, nil
 }
 
-// ReadBlockFromDisk reads a block from disk using the provided block index
-func (cm *ChainstateManager) ReadBlockFromDisk(blockIndex *BlockIndex) (*Block, error) {
+// ReadBlock reads a block using the provided block index
+func (cm *ChainstateManager) ReadBlock(blockIndex *BlockIndex) (*Block, error) {
 	checkReady(cm)
 	if err := validateReady(blockIndex); err != nil {
 		return nil, err
 	}
 
-	ptr := C.kernel_read_block_from_disk(cm.context.ptr, cm.ptr, blockIndex.ptr)
+	ptr := C.kernel_block_read(cm.context.ptr, cm.ptr, blockIndex.ptr)
 	if ptr == nil {
-		return nil, ErrKernelChainstateManagerReadBlockFromDisk
+		return nil, ErrKernelChainstateManagerReadBlock
 	}
 	return newBlockFromPtr(ptr), nil
 }
 
-// ReadBlockUndoFromDisk reads block undo data from disk for a given block index
-func (cm *ChainstateManager) ReadBlockUndoFromDisk(blockIndex *BlockIndex) (*BlockUndo, error) {
+// ReadBlockUndo reads block undo data for a given block index
+func (cm *ChainstateManager) ReadBlockUndo(blockIndex *BlockIndex) (*BlockUndo, error) {
 	checkReady(cm)
 	if err := validateReady(blockIndex); err != nil {
 		return nil, err
 	}
 
-	ptr := C.kernel_read_block_undo_from_disk(cm.context.ptr, cm.ptr, blockIndex.ptr)
+	ptr := C.kernel_block_undo_read(cm.context.ptr, cm.ptr, blockIndex.ptr)
 	if ptr == nil {
-		return nil, ErrKernelChainstateManagerReadBlockUndoFromDisk
+		return nil, ErrKernelChainstateManagerReadBlockUndo
 	}
 
 	blockUndo := &BlockUndo{ptr: ptr}
@@ -95,11 +95,11 @@ func (cm *ChainstateManager) ProcessBlock(block *Block) (bool, bool, error) {
 	return bool(success), bool(newBlock), nil
 }
 
-// GetBlockIndexFromTip returns the block index of the current chain tip
-func (cm *ChainstateManager) GetBlockIndexFromTip() (*BlockIndex, error) {
+// GetBlockIndexTip returns the block index of the current chain tip
+func (cm *ChainstateManager) GetBlockIndexTip() (*BlockIndex, error) {
 	checkReady(cm)
 
-	ptr := C.kernel_get_block_index_from_tip(cm.context.ptr, cm.ptr)
+	ptr := C.kernel_block_index_get_tip(cm.context.ptr, cm.ptr)
 	if ptr == nil {
 		return nil, ErrBlockIndexUninitialized
 	}
@@ -109,11 +109,11 @@ func (cm *ChainstateManager) GetBlockIndexFromTip() (*BlockIndex, error) {
 	return blockIndex, nil
 }
 
-// GetBlockIndexFromGenesis returns the block index of the genesis block
-func (cm *ChainstateManager) GetBlockIndexFromGenesis() (*BlockIndex, error) {
+// GetBlockIndexGenesis returns the block index of the genesis block
+func (cm *ChainstateManager) GetBlockIndexGenesis() (*BlockIndex, error) {
 	checkReady(cm)
 
-	ptr := C.kernel_get_block_index_from_genesis(cm.context.ptr, cm.ptr)
+	ptr := C.kernel_block_index_get_genesis(cm.context.ptr, cm.ptr)
 	if ptr == nil {
 		return nil, ErrBlockIndexUninitialized
 	}
@@ -123,14 +123,14 @@ func (cm *ChainstateManager) GetBlockIndexFromGenesis() (*BlockIndex, error) {
 	return blockIndex, nil
 }
 
-// GetBlockIndexFromHash returns the block index for a given block hash
-func (cm *ChainstateManager) GetBlockIndexFromHash(blockHash *BlockHash) (*BlockIndex, error) {
+// GetBlockIndexByHash returns the block index for a given block hash
+func (cm *ChainstateManager) GetBlockIndexByHash(blockHash *BlockHash) (*BlockIndex, error) {
 	checkReady(cm)
 	if blockHash == nil || blockHash.ptr == nil {
 		return nil, ErrBlockHashUninitialized
 	}
 
-	ptr := C.kernel_get_block_index_from_hash(cm.context.ptr, cm.ptr, blockHash.ptr)
+	ptr := C.kernel_block_index_get_by_hash(cm.context.ptr, cm.ptr, blockHash.ptr)
 	if ptr == nil {
 		return nil, ErrBlockIndexUninitialized
 	}
@@ -140,11 +140,11 @@ func (cm *ChainstateManager) GetBlockIndexFromHash(blockHash *BlockHash) (*Block
 	return blockIndex, nil
 }
 
-// GetBlockIndexFromHeight returns the block index for a given height in the currently active chain
-func (cm *ChainstateManager) GetBlockIndexFromHeight(height int) (*BlockIndex, error) {
+// GetBlockIndexByHeight returns the block index for a given height in the currently active chain
+func (cm *ChainstateManager) GetBlockIndexByHeight(height int) (*BlockIndex, error) {
 	checkReady(cm)
 
-	ptr := C.kernel_get_block_index_from_height(cm.context.ptr, cm.ptr, C.int(height))
+	ptr := C.kernel_block_index_get_by_height(cm.context.ptr, cm.ptr, C.int(height))
 	if ptr == nil {
 		return nil, ErrBlockIndexUninitialized
 	}
@@ -161,7 +161,7 @@ func (cm *ChainstateManager) GetNextBlockIndex(blockIndex *BlockIndex) (*BlockIn
 		return nil, err
 	}
 
-	ptr := C.kernel_get_next_block_index(cm.context.ptr, cm.ptr, blockIndex.ptr)
+	ptr := C.kernel_block_index_get_next(cm.context.ptr, cm.ptr, blockIndex.ptr)
 	if ptr == nil {
 		return nil, nil // No next block (tip or invalid)
 	}
@@ -177,7 +177,7 @@ func (cm *ChainstateManager) ImportBlocks(blockFilePaths []string) error {
 
 	if len(blockFilePaths) == 0 {
 		// Import with no files triggers reindex if wipe options were set
-		success := C.kernel_import_blocks(cm.context.ptr, cm.ptr, nil, nil, 0)
+		success := C.kernel_chainstate_manager_import_blocks(cm.context.ptr, cm.ptr, nil, nil, 0)
 		if !success {
 			return ErrKernelImportBlocks
 		}
@@ -200,7 +200,7 @@ func (cm *ChainstateManager) ImportBlocks(blockFilePaths []string) error {
 		}
 	}()
 
-	success := C.kernel_import_blocks(
+	success := C.kernel_chainstate_manager_import_blocks(
 		cm.context.ptr,
 		cm.ptr,
 		(**C.char)(unsafe.Pointer(&cPaths[0])),

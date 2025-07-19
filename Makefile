@@ -30,6 +30,7 @@ test:
 clean:
 	rm -rf depend/bitcoin/build
 	go clean ./...
+	go clean -testcache
 
 lint:
 	golangci-lint run ./...
@@ -37,13 +38,17 @@ lint:
 deps:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
+update-kernel:
+	git subtree pull --prefix=depend/bitcoin https://github.com/TheCharlatan/bitcoin.git kernelApi --squash
+
 help:
 	@echo "Available targets:"
-	@echo "  all		- Build kernel library and run tests (default)"
-	@echo "  build-kernel	- Build Bitcoin kernel library"
-	@echo "  build		- Compile Go code"
-	@echo "  test        	- Run Go tests"
-	@echo "  clean       	- Clean build artifacts"
-	@echo "  lint        	- Lint Go code"
-	@echo "  deps        	- Install development dependencies"
-	@echo "  help        	- Show this help message"
+	@echo "  all			- Build kernel library and run tests (default)"
+	@echo "  build-kernel		- Build Bitcoin kernel library"
+	@echo "  build			- Compile Go code"
+	@echo "  test        		- Run Go tests"
+	@echo "  clean       		- Clean build artifacts"
+	@echo "  lint        		- Lint Go code"
+	@echo "  deps        		- Install development dependencies"
+	@echo "  update-kernel  	- Update Bitcoin dependency using git subtree"
+	@echo "  help        		- Show this help message"

@@ -109,7 +109,7 @@ func (lc *LoggingConnection) uninitializedError() error {
 // DisableLogging permanently disables the global internal logger.
 // This function should only be called once and is not thread-safe
 func DisableLogging() {
-	C.kernel_disable_logging()
+	C.kernel_logging_disable()
 }
 
 // Global mutex for thread-safe category management
@@ -119,21 +119,21 @@ var loggingMutex = sync.RWMutex{}
 func AddLogLevelCategory(category LogCategory, level LogLevel) {
 	loggingMutex.Lock()
 	defer loggingMutex.Unlock()
-	C.kernel_add_log_level_category(category.mustC(), level.mustC())
+	C.kernel_logging_set_level_category(category.mustC(), level.mustC())
 }
 
 // EnableLogCategory enables logging for a specific category or all categories
 func EnableLogCategory(category LogCategory) {
 	loggingMutex.Lock()
 	defer loggingMutex.Unlock()
-	C.kernel_enable_log_category(category.mustC())
+	C.kernel_logging_enable_category(category.mustC())
 }
 
 // DisableLogCategory disables logging for a specific category or all categories
 func DisableLogCategory(category LogCategory) {
 	loggingMutex.Lock()
 	defer loggingMutex.Unlock()
-	C.kernel_disable_log_category(category.mustC())
+	C.kernel_logging_disable_category(category.mustC())
 }
 
 // LogLevel represents the logging level

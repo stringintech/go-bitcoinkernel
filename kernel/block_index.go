@@ -36,7 +36,7 @@ func (bi *BlockIndex) Hash() (*BlockHash, error) {
 func (bi *BlockIndex) Previous() *BlockIndex {
 	checkReady(bi)
 
-	ptr := C.kernel_get_previous_block_index(bi.ptr)
+	ptr := C.kernel_block_index_get_previous(bi.ptr)
 	if ptr == nil {
 		return nil
 	}

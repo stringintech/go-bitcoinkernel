@@ -51,7 +51,7 @@ func (b *Block) Hash() (*BlockHash, error) {
 func (b *Block) Data() ([]byte, error) {
 	checkReady(b)
 
-	byteArray := C.kernel_copy_block_data(b.ptr)
+	byteArray := C.kernel_block_copy_data(b.ptr)
 	if byteArray == nil {
 		return nil, ErrKernelCopyBlockData
 	}

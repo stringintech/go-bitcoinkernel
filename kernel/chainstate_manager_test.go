@@ -22,9 +22,9 @@ func TestChainstateManager(t *testing.T) {
 }
 
 func (s *ChainstateManagerTestSuite) TestGenesis(t *testing.T) {
-	genesisIndex, err := s.Manager.GetBlockIndexFromGenesis()
+	genesisIndex, err := s.Manager.GetBlockIndexGenesis()
 	if err != nil {
-		t.Fatalf("GetBlockIndexFromGenesis() error = %v", err)
+		t.Fatalf("GetBlockIndexGenesis() error = %v", err)
 	}
 	defer genesisIndex.Destroy()
 
@@ -46,9 +46,9 @@ func (s *ChainstateManagerTestSuite) TestGenesis(t *testing.T) {
 }
 
 func (s *ChainstateManagerTestSuite) TestTip(t *testing.T) {
-	tipIndex, err := s.Manager.GetBlockIndexFromTip()
+	tipIndex, err := s.Manager.GetBlockIndexTip()
 	if err != nil {
-		t.Fatalf("GetBlockIndexFromTip() error = %v", err)
+		t.Fatalf("GetBlockIndexTip() error = %v", err)
 	}
 	defer tipIndex.Destroy()
 
@@ -74,15 +74,15 @@ func (s *ChainstateManagerTestSuite) TestTip(t *testing.T) {
 }
 
 func (s *ChainstateManagerTestSuite) TestBlockUndo(t *testing.T) {
-	blockIndex, err := s.Manager.GetBlockIndexFromHeight(202)
+	blockIndex, err := s.Manager.GetBlockIndexByHeight(202)
 	if err != nil {
-		t.Fatalf("GetBlockIndexFromHeight(202) error = %v", err)
+		t.Fatalf("GetBlockIndexByHeight(202) error = %v", err)
 	}
 	defer blockIndex.Destroy()
 
-	blockUndo, err := s.Manager.ReadBlockUndoFromDisk(blockIndex)
+	blockUndo, err := s.Manager.ReadBlockUndo(blockIndex)
 	if err != nil {
-		t.Fatalf("ReadBlockUndoFromDisk() error = %v", err)
+		t.Fatalf("ReadBlockUndo() error = %v", err)
 	}
 	defer blockUndo.Destroy()
 

@@ -34,7 +34,7 @@ func NewTransactionOutput(scriptPubkey *ScriptPubkey, amount int64) (*Transactio
 func (t *TransactionOutput) ScriptPubkey() (*ScriptPubkey, error) {
 	checkReady(t)
 
-	ptr := C.kernel_copy_script_pubkey_from_output(t.ptr)
+	ptr := C.kernel_transaction_output_copy_script_pubkey(t.ptr)
 	if ptr == nil {
 		return nil, ErrKernelCopyScriptPubkeyFromOutput
 	}
@@ -46,7 +46,7 @@ func (t *TransactionOutput) ScriptPubkey() (*ScriptPubkey, error) {
 
 func (t *TransactionOutput) Amount() int64 {
 	checkReady(t)
-	return int64(C.kernel_get_transaction_output_amount(t.ptr))
+	return int64(C.kernel_transaction_output_get_amount(t.ptr))
 }
 
 func (t *TransactionOutput) destroy() {

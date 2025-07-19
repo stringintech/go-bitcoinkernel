@@ -55,7 +55,7 @@ func (bp *BlockPointer) CopyData() ([]byte, error) {
 		return nil, ErrBlockUninitialized
 	}
 
-	byteArray := C.kernel_copy_block_pointer_data(bp.ptr)
+	byteArray := C.kernel_block_pointer_copy_data(bp.ptr)
 	if byteArray == nil {
 		return nil, ErrKernelCopyBlockData
 	}

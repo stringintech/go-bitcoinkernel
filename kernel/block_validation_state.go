@@ -14,13 +14,13 @@ type BlockValidationState struct {
 
 func (bvs *BlockValidationState) ValidationMode() ValidationMode {
 	checkReady(bvs)
-	mode := C.kernel_get_validation_mode_from_block_validation_state(bvs.ptr)
+	mode := C.kernel_block_validation_state_get_validation_mode(bvs.ptr)
 	return ValidationMode(mode)
 }
 
 func (bvs *BlockValidationState) ValidationResult() BlockValidationResult {
 	checkReady(bvs)
-	result := C.kernel_get_block_validation_result_from_block_validation_state(bvs.ptr)
+	result := C.kernel_block_validation_state_get_block_validation_result(bvs.ptr)
 	return BlockValidationResult(result)
 }
 
