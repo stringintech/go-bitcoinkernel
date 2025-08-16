@@ -791,7 +791,7 @@ static DBErrors LoadDescriptorWalletRecords(CWallet* pwallet, DatabaseBatch& bat
             value >> desc;
         } catch (const std::ios_base::failure& e) {
             strErr = strprintf("Error: Unrecognized descriptor found in wallet %s. ", pwallet->GetName());
-            strErr += (last_client > CLIENT_VERSION) ? "The wallet might had been created on a newer version. " :
+            strErr += (last_client > CLIENT_VERSION) ? "The wallet might have been created on a newer version. " :
                     "The database might be corrupted or the software version is not compatible with one of your wallet descriptors. ";
             strErr += "Please try running the latest software version";
             // Also include error details
@@ -1050,7 +1050,7 @@ static DBErrors LoadTxRecords(CWallet* pwallet, DatabaseBatch& batch, bool& any_
         uint32_t n;
         key >> hash;
         key >> n;
-        pwallet->LockCoin(COutPoint(hash, n));
+        pwallet->LoadLockedCoin(COutPoint(hash, n), /*persistent=*/true);
         return DBErrors::LOAD_OK;
     });
     result = std::max(result, locked_utxo_res.m_result);
