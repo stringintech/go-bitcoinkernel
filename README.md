@@ -101,7 +101,7 @@ The library uses structured error types for better error handling (see [errors.g
 
 ```go
 m := kernel.ChainstateManager{}
-blockIndex := m.GetBlockIndexFromGenesis() // panic: chainstateManager is not initialized
+chain, _ := m.GetActiveChain() // panic: chainstateManager is not initialized
 ```
 
 Always ensure objects are properly initialized (and not destroyed) before calling methods on them. Constructor functions like `NewChainstateManager()` return errors for validation, but method calls on receivers expect valid objects.

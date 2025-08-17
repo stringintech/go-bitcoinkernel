@@ -16,26 +16,94 @@ func TestChainstateManager(t *testing.T) {
 	}
 	suite.Setup(t)
 
-	t.Run("genesis validation", suite.TestGenesis)
-	t.Run("tip validation", suite.TestTip)
-	t.Run("block undo", suite.TestBlockUndo)
+	t.Run("read block", suite.TestReadBlock)
+	t.Run("block undo", suite.TestBlockSpentOutputs)
+	t.Run("get block tree entry by hash", suite.TestGetBlockTreeEntryByHash)
 }
 
-func (s *ChainstateManagerTestSuite) TestGenesis(t *testing.T) {
-	genesisIndex, err := s.Manager.GetBlockIndexGenesis()
+func (s *ChainstateManagerTestSuite) TestBlockSpentOutputs(t *testing.T) {
+	chain, err := s.Manager.GetActiveChain()
 	if err != nil {
-		t.Fatalf("GetBlockIndexGenesis() error = %v", err)
+		t.Fatalf("GetActiveChain() error = %v", err)
 	}
-	defer genesisIndex.Destroy()
+	defer chain.Destroy()
 
-	height := genesisIndex.Height()
-	if height != 0 {
-		t.Errorf("Expected genesis height 0, got %d", height)
-	}
-
-	genesisHash, err := genesisIndex.Hash()
+	blockIndex, err := chain.GetByHeight(202)
 	if err != nil {
-		t.Fatalf("BlockIndex.Hash() error = %v", err)
+		t.Fatalf("GetByHeight(202) error = %v", err)
+	}
+	defer blockIndex.Destroy()
+
+	blockSpentOutputs, err := s.Manager.ReadBlockSpentOutputs(blockIndex)
+	if err != nil {
+		t.Fatalf("ReadBlockSpentOutputs() error = %v", err)
+	}
+	defer blockSpentOutputs.Destroy()
+
+	// Test transaction spent outputs count
+	txCount := blockSpentOutputs.Size()
+	if txCount != 20 {
+		t.Errorf("Expected 20 transactions, got %d", txCount)
+	}
+
+	// Verify each transaction spent outputs
+	for i := uint64(0); i < txCount; i++ {
+		txSpentOutputs, err := blockSpentOutputs.GetTransactionSpentOutputsAt(i)
+		if err != nil {
+			t.Fatalf("GetTransactionSpentOutputsAt(%d) error = %v", i, err)
+		}
+		defer txSpentOutputs.Destroy()
+
+		spentOutputSize := txSpentOutputs.Size()
+		if spentOutputSize != 1 {
+			t.Errorf("Expected transaction spent output size 1, got %d", spentOutputSize)
+		}
+
+		coin, err := txSpentOutputs.GetCoinAt(0)
+		if err != nil {
+			t.Fatalf("GetCoinAt(0) error = %v", err)
+		}
+		defer coin.Destroy()
+
+		_, err = coin.GetOutput()
+		if err != nil {
+			t.Fatalf("GetOutput() error = %v", err)
+		}
+
+		height := coin.ConfirmationHeight()
+		if height <= 0 {
+			t.Fatalf("ConfirmationHeight() height %d, want > 0", height)
+		}
+	}
+}
+
+func (s *ChainstateManagerTestSuite) TestReadBlock(t *testing.T) {
+	chain, err := s.Manager.GetActiveChain()
+	if err != nil {
+		t.Fatalf("GetActiveChain() error = %v", err)
+	}
+	defer chain.Destroy()
+
+	// Test reading genesis block
+	genesis, err := chain.GetGenesis()
+	if err != nil {
+		t.Fatalf("GetGenesis() error = %v", err)
+	}
+	defer genesis.Destroy()
+
+	genesisBlock, err := s.Manager.ReadBlock(genesis)
+	if err != nil {
+		t.Fatalf("ChainstateManager.ReadBlock() for genesis error = %v", err)
+	}
+	if genesisBlock == nil {
+		t.Fatal("Read genesis block is nil")
+	}
+	defer genesisBlock.Destroy()
+
+	// Verify genesis block has expected properties
+	genesisHash, err := genesisBlock.Hash()
+	if err != nil {
+		t.Fatalf("Genesis block Hash() error = %v", err)
 	}
 	defer genesisHash.Destroy()
 
@@ -43,71 +111,100 @@ func (s *ChainstateManagerTestSuite) TestGenesis(t *testing.T) {
 	if len(hashBytes) != 32 {
 		t.Errorf("Expected hash length 32, got %d", len(hashBytes))
 	}
-}
 
-func (s *ChainstateManagerTestSuite) TestTip(t *testing.T) {
-	tipIndex, err := s.Manager.GetBlockIndexTip()
+	// Test reading tip block
+	tip, err := chain.GetTip()
 	if err != nil {
-		t.Fatalf("GetBlockIndexTip() error = %v", err)
+		t.Fatalf("GetTip() error = %v", err)
 	}
-	defer tipIndex.Destroy()
+	defer tip.Destroy()
 
-	height := tipIndex.Height()
-	if height <= 0 {
-		t.Errorf("Expected tip height > 0, got %d", height)
-	}
-
-	tipHash, err := tipIndex.Hash()
+	tipBlock, err := s.Manager.ReadBlock(tip)
 	if err != nil {
-		t.Fatalf("Failed to get tip hash: %v", err)
+		t.Fatalf("ChainstateManager.ReadBlock() for tip error = %v", err)
+	}
+	if tipBlock == nil {
+		t.Fatal("Read tip block is nil")
+	}
+	defer tipBlock.Destroy()
+
+	// Verify tip block properties
+	tipHash, err := tipBlock.Hash()
+	if err != nil {
+		t.Fatalf("Tip block Hash() error = %v", err)
 	}
 	defer tipHash.Destroy()
 
-	hashBytes := tipHash.Bytes()
-	if len(hashBytes) != 32 {
-		t.Errorf("Expected hash length 32, got %d", len(hashBytes))
-	}
-
-	if tipIndex.Height() != s.ImportedBlocksCount {
-		t.Errorf("Expected tip height %d, got %d", s.ImportedBlocksCount, tipIndex.Height())
+	tipHashBytes := tipHash.Bytes()
+	if len(tipHashBytes) != 32 {
+		t.Errorf("Expected tip hash length 32, got %d", len(tipHashBytes))
 	}
 }
 
-func (s *ChainstateManagerTestSuite) TestBlockUndo(t *testing.T) {
-	blockIndex, err := s.Manager.GetBlockIndexByHeight(202)
+func (s *ChainstateManagerTestSuite) TestGetBlockTreeEntryByHash(t *testing.T) {
+	chain, err := s.Manager.GetActiveChain()
 	if err != nil {
-		t.Fatalf("GetBlockIndexByHeight(202) error = %v", err)
+		t.Fatalf("GetActiveChain() error = %v", err)
 	}
-	defer blockIndex.Destroy()
+	defer chain.Destroy()
 
-	blockUndo, err := s.Manager.ReadBlockUndo(blockIndex)
+	// Test getting genesis block by hash
+	genesis, err := chain.GetGenesis()
 	if err != nil {
-		t.Fatalf("ReadBlockUndo() error = %v", err)
+		t.Fatalf("GetGenesis() error = %v", err)
 	}
-	defer blockUndo.Destroy()
+	defer genesis.Destroy()
 
-	// Test transaction count
-	txCount := blockUndo.Size()
-	if txCount != 20 {
-		t.Errorf("Expected 20 transactions, got %d", txCount)
+	genesisHash, err := genesis.Hash()
+	if err != nil {
+		t.Fatalf("Genesis Hash() error = %v", err)
+	}
+	defer genesisHash.Destroy()
+
+	// Use GetBlockTreeEntryByHash to find genesis
+	foundGenesisIndex, err := s.Manager.GetBlockTreeEntryByHash(genesisHash)
+	if err != nil {
+		t.Fatalf("ChainstateManager.GetBlockTreeEntryByHash() for genesis error = %v", err)
+	}
+	if foundGenesisIndex == nil {
+		t.Fatal("Found genesis block tree entry is nil")
+	}
+	defer foundGenesisIndex.Destroy()
+
+	// Verify found block has same height as original
+	foundHeight := foundGenesisIndex.Height()
+	originalHeight := genesis.Height()
+	if foundHeight != originalHeight {
+		t.Errorf("Found genesis height %d, expected %d", foundHeight, originalHeight)
 	}
 
-	// Verify each transaction is a valid TransactionUndo
-	for i := uint64(0); i < txCount; i++ {
-		undoSize := blockUndo.GetTransactionUndoSize(i)
-		if undoSize != 1 {
-			t.Errorf("Expected transaction undo size 1, got %d", undoSize)
-		}
+	// Test getting tip block by hash
+	tipIndex, err := chain.GetTip()
+	if err != nil {
+		t.Fatalf("GetTip() error = %v", err)
+	}
+	defer tipIndex.Destroy()
 
-		_, err := blockUndo.GetUndoOutputByIndex(i, 0)
-		if err != nil {
-			t.Fatalf("GetUndoOutputByIndex() error = %v", err)
-		}
+	tipHash, err := tipIndex.Hash()
+	if err != nil {
+		t.Fatalf("Tip Hash() error = %v", err)
+	}
+	defer tipHash.Destroy()
 
-		height := blockUndo.GetUndoOutputHeightByIndex(i, 0)
-		if height <= 0 {
-			t.Fatalf("GetUndoOutputHeightByIndex() height %d, want > 0", height)
-		}
+	foundTipIndex, err := s.Manager.GetBlockTreeEntryByHash(tipHash)
+	if err != nil {
+		t.Fatalf("ChainstateManager.GetBlockTreeEntryByHash() for tip error = %v", err)
+	}
+	if foundTipIndex == nil {
+		t.Fatal("Found tip block tree entry is nil")
+	}
+	defer foundTipIndex.Destroy()
+
+	// Verify found tip has same height as original
+	foundTipHeight := foundTipIndex.Height()
+	originalTipHeight := tipIndex.Height()
+	if foundTipHeight != originalTipHeight {
+		t.Errorf("Found tip height %d, expected %d", foundTipHeight, originalTipHeight)
 	}
 }
 
@@ -173,6 +270,8 @@ func (s *ChainstateManagerTestSuite) Setup(t *testing.T) {
 	opts.SetWorkerThreads(1)
 	opts.SetBlockTreeDBInMemory(true)
 	opts.SetChainstateDBInMemory(true)
+	// Wipe both databases to enable proper initialization
+	opts.SetWipeDBs(true, true)
 
 	// Create chainstate manager
 	manager, err := NewChainstateManager(ctx, opts)

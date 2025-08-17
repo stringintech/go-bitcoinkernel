@@ -11,7 +11,7 @@ func TestNotificationCallbacks(t *testing.T) {
 	var lastHeaderHeight int64
 
 	callbacks := &NotificationCallbacks{
-		OnBlockTip: func(state SynchronizationState, index *BlockIndex, _ float64) {
+		OnBlockTip: func(state SynchronizationState, index *BlockTreeEntry, _ float64) {
 			blockTipCalled = true
 			lastBlockHeight = int64(index.Height())
 		},

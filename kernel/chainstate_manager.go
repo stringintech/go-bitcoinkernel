@@ -12,9 +12,9 @@ import (
 
 var _ cManagedResource = &ChainstateManager{}
 
-// ChainstateManager wraps the C kernel_ChainstateManager
+// ChainstateManager wraps the C btck_ChainstateManager
 type ChainstateManager struct {
-	ptr     *C.kernel_ChainstateManager
+	ptr     *C.btck_ChainstateManager
 	context *Context
 }
 
@@ -30,7 +30,7 @@ func NewChainstateManager(context *Context, options *ChainstateManagerOptions) (
 		return nil, err
 	}
 
-	ptr := C.kernel_chainstate_manager_create(context.ptr, options.ptr)
+	ptr := C.btck_chainstate_manager_create(options.ptr)
 	if ptr == nil {
 		return nil, ErrKernelChainstateManagerCreate
 	}
@@ -43,35 +43,35 @@ func NewChainstateManager(context *Context, options *ChainstateManagerOptions) (
 	return manager, nil
 }
 
-// ReadBlock reads a block using the provided block index
-func (cm *ChainstateManager) ReadBlock(blockIndex *BlockIndex) (*Block, error) {
+// ReadBlock reads a block using the provided block tree entry
+func (cm *ChainstateManager) ReadBlock(blockTreeEntry *BlockTreeEntry) (*Block, error) {
 	checkReady(cm)
-	if err := validateReady(blockIndex); err != nil {
+	if err := validateReady(blockTreeEntry); err != nil {
 		return nil, err
 	}
 
-	ptr := C.kernel_block_read(cm.context.ptr, cm.ptr, blockIndex.ptr)
+	ptr := C.btck_block_read(cm.ptr, blockTreeEntry.ptr)
 	if ptr == nil {
 		return nil, ErrKernelChainstateManagerReadBlock
 	}
 	return newBlockFromPtr(ptr), nil
 }
 
-// ReadBlockUndo reads block undo data for a given block index
-func (cm *ChainstateManager) ReadBlockUndo(blockIndex *BlockIndex) (*BlockUndo, error) {
+// ReadBlockSpentOutputs reads block spent outputs data for a given block tree entry
+func (cm *ChainstateManager) ReadBlockSpentOutputs(blockTreeEntry *BlockTreeEntry) (*BlockSpentOutputs, error) {
 	checkReady(cm)
-	if err := validateReady(blockIndex); err != nil {
+	if err := validateReady(blockTreeEntry); err != nil {
 		return nil, err
 	}
 
-	ptr := C.kernel_block_undo_read(cm.context.ptr, cm.ptr, blockIndex.ptr)
+	ptr := C.btck_block_spent_outputs_read(cm.ptr, blockTreeEntry.ptr)
 	if ptr == nil {
 		return nil, ErrKernelChainstateManagerReadBlockUndo
 	}
 
-	blockUndo := &BlockUndo{ptr: ptr}
-	runtime.SetFinalizer(blockUndo, (*BlockUndo).destroy)
-	return blockUndo, nil
+	blockSpentOutputs := &BlockSpentOutputs{ptr: ptr}
+	runtime.SetFinalizer(blockSpentOutputs, (*BlockSpentOutputs).destroy)
+	return blockSpentOutputs, nil
 }
 
 // ProcessBlock processes and validates a block
@@ -81,108 +81,52 @@ func (cm *ChainstateManager) ProcessBlock(block *Block) (bool, bool, error) {
 		return false, false, err
 	}
 
-	var newBlock C.bool
-	success := C.kernel_chainstate_manager_process_block(
-		cm.context.ptr,
+	var newBlock C.int
+	result := C.btck_chainstate_manager_process_block(
 		cm.ptr,
 		block.ptr,
 		&newBlock,
 	)
-
-	if !success {
+	if result != 0 {
 		return false, false, ErrKernelChainstateManagerProcessBlock
 	}
-	return bool(success), bool(newBlock), nil
+	return true, newBlock != 0, nil
 }
 
-// GetBlockIndexTip returns the block index of the current chain tip
-func (cm *ChainstateManager) GetBlockIndexTip() (*BlockIndex, error) {
+// GetActiveChain returns the currently active chain
+func (cm *ChainstateManager) GetActiveChain() (*Chain, error) {
 	checkReady(cm)
 
-	ptr := C.kernel_block_index_get_tip(cm.context.ptr, cm.ptr)
+	ptr := C.btck_chainstate_manager_get_active_chain(cm.ptr)
 	if ptr == nil {
-		return nil, ErrBlockIndexUninitialized
+		return nil, ErrChainUninitialized
 	}
 
-	blockIndex := &BlockIndex{ptr: ptr}
-	runtime.SetFinalizer(blockIndex, (*BlockIndex).destroy)
-	return blockIndex, nil
+	chain := &Chain{ptr: ptr}
+	runtime.SetFinalizer(chain, (*Chain).destroy)
+	return chain, nil
 }
 
-// GetBlockIndexGenesis returns the block index of the genesis block
-func (cm *ChainstateManager) GetBlockIndexGenesis() (*BlockIndex, error) {
+// GetBlockTreeEntryByHash returns the block tree entry for a given block hash, or null if the hash is not found
+func (cm *ChainstateManager) GetBlockTreeEntryByHash(blockHash *BlockHash) (*BlockTreeEntry, error) {
 	checkReady(cm)
-
-	ptr := C.kernel_block_index_get_genesis(cm.context.ptr, cm.ptr)
-	if ptr == nil {
-		return nil, ErrBlockIndexUninitialized
-	}
-
-	blockIndex := &BlockIndex{ptr: ptr}
-	runtime.SetFinalizer(blockIndex, (*BlockIndex).destroy)
-	return blockIndex, nil
-}
-
-// GetBlockIndexByHash returns the block index for a given block hash
-func (cm *ChainstateManager) GetBlockIndexByHash(blockHash *BlockHash) (*BlockIndex, error) {
-	checkReady(cm)
-	if blockHash == nil || blockHash.ptr == nil {
-		return nil, ErrBlockHashUninitialized
-	}
-
-	ptr := C.kernel_block_index_get_by_hash(cm.context.ptr, cm.ptr, blockHash.ptr)
-	if ptr == nil {
-		return nil, ErrBlockIndexUninitialized
-	}
-
-	blockIndex := &BlockIndex{ptr: ptr}
-	runtime.SetFinalizer(blockIndex, (*BlockIndex).destroy)
-	return blockIndex, nil
-}
-
-// GetBlockIndexByHeight returns the block index for a given height in the currently active chain
-func (cm *ChainstateManager) GetBlockIndexByHeight(height int) (*BlockIndex, error) {
-	checkReady(cm)
-
-	ptr := C.kernel_block_index_get_by_height(cm.context.ptr, cm.ptr, C.int(height))
-	if ptr == nil {
-		return nil, ErrBlockIndexUninitialized
-	}
-
-	blockIndex := &BlockIndex{ptr: ptr}
-	runtime.SetFinalizer(blockIndex, (*BlockIndex).destroy)
-	return blockIndex, nil
-}
-
-// GetNextBlockIndex returns the next block index in the active chain
-func (cm *ChainstateManager) GetNextBlockIndex(blockIndex *BlockIndex) (*BlockIndex, error) {
-	checkReady(cm)
-	if err := validateReady(blockIndex); err != nil {
+	if err := validateReady(blockHash); err != nil {
 		return nil, err
 	}
 
-	ptr := C.kernel_block_index_get_next(cm.context.ptr, cm.ptr, blockIndex.ptr)
+	ptr := C.btck_chainstate_manager_get_block_tree_entry_by_hash(cm.ptr, blockHash.ptr)
 	if ptr == nil {
-		return nil, nil // No next block (tip or invalid)
+		return nil, nil
 	}
 
-	nextIndex := &BlockIndex{ptr: ptr}
-	runtime.SetFinalizer(nextIndex, (*BlockIndex).destroy)
-	return nextIndex, nil
+	blockTreeEntry := &BlockTreeEntry{ptr: ptr}
+	runtime.SetFinalizer(blockTreeEntry, (*BlockTreeEntry).destroy)
+	return blockTreeEntry, nil
 }
 
 // ImportBlocks imports blocks from the specified file paths
 func (cm *ChainstateManager) ImportBlocks(blockFilePaths []string) error {
 	checkReady(cm)
-
-	if len(blockFilePaths) == 0 {
-		// Import with no files triggers reindex if wipe options were set
-		success := C.kernel_chainstate_manager_import_blocks(cm.context.ptr, cm.ptr, nil, nil, 0)
-		if !success {
-			return ErrKernelImportBlocks
-		}
-		return nil
-	}
 
 	// Convert Go strings to C strings
 	cPaths := make([]*C.char, len(blockFilePaths))
@@ -196,19 +140,27 @@ func (cm *ChainstateManager) ImportBlocks(blockFilePaths []string) error {
 	// Clean up C strings
 	defer func() {
 		for i := range cPaths {
-			C.free(unsafe.Pointer(cPaths[i]))
+			if cPaths[i] != nil {
+				C.free(unsafe.Pointer(cPaths[i]))
+			}
 		}
 	}()
 
-	success := C.kernel_chainstate_manager_import_blocks(
-		cm.context.ptr,
+	var cPathsPtr **C.char
+	var cLensPtr *C.size_t
+	if len(cPaths) > 0 {
+		cPathsPtr = &cPaths[0]
+		cLensPtr = &cLens[0]
+	}
+
+	success := C.btck_chainstate_manager_import_blocks(
 		cm.ptr,
-		(**C.char)(unsafe.Pointer(&cPaths[0])),
-		(*C.size_t)(unsafe.Pointer(&cLens[0])),
+		cPathsPtr,
+		cLensPtr,
 		C.size_t(len(blockFilePaths)),
 	)
 
-	if !success {
+	if success != 0 {
 		return ErrKernelImportBlocks
 	}
 	return nil
@@ -216,7 +168,7 @@ func (cm *ChainstateManager) ImportBlocks(blockFilePaths []string) error {
 
 func (cm *ChainstateManager) destroy() {
 	if cm.isReady() {
-		C.kernel_chainstate_manager_destroy(cm.ptr, cm.context.ptr)
+		C.btck_chainstate_manager_destroy(cm.ptr)
 		cm.ptr = nil
 		cm.context = nil
 	}

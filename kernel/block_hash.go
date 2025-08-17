@@ -11,9 +11,9 @@ import (
 
 var _ cManagedResource = &BlockHash{}
 
-// BlockHash wraps the C kernel_BlockHash
+// BlockHash wraps the C btck_BlockHash
 type BlockHash struct {
-	ptr *C.kernel_BlockHash
+	ptr *C.btck_BlockHash
 }
 
 // Bytes returns the raw hash bytes
@@ -25,7 +25,7 @@ func (bh *BlockHash) Bytes() []byte {
 
 func (bh *BlockHash) destroy() {
 	if bh.ptr != nil {
-		C.kernel_block_hash_destroy(bh.ptr)
+		C.btck_block_hash_destroy(bh.ptr)
 		bh.ptr = nil
 	}
 }

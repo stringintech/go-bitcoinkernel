@@ -11,7 +11,7 @@ import (
 
 // NotificationCallbacks contains all the Go callback function types for notifications.
 type NotificationCallbacks struct {
-	OnBlockTip     func(state SynchronizationState, index *BlockIndex, progress float64)
+	OnBlockTip     func(state SynchronizationState, entry *BlockTreeEntry, progress float64)
 	OnHeaderTip    func(state SynchronizationState, height int64, timestamp int64, presync bool)
 	OnProgress     func(title string, percent int, resumable bool)
 	OnWarningSet   func(warning Warning, message string)
@@ -21,7 +21,7 @@ type NotificationCallbacks struct {
 }
 
 //export go_notify_block_tip_bridge
-func go_notify_block_tip_bridge(user_data unsafe.Pointer, state C.kernel_SynchronizationState, index *C.kernel_BlockIndex, verification_progress C.double) {
+func go_notify_block_tip_bridge(user_data unsafe.Pointer, state C.btck_SynchronizationState, entry *C.btck_BlockTreeEntry, verification_progress C.double) {
 	// Convert void* back to Handle - user_data contains Handle ID
 	handle := cgo.Handle(user_data)
 	// Retrieve original Go callback struct
@@ -29,37 +29,35 @@ func go_notify_block_tip_bridge(user_data unsafe.Pointer, state C.kernel_Synchro
 
 	if callbacks.OnBlockTip != nil {
 		goState := SynchronizationState(state)
-		// Note: BlockIndex from notification is const and owned by kernel library
-		// We create a wrapper but don't set finalizer since we don't own it
-		goIndex := &BlockIndex{ptr: (*C.kernel_BlockIndex)(unsafe.Pointer(index))}
-		callbacks.OnBlockTip(goState, goIndex, float64(verification_progress))
+		goEntry := &BlockTreeEntry{ptr: (*C.btck_BlockTreeEntry)(unsafe.Pointer(entry))}
+		callbacks.OnBlockTip(goState, goEntry, float64(verification_progress))
 	}
 }
 
 //export go_notify_header_tip_bridge
-func go_notify_header_tip_bridge(user_data unsafe.Pointer, state C.kernel_SynchronizationState, height C.int64_t, timestamp C.int64_t, presync C.bool) {
+func go_notify_header_tip_bridge(user_data unsafe.Pointer, state C.btck_SynchronizationState, height C.int64_t, timestamp C.int64_t, presync C.int) {
 	handle := cgo.Handle(user_data)
 	callbacks := handle.Value().(*NotificationCallbacks)
 
 	if callbacks.OnHeaderTip != nil {
 		goState := SynchronizationState(state)
-		callbacks.OnHeaderTip(goState, int64(height), int64(timestamp), bool(presync))
+		callbacks.OnHeaderTip(goState, int64(height), int64(timestamp), presync != 0)
 	}
 }
 
 //export go_notify_progress_bridge
-func go_notify_progress_bridge(user_data unsafe.Pointer, title *C.char, title_len C.size_t, progress_percent C.int, resume_possible C.bool) {
+func go_notify_progress_bridge(user_data unsafe.Pointer, title *C.char, title_len C.size_t, progress_percent C.int, resume_possible C.int) {
 	handle := cgo.Handle(user_data)
 	callbacks := handle.Value().(*NotificationCallbacks)
 
 	if callbacks.OnProgress != nil {
 		goTitle := C.GoStringN(title, C.int(title_len))
-		callbacks.OnProgress(goTitle, int(progress_percent), bool(resume_possible))
+		callbacks.OnProgress(goTitle, int(progress_percent), resume_possible != 0)
 	}
 }
 
 //export go_notify_warning_set_bridge
-func go_notify_warning_set_bridge(user_data unsafe.Pointer, warning C.kernel_Warning, message *C.char, message_len C.size_t) {
+func go_notify_warning_set_bridge(user_data unsafe.Pointer, warning C.btck_Warning, message *C.char, message_len C.size_t) {
 	handle := cgo.Handle(user_data)
 	callbacks := handle.Value().(*NotificationCallbacks)
 
@@ -71,7 +69,7 @@ func go_notify_warning_set_bridge(user_data unsafe.Pointer, warning C.kernel_War
 }
 
 //export go_notify_warning_unset_bridge
-func go_notify_warning_unset_bridge(user_data unsafe.Pointer, warning C.kernel_Warning) {
+func go_notify_warning_unset_bridge(user_data unsafe.Pointer, warning C.btck_Warning) {
 	handle := cgo.Handle(user_data)
 	callbacks := handle.Value().(*NotificationCallbacks)
 

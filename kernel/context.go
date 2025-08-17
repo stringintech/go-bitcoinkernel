@@ -10,13 +10,13 @@ import (
 
 var _ cManagedResource = &Context{}
 
-// Context wraps the C kernel_Context
+// Context wraps the C btck_Context
 // Once other validation objects are instantiated from it, the context needs to be kept in
 // memory for the duration of their lifetimes.
 //
 // A constructed context can be safely used from multiple threads.
 type Context struct {
-	ptr *C.kernel_Context
+	ptr *C.btck_Context
 }
 
 // NewContext creates a new kernel context with the specified options.
@@ -27,7 +27,7 @@ func NewContext(options *ContextOptions) (*Context, error) {
 		return nil, err
 	}
 
-	ptr := C.kernel_context_create(options.ptr)
+	ptr := C.btck_context_create(options.ptr)
 	if ptr == nil {
 		return nil, ErrKernelContextCreate
 	}
@@ -61,12 +61,12 @@ func NewDefaultContext() (*Context, error) {
 // Interrupt can be used to halt long-running validation functions
 func (ctx *Context) Interrupt() bool {
 	checkReady(ctx)
-	return bool(C.kernel_context_interrupt(ctx.ptr))
+	return C.btck_context_interrupt(ctx.ptr) != 0
 }
 
 func (ctx *Context) destroy() {
 	if ctx.ptr != nil {
-		C.kernel_context_destroy(ctx.ptr)
+		C.btck_context_destroy(ctx.ptr)
 		ctx.ptr = nil
 	}
 }

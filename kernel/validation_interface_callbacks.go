@@ -15,24 +15,22 @@ type ValidationInterfaceCallbacks struct {
 }
 
 //export go_validation_interface_block_checked_bridge
-func go_validation_interface_block_checked_bridge(user_data unsafe.Pointer, block *C.kernel_BlockPointer, state *C.kernel_BlockValidationState) {
+func go_validation_interface_block_checked_bridge(user_data unsafe.Pointer, block *C.btck_BlockPointer, state *C.btck_BlockValidationState) {
 	// Convert void* back to Handle - user_data contains Handle ID
 	handle := cgo.Handle(user_data)
 	// Retrieve original Go callback struct
 	callbacks := handle.Value().(*ValidationInterfaceCallbacks)
 
 	if callbacks.OnBlockChecked != nil {
-		// Note: BlockPointer and BlockValidationState from validation interface are const and owned by kernel library
-		// We create wrappers but don't set finalizer since we don't own them
-		goBlock := &BlockPointer{ptr: (*C.kernel_BlockPointer)(unsafe.Pointer(block))}
-		goState := &BlockValidationState{ptr: (*C.kernel_BlockValidationState)(unsafe.Pointer(state))}
+		goBlock := &BlockPointer{ptr: (*C.btck_BlockPointer)(unsafe.Pointer(block))}
+		goState := &BlockValidationState{ptr: (*C.btck_BlockValidationState)(unsafe.Pointer(state))}
 		callbacks.OnBlockChecked(goBlock, goState)
 	}
 }
 
 // BlockPointer wraps the C kernel_BlockPointer for validation interface callbacks
 type BlockPointer struct {
-	ptr *C.kernel_BlockPointer
+	ptr *C.btck_BlockPointer
 }
 
 // GetHash returns the block hash
@@ -41,7 +39,7 @@ func (bp *BlockPointer) GetHash() (*BlockHash, error) {
 		return nil, ErrBlockUninitialized
 	}
 
-	hashPtr := C.kernel_block_pointer_get_hash(bp.ptr)
+	hashPtr := C.btck_block_pointer_get_hash(bp.ptr)
 	if hashPtr == nil {
 		return nil, ErrKernelBlockGetHash
 	}
@@ -55,18 +53,7 @@ func (bp *BlockPointer) CopyData() ([]byte, error) {
 		return nil, ErrBlockUninitialized
 	}
 
-	byteArray := C.kernel_block_pointer_copy_data(bp.ptr)
-	if byteArray == nil {
-		return nil, ErrKernelCopyBlockData
-	}
-	defer C.kernel_byte_array_destroy(byteArray)
-
-	size := int(byteArray.size)
-	if size == 0 {
-		return nil, nil
-	}
-
-	// Copy the data to Go slice
-	data := C.GoBytes(unsafe.Pointer(byteArray.data), C.int(size))
-	return data, nil
+	return writeToBytes(func(writer C.btck_WriteBytes, user_data unsafe.Pointer) C.int {
+		return C.btck_block_pointer_to_bytes(bp.ptr, writer, user_data)
+	})
 }

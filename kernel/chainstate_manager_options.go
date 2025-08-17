@@ -12,9 +12,9 @@ import (
 
 var _ cManagedResource = &ChainstateManagerOptions{}
 
-// ChainstateManagerOptions wraps the C kernel_ChainstateManagerOptions
+// ChainstateManagerOptions wraps the C btck_ChainstateManagerOptions
 type ChainstateManagerOptions struct {
-	ptr     *C.kernel_ChainstateManagerOptions
+	ptr     *C.btck_ChainstateManagerOptions
 	context *Context
 }
 
@@ -31,7 +31,7 @@ func NewChainstateManagerOptions(context *Context, dataDir, blocksDir string) (*
 	cBlocksDir := C.CString(blocksDir)
 	defer C.free(unsafe.Pointer(cBlocksDir))
 
-	ptr := C.kernel_chainstate_manager_options_create(
+	ptr := C.btck_chainstate_manager_options_create(
 		context.ptr,
 		cDataDir,
 		C.size_t(len(dataDir)),
@@ -53,31 +53,47 @@ func NewChainstateManagerOptions(context *Context, dataDir, blocksDir string) (*
 // SetWorkerThreads sets the number of worker threads for validation
 func (opts *ChainstateManagerOptions) SetWorkerThreads(threads int) {
 	checkReady(opts)
-	C.kernel_chainstate_manager_options_set_worker_threads_num(opts.ptr, C.int(threads))
+	C.btck_chainstate_manager_options_set_worker_threads_num(opts.ptr, C.int(threads))
 }
 
 func (opts *ChainstateManagerOptions) SetWipeDBs(wipeBlockTree, wipeChainstate bool) bool {
 	checkReady(opts)
-	return bool(C.kernel_chainstate_manager_options_set_wipe_dbs(
+	wipeBlockTreeInt := 0
+	if wipeBlockTree {
+		wipeBlockTreeInt = 1
+	}
+	wipeChainstateInt := 0
+	if wipeChainstate {
+		wipeChainstateInt = 1
+	}
+	return C.btck_chainstate_manager_options_set_wipe_dbs(
 		opts.ptr,
-		C.bool(wipeBlockTree),
-		C.bool(wipeChainstate),
-	))
+		C.int(wipeBlockTreeInt),
+		C.int(wipeChainstateInt),
+	) != 0
 }
 
 func (opts *ChainstateManagerOptions) SetBlockTreeDBInMemory(inMemory bool) {
 	checkReady(opts)
-	C.kernel_chainstate_manager_options_set_block_tree_db_in_memory(opts.ptr, C.bool(inMemory))
+	inMemoryInt := 0
+	if inMemory {
+		inMemoryInt = 1
+	}
+	C.btck_chainstate_manager_options_set_block_tree_db_in_memory(opts.ptr, C.int(inMemoryInt))
 }
 
 func (opts *ChainstateManagerOptions) SetChainstateDBInMemory(inMemory bool) {
 	checkReady(opts)
-	C.kernel_chainstate_manager_options_set_chainstate_db_in_memory(opts.ptr, C.bool(inMemory))
+	inMemoryInt := 0
+	if inMemory {
+		inMemoryInt = 1
+	}
+	C.btck_chainstate_manager_options_set_chainstate_db_in_memory(opts.ptr, C.int(inMemoryInt))
 }
 
 func (opts *ChainstateManagerOptions) destroy() {
 	if opts.ptr != nil {
-		C.kernel_chainstate_manager_options_destroy(opts.ptr)
+		C.btck_chainstate_manager_options_destroy(opts.ptr)
 		opts.ptr = nil
 		opts.context = nil
 	}

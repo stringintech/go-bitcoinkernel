@@ -8,9 +8,9 @@ import "runtime"
 
 var _ cManagedResource = &ChainParameters{}
 
-// ChainParameters wraps the C kernel_ChainParameters
+// ChainParameters wraps the C btck_ChainParameters
 type ChainParameters struct {
-	ptr *C.kernel_ChainParameters
+	ptr *C.btck_ChainParameters
 }
 
 func NewChainParameters(chainType ChainType) (*ChainParameters, error) {
@@ -18,7 +18,7 @@ func NewChainParameters(chainType ChainType) (*ChainParameters, error) {
 	if err != nil {
 		return nil, err
 	}
-	ptr := C.kernel_chain_parameters_create(cType)
+	ptr := C.btck_chain_parameters_create(cType)
 	if ptr == nil {
 		return nil, ErrKernelChainParametersCreate
 	}
@@ -30,7 +30,7 @@ func NewChainParameters(chainType ChainType) (*ChainParameters, error) {
 
 func (cp *ChainParameters) destroy() {
 	if cp.ptr != nil {
-		C.kernel_chain_parameters_destroy(cp.ptr)
+		C.btck_chain_parameters_destroy(cp.ptr)
 		cp.ptr = nil
 	}
 }
@@ -59,9 +59,9 @@ const (
 	ChainTypeRegtest
 )
 
-func (t ChainType) c() (C.kernel_ChainType, error) {
+func (t ChainType) c() (C.btck_ChainType, error) {
 	if t < ChainTypeMainnet || t > ChainTypeRegtest {
 		return 0, ErrInvalidChainType
 	}
-	return C.kernel_ChainType(t), nil
+	return C.btck_ChainType(t), nil
 }

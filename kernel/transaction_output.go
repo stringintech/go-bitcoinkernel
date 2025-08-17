@@ -10,9 +10,9 @@ import (
 
 var _ cManagedResource = &TransactionOutput{}
 
-// TransactionOutput wraps the C kernel_TransactionOutput
+// TransactionOutput wraps the C btck_TransactionOutput
 type TransactionOutput struct {
-	ptr *C.kernel_TransactionOutput
+	ptr *C.btck_TransactionOutput
 }
 
 func NewTransactionOutput(scriptPubkey *ScriptPubkey, amount int64) (*TransactionOutput, error) {
@@ -20,7 +20,7 @@ func NewTransactionOutput(scriptPubkey *ScriptPubkey, amount int64) (*Transactio
 		return nil, err
 	}
 
-	ptr := C.kernel_transaction_output_create(scriptPubkey.ptr, C.int64_t(amount))
+	ptr := C.btck_transaction_output_create(scriptPubkey.ptr, C.int64_t(amount))
 	if ptr == nil {
 		return nil, ErrKernelTransactionOutputCreate
 	}
@@ -30,11 +30,11 @@ func NewTransactionOutput(scriptPubkey *ScriptPubkey, amount int64) (*Transactio
 	return output, nil
 }
 
-// ScriptPubkey returns a copy of the script pubkey from this transaction output
+// ScriptPubkey returns the script pubkey from this transaction output
 func (t *TransactionOutput) ScriptPubkey() (*ScriptPubkey, error) {
 	checkReady(t)
 
-	ptr := C.kernel_transaction_output_copy_script_pubkey(t.ptr)
+	ptr := C.btck_transaction_output_get_script_pubkey(t.ptr)
 	if ptr == nil {
 		return nil, ErrKernelCopyScriptPubkeyFromOutput
 	}
@@ -46,12 +46,26 @@ func (t *TransactionOutput) ScriptPubkey() (*ScriptPubkey, error) {
 
 func (t *TransactionOutput) Amount() int64 {
 	checkReady(t)
-	return int64(C.kernel_transaction_output_get_amount(t.ptr))
+	return int64(C.btck_transaction_output_get_amount(t.ptr))
+}
+
+// Copy creates a copy of the transaction output
+func (t *TransactionOutput) Copy() (*TransactionOutput, error) {
+	checkReady(t)
+
+	ptr := C.btck_transaction_output_copy(t.ptr)
+	if ptr == nil {
+		return nil, ErrKernelTransactionOutputCopy
+	}
+
+	output := &TransactionOutput{ptr: ptr}
+	runtime.SetFinalizer(output, (*TransactionOutput).destroy)
+	return output, nil
 }
 
 func (t *TransactionOutput) destroy() {
 	if t.ptr != nil {
-		C.kernel_transaction_output_destroy(t.ptr)
+		C.btck_transaction_output_destroy(t.ptr)
 		t.ptr = nil
 	}
 }

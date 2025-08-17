@@ -7,20 +7,20 @@ import "C"
 
 var _ cResource = &BlockValidationState{}
 
-// BlockValidationState wraps the C kernel_BlockValidationState
+// BlockValidationState wraps the C btck_BlockValidationState
 type BlockValidationState struct {
-	ptr *C.kernel_BlockValidationState
+	ptr *C.btck_BlockValidationState
 }
 
 func (bvs *BlockValidationState) ValidationMode() ValidationMode {
 	checkReady(bvs)
-	mode := C.kernel_block_validation_state_get_validation_mode(bvs.ptr)
+	mode := C.btck_block_validation_state_get_validation_mode(bvs.ptr)
 	return ValidationMode(mode)
 }
 
 func (bvs *BlockValidationState) ValidationResult() BlockValidationResult {
 	checkReady(bvs)
-	result := C.kernel_block_validation_state_get_block_validation_result(bvs.ptr)
+	result := C.btck_block_validation_state_get_block_validation_result(bvs.ptr)
 	return BlockValidationResult(result)
 }
 

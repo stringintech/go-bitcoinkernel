@@ -11,9 +11,9 @@ import (
 
 var _ cManagedResource = &ScriptPubkey{}
 
-// ScriptPubkey wraps the C kernel_ScriptPubkey
+// ScriptPubkey wraps the C btck_ScriptPubkey
 type ScriptPubkey struct {
-	ptr *C.kernel_ScriptPubkey
+	ptr *C.btck_ScriptPubkey
 }
 
 // NewScriptPubkeyFromRaw creates a new script pubkey from raw serialized data
@@ -21,7 +21,7 @@ func NewScriptPubkeyFromRaw(rawScriptPubkey []byte) (*ScriptPubkey, error) {
 	if len(rawScriptPubkey) == 0 {
 		return nil, ErrEmptyScriptPubkeyData
 	}
-	ptr := C.kernel_script_pubkey_create((*C.uchar)(unsafe.Pointer(&rawScriptPubkey[0])), C.size_t(len(rawScriptPubkey)))
+	ptr := C.btck_script_pubkey_create(unsafe.Pointer(&rawScriptPubkey[0]), C.size_t(len(rawScriptPubkey)))
 	if ptr == nil {
 		return nil, ErrKernelScriptPubkeyCreate
 	}
@@ -35,25 +35,28 @@ func NewScriptPubkeyFromRaw(rawScriptPubkey []byte) (*ScriptPubkey, error) {
 func (s *ScriptPubkey) Data() ([]byte, error) {
 	checkReady(s)
 
-	byteArray := C.kernel_script_pubkey_copy_data(s.ptr)
-	if byteArray == nil {
-		return nil, ErrKernelCopyScriptPubkeyData
-	}
-	defer C.kernel_byte_array_destroy(byteArray)
+	return writeToBytes(func(writer C.btck_WriteBytes, user_data unsafe.Pointer) C.int {
+		return C.btck_script_pubkey_to_bytes(s.ptr, writer, user_data)
+	})
+}
 
-	size := int(byteArray.size)
-	if size == 0 {
-		return nil, nil
+// Copy creates a copy of the script pubkey
+func (s *ScriptPubkey) Copy() (*ScriptPubkey, error) {
+	checkReady(s)
+
+	ptr := C.btck_script_pubkey_copy(s.ptr)
+	if ptr == nil {
+		return nil, ErrKernelScriptPubkeyCopy
 	}
 
-	// Copy the data to Go slice
-	data := C.GoBytes(unsafe.Pointer(byteArray.data), C.int(size))
-	return data, nil
+	scriptPubkey := &ScriptPubkey{ptr: ptr}
+	runtime.SetFinalizer(scriptPubkey, (*ScriptPubkey).destroy)
+	return scriptPubkey, nil
 }
 
 func (s *ScriptPubkey) destroy() {
 	if s.ptr != nil {
-		C.kernel_script_pubkey_destroy(s.ptr)
+		C.btck_script_pubkey_destroy(s.ptr)
 		s.ptr = nil
 	}
 }

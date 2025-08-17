@@ -7,39 +7,39 @@ package kernel
 
 // Bridge functions: exported Go functions that C library can call
 // user_data contains the cgo.Handle ID as void* for callback identification
-extern void go_notify_block_tip_bridge(void* user_data, kernel_SynchronizationState state, kernel_BlockIndex* index, double verification_progress);
-extern void go_notify_header_tip_bridge(void* user_data, kernel_SynchronizationState state, int64_t height, int64_t timestamp, bool presync);
-extern void go_notify_progress_bridge(void* user_data, char* title, size_t title_len, int progress_percent, bool resume_possible);
-extern void go_notify_warning_set_bridge(void* user_data, kernel_Warning warning, char* message, size_t message_len);
-extern void go_notify_warning_unset_bridge(void* user_data, kernel_Warning warning);
-extern void go_notify_flush_error_bridge(void* user_data, char* message, size_t message_len);
-extern void go_notify_fatal_error_bridge(void* user_data, char* message, size_t message_len);
-extern void go_validation_interface_block_checked_bridge(void* user_data, const kernel_BlockPointer* block, const kernel_BlockValidationState* state);
+extern void go_notify_block_tip_bridge(void* user_data, btck_SynchronizationState state, btck_BlockTreeEntry* entry, double verification_progress);
+extern void go_notify_header_tip_bridge(void* user_data, btck_SynchronizationState state, int64_t height, int64_t timestamp, int presync);
+extern void go_notify_progress_bridge(void* user_data, const char* title, size_t title_len, int progress_percent, int resume_possible);
+extern void go_notify_warning_set_bridge(void* user_data, btck_Warning warning, const char* message, size_t message_len);
+extern void go_notify_warning_unset_bridge(void* user_data, btck_Warning warning);
+extern void go_notify_flush_error_bridge(void* user_data, const char* message, size_t message_len);
+extern void go_notify_fatal_error_bridge(void* user_data, const char* message, size_t message_len);
+extern void go_validation_interface_block_checked_bridge(void* user_data, const btck_BlockPointer* block, const btck_BlockValidationState* state);
 
 // Wrapper function: C helper to set notifications with Go callbacks
 // Converts Handle ID to void* and passes to C library
-static inline void set_notifications_wrapper(kernel_ContextOptions* opts, uintptr_t handle) {
-    kernel_NotificationInterfaceCallbacks callbacks = {
+static inline void set_notifications_wrapper(btck_ContextOptions* opts, uintptr_t handle) {
+    btck_NotificationInterfaceCallbacks callbacks = {
         .user_data = (void*)handle,
-        .block_tip = (kernel_NotifyBlockTip)go_notify_block_tip_bridge,
-        .header_tip = (kernel_NotifyHeaderTip)go_notify_header_tip_bridge,
-        .progress = (kernel_NotifyProgress)go_notify_progress_bridge,
-        .warning_set = (kernel_NotifyWarningSet)go_notify_warning_set_bridge,
-        .warning_unset = (kernel_NotifyWarningUnset)go_notify_warning_unset_bridge,
-        .flush_error = (kernel_NotifyFlushError)go_notify_flush_error_bridge,
-        .fatal_error = (kernel_NotifyFatalError)go_notify_fatal_error_bridge,
+        .block_tip = (btck_NotifyBlockTip)go_notify_block_tip_bridge,
+        .header_tip = (btck_NotifyHeaderTip)go_notify_header_tip_bridge,
+        .progress = (btck_NotifyProgress)go_notify_progress_bridge,
+        .warning_set = (btck_NotifyWarningSet)go_notify_warning_set_bridge,
+        .warning_unset = (btck_NotifyWarningUnset)go_notify_warning_unset_bridge,
+        .flush_error = (btck_NotifyFlushError)go_notify_flush_error_bridge,
+        .fatal_error = (btck_NotifyFatalError)go_notify_fatal_error_bridge,
     };
-    kernel_context_options_set_notifications(opts, callbacks);
+    btck_context_options_set_notifications(opts, callbacks);
 }
 
 // Wrapper function: C helper to set validation interface with Go callbacks
 // Converts Handle ID to void* and passes to C library
-static inline void set_validation_interface_wrapper(kernel_ContextOptions* opts, uintptr_t handle) {
-    kernel_ValidationInterfaceCallbacks callbacks = {
+static inline void set_validation_interface_wrapper(btck_ContextOptions* opts, uintptr_t handle) {
+    btck_ValidationInterfaceCallbacks callbacks = {
         .user_data = (void*)handle,
-        .block_checked = (kernel_ValidationInterfaceBlockChecked)go_validation_interface_block_checked_bridge,
+        .block_checked = (btck_ValidationInterfaceBlockChecked)go_validation_interface_block_checked_bridge,
     };
-    kernel_context_options_set_validation_interface(opts, callbacks);
+    btck_context_options_set_validation_interface(opts, callbacks);
 }
 */
 import "C"
@@ -50,15 +50,15 @@ import (
 
 var _ cManagedResource = &ContextOptions{}
 
-// ContextOptions wraps the C kernel_ContextOptions
+// ContextOptions wraps the C btck_ContextOptions
 type ContextOptions struct {
-	ptr                *C.kernel_ContextOptions
+	ptr                *C.btck_ContextOptions
 	notificationHandle cgo.Handle // Prevents notification callbacks GC until Destroy() called
 	validationHandle   cgo.Handle // Prevents validation callbacks GC until Destroy() called
 }
 
 func NewContextOptions() (*ContextOptions, error) {
-	ptr := C.kernel_context_options_create()
+	ptr := C.btck_context_options_create()
 	if ptr == nil {
 		return nil, ErrKernelContextOptionsCreate
 	}
@@ -76,7 +76,7 @@ func (opts *ContextOptions) SetChainParams(chainParams *ChainParameters) {
 	if chainParams == nil || chainParams.ptr == nil {
 		panic(ErrChainParametersUninitialized)
 	}
-	C.kernel_context_options_set_chainparams(opts.ptr, chainParams.ptr)
+	C.btck_context_options_set_chainparams(opts.ptr, chainParams.ptr)
 }
 
 // SetNotifications sets the notification callbacks for these context options.
@@ -121,7 +121,7 @@ func (opts *ContextOptions) SetValidationInterface(callbacks *ValidationInterfac
 
 func (opts *ContextOptions) destroy() {
 	if opts.ptr != nil {
-		C.kernel_context_options_destroy(opts.ptr)
+		C.btck_context_options_destroy(opts.ptr)
 		opts.ptr = nil
 	}
 	if opts.notificationHandle != 0 {

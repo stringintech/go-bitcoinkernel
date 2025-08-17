@@ -11,8 +11,8 @@ extern void go_log_callback_bridge(void* user_data, char* message, size_t messag
 
 // Wrapper function: C helper to create logging connection with Go callback
 // Converts Handle ID to void* and passes to C library
-static inline kernel_LoggingConnection* create_logging_connection_wrapper(uintptr_t context, kernel_LoggingOptions options) {
-    return kernel_logging_connection_create((kernel_LogCallback)go_log_callback_bridge, (void*)context, options);
+static inline btck_LoggingConnection* create_logging_connection_wrapper(uintptr_t context, btck_LoggingOptions options) {
+    return btck_logging_connection_create((btck_LogCallback)go_log_callback_bridge, (void*)context, options);
 }
 */
 import "C"
@@ -28,12 +28,20 @@ type LogCallback func(message string)
 
 var _ cManagedResource = &LoggingConnection{}
 
-// LoggingConnection wraps the C kernel_LoggingConnection.
+// LoggingConnection wraps the C btck_LoggingConnection.
 // Functions changing the logging settings are global and change
-// the settings for all existing kernel_LoggingConnection instances.
+// the settings for all existing btck_LoggingConnection instances.
 type LoggingConnection struct {
-	ptr    *C.kernel_LoggingConnection
+	ptr    *C.btck_LoggingConnection
 	handle cgo.Handle // Prevents callback GC until Delete() called
+}
+
+// boolToInt converts Go bool to C int (0 for false, 1 for true)
+func boolToInt(b bool) C.int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 //export go_log_callback_bridge
@@ -58,12 +66,12 @@ func NewLoggingConnection(callback LogCallback, options LoggingOptions) (*Loggin
 	// and provides a stable ID that can be passed through C code safely
 	handle := cgo.NewHandle(callback)
 
-	cOptions := C.kernel_LoggingOptions{
-		log_timestamps:               C.bool(options.LogTimestamps),
-		log_time_micros:              C.bool(options.LogTimeMicros),
-		log_threadnames:              C.bool(options.LogThreadNames),
-		log_sourcelocations:          C.bool(options.LogSourceLocations),
-		always_print_category_levels: C.bool(options.AlwaysPrintCategoryLevel),
+	cOptions := C.btck_LoggingOptions{
+		log_timestamps:               boolToInt(options.LogTimestamps),
+		log_time_micros:              boolToInt(options.LogTimeMicros),
+		log_threadnames:              boolToInt(options.LogThreadNames),
+		log_sourcelocations:          boolToInt(options.LogSourceLocations),
+		always_print_category_levels: boolToInt(options.AlwaysPrintCategoryLevel),
 	}
 
 	ptr := C.create_logging_connection_wrapper(C.uintptr_t(handle), cOptions)
@@ -83,7 +91,7 @@ func NewLoggingConnection(callback LogCallback, options LoggingOptions) (*Loggin
 
 func (lc *LoggingConnection) destroy() {
 	if lc.ptr != nil {
-		C.kernel_logging_connection_destroy(lc.ptr)
+		C.btck_logging_connection_destroy(lc.ptr)
 		lc.ptr = nil
 	}
 	if lc.handle != 0 {
@@ -109,7 +117,7 @@ func (lc *LoggingConnection) uninitializedError() error {
 // DisableLogging permanently disables the global internal logger.
 // This function should only be called once and is not thread-safe
 func DisableLogging() {
-	C.kernel_logging_disable()
+	C.btck_logging_disable()
 }
 
 // Global mutex for thread-safe category management
@@ -119,21 +127,21 @@ var loggingMutex = sync.RWMutex{}
 func AddLogLevelCategory(category LogCategory, level LogLevel) {
 	loggingMutex.Lock()
 	defer loggingMutex.Unlock()
-	C.kernel_logging_set_level_category(category.mustC(), level.mustC())
+	C.btck_logging_set_level_category(category.mustC(), level.mustC())
 }
 
 // EnableLogCategory enables logging for a specific category or all categories
 func EnableLogCategory(category LogCategory) {
 	loggingMutex.Lock()
 	defer loggingMutex.Unlock()
-	C.kernel_logging_enable_category(category.mustC())
+	C.btck_logging_enable_category(category.mustC())
 }
 
 // DisableLogCategory disables logging for a specific category or all categories
 func DisableLogCategory(category LogCategory) {
 	loggingMutex.Lock()
 	defer loggingMutex.Unlock()
-	C.kernel_logging_disable_category(category.mustC())
+	C.btck_logging_disable_category(category.mustC())
 }
 
 // LogLevel represents the logging level
@@ -145,7 +153,7 @@ const (
 	LogLevelInfo
 )
 
-func (l LogLevel) mustC() C.kernel_LogLevel {
+func (l LogLevel) mustC() C.btck_LogLevel {
 	c, err := l.c()
 	if err != nil {
 		panic(err)
@@ -153,11 +161,11 @@ func (l LogLevel) mustC() C.kernel_LogLevel {
 	return c
 }
 
-func (l LogLevel) c() (C.kernel_LogLevel, error) {
+func (l LogLevel) c() (C.btck_LogLevel, error) {
 	if l < LogLevelTrace || l > LogLevelInfo {
 		return 0, ErrInvalidLogLevel
 	}
-	return C.kernel_LogLevel(l), nil
+	return C.btck_LogLevel(l), nil
 }
 
 // LogCategory represents a logging category
@@ -177,7 +185,7 @@ const (
 	LogKernel
 )
 
-func (c LogCategory) mustC() C.kernel_LogCategory {
+func (c LogCategory) mustC() C.btck_LogCategory {
 	cType, err := c.c()
 	if err != nil {
 		panic(err)
@@ -185,11 +193,11 @@ func (c LogCategory) mustC() C.kernel_LogCategory {
 	return cType
 }
 
-func (c LogCategory) c() (C.kernel_LogCategory, error) {
+func (c LogCategory) c() (C.btck_LogCategory, error) {
 	if c < LogAll || c > LogKernel {
 		return 0, ErrInvalidLogCategory
 	}
-	return C.kernel_LogCategory(c), nil
+	return C.btck_LogCategory(c), nil
 }
 
 // LoggingOptions configures the format of log messages
