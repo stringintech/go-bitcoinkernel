@@ -26,7 +26,7 @@ func (bso *BlockSpentOutputs) GetTransactionSpentOutputsAt(index uint64) (*Trans
 	checkReady(bso)
 	ptr := C.btck_block_spent_outputs_get_transaction_spent_outputs_at(bso.ptr, C.uint64_t(index))
 	if ptr == nil {
-		return nil, ErrBlockSpentOutputsGetTransactionSpentOutputsAt
+		return nil, ErrKernelBlockSpentOutputsGetTransactionSpentOutputsAt
 	}
 
 	txSpentOutputs := &TransactionSpentOutputs{ptr: ptr}

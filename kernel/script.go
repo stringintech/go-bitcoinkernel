@@ -83,13 +83,13 @@ const (
 func (s ScriptVerifyStatus) err() error {
 	switch s {
 	case ScriptVerifyErrorInvalidFlags:
-		return ErrScriptVerifyInvalidFlags
+		return ErrKernelScriptVerifyInvalidFlags
 	case ScriptVerifyErrorInvalidFlagsCombination:
-		return ErrScriptVerifyInvalidFlagsCombination
+		return ErrKernelScriptVerifyInvalidFlagsCombination
 	case ScriptVerifyErrorSpentOutputsRequired:
-		return ErrScriptVerifySpentOutputsRequired
+		return ErrKernelScriptVerifySpentOutputsRequired
 	default:
-		return ErrScriptVerify
+		return ErrKernelScriptVerify
 	}
 }
 

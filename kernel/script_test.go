@@ -89,8 +89,8 @@ func TestInvalidScripts(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := testVerifyScript(t, tt.scriptPubkeyHex, tt.amount, tt.txToHex, tt.inputIndex)
-			if err == nil || !errors.Is(err, ErrScriptVerify) {
-				t.Errorf("testVerifyScript() was expected to fail with error '%v'", ErrScriptVerify)
+			if err == nil || !errors.Is(err, ErrKernelScriptVerify) {
+				t.Errorf("testVerifyScript() was expected to fail with error '%v'", ErrKernelScriptVerify)
 			}
 		})
 	}
