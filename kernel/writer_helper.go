@@ -9,6 +9,7 @@ package kernel
 
 // Bridge function: exported Go function that C library can call
 extern int go_writer_callback_bridge(void* bytes, size_t size, void* userdata);
+extern int go_pre_alloc_writer_callback_bridge(void* bytes, size_t size, void* userdata);
 */
 import "C"
 import (
@@ -41,7 +42,14 @@ func go_writer_callback_bridge(bytes unsafe.Pointer, size C.size_t, userdata uns
 // writeToBytes is a helper function that uses a callback pattern to collect bytes
 // It takes a function that calls the C API with the writer callback
 func writeToBytes(writerFunc func(C.btck_WriteBytes, unsafe.Pointer) C.int) ([]byte, error) {
+	return writeToPreAllocBytes(writerFunc, 0)
+}
+
+func writeToPreAllocBytes(writerFunc func(C.btck_WriteBytes, unsafe.Pointer) C.int, preallocSize int) ([]byte, error) {
 	callbackData := &writerCallbackData{}
+	if preallocSize > 0 {
+		callbackData.buffer = make([]byte, 0, preallocSize)
+	}
 
 	// Create cgo handle for the callback data
 	handle := cgo.NewHandle(callbackData)
@@ -57,6 +65,5 @@ func writeToBytes(writerFunc func(C.btck_WriteBytes, unsafe.Pointer) C.int) ([]b
 		return nil, callbackData.err
 	}
 
-	// Return exactly the bytes that were written (slice the buffer to actual size)
 	return callbackData.buffer, nil
 }

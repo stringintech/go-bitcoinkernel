@@ -5,6 +5,7 @@ package kernel
 */
 import "C"
 import (
+	"fmt"
 	"runtime"
 	"unsafe"
 )
@@ -55,6 +56,21 @@ func (b *Block) Bytes() ([]byte, error) {
 	return writeToBytes(func(writer C.btck_WriteBytes, userData unsafe.Pointer) C.int {
 		return C.btck_block_to_bytes(b.ptr, writer, userData)
 	})
+}
+
+func (b *Block) PreAllocBytes() ([]byte, error) {
+	checkReady(b)
+
+	// Get the serialize size first
+	size := int(C.btck_block_get_serialize_size(b.ptr))
+	if size < 0 {
+		return nil, fmt.Errorf("failed to get serialize size")
+	}
+
+	// Use the callback helper with pre-allocated buffer to collect bytes from btck_block_to_bytes
+	return writeToPreAllocBytes(func(writer C.btck_WriteBytes, userData unsafe.Pointer) C.int {
+		return C.btck_block_to_bytes(b.ptr, writer, userData)
+	}, size)
 }
 
 // Copy creates a copy of the block

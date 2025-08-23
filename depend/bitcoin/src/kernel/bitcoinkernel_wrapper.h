@@ -49,9 +49,12 @@ public:
 };
 
 template <typename T>
-std::vector<std::byte> write_bytes(const T* object, int (*to_bytes)(const T*, btck_WriteBytes, void*))
+std::vector<std::byte> write_bytes(const T* object, int (*to_bytes)(const T*, btck_WriteBytes, void*), size_t initial_size = 0)
 {
     std::vector<std::byte> bytes;
+    if (initial_size > 0) {
+        bytes.reserve(initial_size);
+    }
     struct UserData {
         std::vector<std::byte>* bytes;
         std::exception_ptr exception;

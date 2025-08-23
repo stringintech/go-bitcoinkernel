@@ -965,8 +965,20 @@ int btck_block_to_bytes(const btck_Block* block, btck_WriteBytes writer, void* u
     }
 }
 
+int btck_block_get_serialize_size(const btck_Block* block)
+{
+    try {
+        return ::GetSerializeSize(TX_WITH_WITNESS(*block->m_block));
+    } catch (...) {
+        return -1;
+    }
+}
+
 int btck_block_pointer_to_bytes(const btck_BlockPointer* block_, btck_WriteBytes writer, void* user_data)
 {
+//    auto*v=new std::vector<char>(500000);
+//    ;delete v;
+
     auto block{cast_const_cblock(block_)};
     try {
         WriterStream ws{writer, user_data};
