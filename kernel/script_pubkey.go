@@ -31,8 +31,8 @@ func NewScriptPubkeyFromRaw(rawScriptPubkey []byte) (*ScriptPubkey, error) {
 	return scriptPubkey, nil
 }
 
-// Data returns the serialized script pubkey data
-func (s *ScriptPubkey) Data() ([]byte, error) {
+// Bytes returns the serialized script pubkey
+func (s *ScriptPubkey) Bytes() ([]byte, error) {
 	checkReady(s)
 
 	return writeToBytes(func(writer C.btck_WriteBytes, user_data unsafe.Pointer) C.int {

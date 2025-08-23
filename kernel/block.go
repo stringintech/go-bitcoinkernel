@@ -47,8 +47,8 @@ func (b *Block) Hash() (*BlockHash, error) {
 	return hash, nil
 }
 
-// Data returns the serialized block data
-func (b *Block) Data() ([]byte, error) {
+// Bytes returns the serialized block
+func (b *Block) Bytes() ([]byte, error) {
 	checkReady(b)
 
 	// Use the callback helper to collect bytes from btck_block_to_bytes

@@ -47,8 +47,8 @@ func (bp *BlockPointer) GetHash() (*BlockHash, error) {
 	return &BlockHash{ptr: hashPtr}, nil
 }
 
-// CopyData copies the block data into a byte array
-func (bp *BlockPointer) CopyData() ([]byte, error) {
+// Bytes returns the serialized block
+func (bp *BlockPointer) Bytes() ([]byte, error) {
 	if bp.ptr == nil {
 		return nil, ErrBlockUninitialized
 	}

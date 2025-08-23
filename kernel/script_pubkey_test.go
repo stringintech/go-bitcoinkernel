@@ -27,10 +27,10 @@ func TestScriptPubkeyFromRaw(t *testing.T) {
 	}
 	defer scriptPubkey.Destroy()
 
-	// Test getting script pubkey data
-	data, err := scriptPubkey.Data()
+	// Test getting the serialized script pubkey
+	data, err := scriptPubkey.Bytes()
 	if err != nil {
-		t.Fatalf("ScriptPubkey.Data() error = %v", err)
+		t.Fatalf("ScriptPubkey.Bytes() error = %v", err)
 	}
 
 	if len(data) != len(scriptBytes) {
@@ -71,14 +71,14 @@ func TestScriptPubkeyCopy(t *testing.T) {
 	}
 
 	// Verify copy has same data
-	originalData, err := scriptPubkey.Data()
+	originalData, err := scriptPubkey.Bytes()
 	if err != nil {
-		t.Fatalf("Original ScriptPubkey.Data() error = %v", err)
+		t.Fatalf("Original ScriptPubkey.Bytes() error = %v", err)
 	}
 
-	copyData, err := scriptCopy.Data()
+	copyData, err := scriptCopy.Bytes()
 	if err != nil {
-		t.Fatalf("Copied ScriptPubkey.Data() error = %v", err)
+		t.Fatalf("Copied ScriptPubkey.Bytes() error = %v", err)
 	}
 
 	if hex.EncodeToString(originalData) != hex.EncodeToString(copyData) {
@@ -86,7 +86,7 @@ func TestScriptPubkeyCopy(t *testing.T) {
 	}
 }
 
-func TestScriptPubkeyData(t *testing.T) {
+func TestScriptPubkeyBytes(t *testing.T) {
 	scriptHex := "76a914389ffce9cd9ae88dcc0631e88a821ffdbe9bfe26158088ac"
 	scriptBytes, err := hex.DecodeString(scriptHex)
 	if err != nil {
@@ -100,9 +100,9 @@ func TestScriptPubkeyData(t *testing.T) {
 	defer scriptPubkey.Destroy()
 
 	// Test serializing script to bytes
-	serialized, err := scriptPubkey.Data()
+	serialized, err := scriptPubkey.Bytes()
 	if err != nil {
-		t.Fatalf("ScriptPubkey.Data() error = %v", err)
+		t.Fatalf("ScriptPubkey.Bytes() error = %v", err)
 	}
 
 	if len(serialized) == 0 {

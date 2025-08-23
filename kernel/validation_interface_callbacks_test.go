@@ -15,7 +15,7 @@ func TestValidationInterfaceCallbacks(t *testing.T) {
 			blockCheckedCalled = true
 			lastValidationMode = state.ValidationMode()
 			var err error
-			lastBlockData, err = block.CopyData()
+			lastBlockData, err = block.Bytes()
 			if err != nil {
 				t.Fatal(err)
 			}

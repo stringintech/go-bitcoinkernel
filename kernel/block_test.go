@@ -54,10 +54,10 @@ func TestBlockFromRaw(t *testing.T) {
 		t.Logf("Expected hash: %s", expectedHash)
 	}
 
-	// Test getting block data
-	data, err := block.Data()
+	// Test getting the serialized block
+	data, err := block.Bytes()
 	if err != nil {
-		t.Fatalf("Block.Data() error = %v", err)
+		t.Fatalf("Block.Bytes() error = %v", err)
 	}
 
 	if len(data) != len(genesisBytes) {

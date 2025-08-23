@@ -50,9 +50,9 @@ func TestTransactionOutputCreation(t *testing.T) {
 	}
 	defer gotScript.Destroy()
 
-	scriptData, err := gotScript.Data()
+	scriptData, err := gotScript.Bytes()
 	if err != nil {
-		t.Fatalf("ScriptPubkey.Data() error = %v", err)
+		t.Fatalf("ScriptPubkey.Bytes() error = %v", err)
 	}
 
 	if len(scriptData) != len(scriptBytes) {
