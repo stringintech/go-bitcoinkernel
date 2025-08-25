@@ -7,6 +7,7 @@
 
 #include <kernel/bitcoinkernel.h>
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
@@ -164,11 +165,104 @@ T check(T ptr)
     return ptr;
 }
 
+template <typename Collection, typename ValueType>
+class Iterator
+{
+public:
+    using iterator_category = std::random_access_iterator_tag;
+    using iterator_concept = std::random_access_iterator_tag;
+    using difference_type = std::ptrdiff_t;
+    using value_type = ValueType;
+
+private:
+    const Collection* m_collection;
+    size_t m_idx;
+
+public:
+    Iterator() = default;
+    Iterator(const Collection* ptr) : m_collection{ptr}, m_idx{0} {}
+    Iterator(const Collection* ptr, size_t idx) : m_collection{ptr}, m_idx{idx} {}
+
+    auto operator*() const { return (*m_collection)[m_idx]; }
+    auto operator->() const { return (*m_collection)[m_idx]; }
+
+    auto& operator++() { m_idx++; return *this; }
+    auto operator++(int) { Iterator tmp = *this; ++(*this); return tmp; }
+
+    auto& operator--() { m_idx--; return *this; }
+    auto operator--(int) { auto temp = *this; --m_idx; return temp; }
+
+    auto& operator+=(difference_type n) { m_idx += n; return *this; }
+    auto& operator-=(difference_type n) { m_idx -= n; return *this; }
+
+    auto operator+(difference_type n) const { return Iterator(m_collection, m_idx + n); }
+    auto operator-(difference_type n) const { return Iterator(m_collection, m_idx - n); }
+
+    auto operator-(const Iterator& other) const { return static_cast<difference_type>(m_idx) - static_cast<difference_type>(other.m_idx); }
+
+    ValueType operator[](difference_type n) const { return (*m_collection)[m_idx + n]; }
+
+    auto operator<=>(const Iterator& other) const { return m_idx <=> other.m_idx; }
+
+    bool operator==(const Iterator& other) const { return m_collection == other.m_collection && m_idx == other.m_idx; }
+
+private:
+    friend Iterator operator+(difference_type n, const Iterator& it) { return it + n; }
+};
+
+template<typename Container, typename SizeFunc, typename GetFunc>
+concept IndexedContainer = requires(const Container& c, SizeFunc size_func, GetFunc get_func, std::size_t i) {
+    { std::invoke(size_func, c) } -> std::convertible_to<std::size_t>;
+    { std::invoke(get_func, c, i) }; // Return type is deduced
+};
+
+template<typename Container, auto SizeFunc, auto GetFunc>
+requires IndexedContainer<Container, decltype(SizeFunc), decltype(GetFunc)>
+class Range
+{
+public:
+    using value_type = std::invoke_result_t<decltype(GetFunc), const Container&, size_t>;
+    using difference_type = std::ptrdiff_t;
+    using iterator = Iterator<Range, value_type>;
+    using const_iterator = iterator;
+
+private:
+    const Container* m_container;
+
+public:
+    explicit Range(const Container& container) : m_container(&container) {
+        static_assert(std::ranges::random_access_range<Range>);
+    }
+
+    iterator begin() const { return iterator(this, 0); }
+    iterator end() const { return iterator(this, size()); }
+
+    const_iterator cbegin() const { return begin(); }
+    const_iterator cend() const { return end(); }
+
+    size_t size() const { return std::invoke(SizeFunc, *m_container); }
+
+    bool empty() const { return size() == 0; }
+
+    value_type operator[](size_t index) const { return std::invoke(GetFunc, *m_container, index); }
+
+    value_type at(size_t index) const
+    {
+        if (index >= size()) {
+            throw std::out_of_range("Index out of range");
+        }
+        return (*this)[index];
+    }
+
+    value_type front() const { return (*this)[0]; }
+    value_type back() const { return (*this)[size() - 1]; }
+};
+
 template <typename T>
 class RefWrapper
 {
 private:
-    T m_ref_data;
+    const T m_ref_data;
 
 public:
     RefWrapper(T&& data) : m_ref_data{std::move(data)} {}
@@ -177,7 +271,7 @@ public:
     RefWrapper(const RefWrapper&) = delete;
     RefWrapper& operator=(const RefWrapper& other) = delete;
 
-    T& Get()
+    const T& Get() const
     {
         return m_ref_data;
     }
@@ -193,7 +287,7 @@ std::vector<std::byte> write_bytes(const T* object, int (*to_bytes)(const T*, bt
     };
     UserData user_data = UserData{.bytes = &bytes, .exception = nullptr};
 
-    constexpr auto const write = +[](const void* buffer, size_t len, void* user_data) {
+    constexpr auto const write = +[](const void* buffer, size_t len, void* user_data) -> int {
         auto& data = *reinterpret_cast<UserData*>(user_data);
         auto& bytes = *data.bytes;
         try {
@@ -301,7 +395,7 @@ public:
     {
     }
 
-    uint64_t GetAmount() const
+    int64_t GetAmount() const
     {
         return btck_transaction_output_get_amount(impl());
     }
@@ -339,19 +433,24 @@ public:
     {
     }
 
-    uint64_t CountOutputs() const
+    size_t CountOutputs() const
     {
         return btck_transaction_count_outputs(impl());
     }
 
-    uint64_t CountInputs() const
+    size_t CountInputs() const
     {
         return btck_transaction_count_inputs(impl());
     }
 
-    RefWrapper<TransactionOutput> GetOutput(uint64_t index) const
+    RefWrapper<TransactionOutput> GetOutput(size_t index) const
     {
         return TransactionOutput{btck_transaction_get_output_at(impl(), index)};
+    }
+
+    auto Outputs() const
+    {
+        return Range<Transaction, &Transaction::CountOutputs, &Transaction::GetOutput>{*this};
     }
 
     std::vector<std::byte> ToBytes() const
@@ -692,14 +791,19 @@ public:
         return *this;
     }
 
-    uint64_t CountOutputs() const
+    size_t CountTransactions() const
     {
         return btck_block_count_transactions(impl());
     }
 
-    Transaction GetTransaction(uint64_t index) const
+    Transaction GetTransaction(size_t index) const
     {
         return Transaction{btck_block_get_transaction_at(impl(), index)};
+    }
+
+    auto Transactions() const
+    {
+        return Range<Block, &Block::CountTransactions, &Block::GetTransaction>{*this};
     }
 
     std::unique_ptr<btck_BlockHash, BlockHashDeleter> GetHash() const
@@ -744,63 +848,74 @@ public:
 class TransactionSpentOutputs : Handle<btck_TransactionSpentOutputs, btck_transaction_spent_outputs_destroy>
 {
 public:
-    uint64_t m_size;
 
     TransactionSpentOutputs(btck_TransactionSpentOutputs* transaction_spent_outputs)
-        : Handle{check(transaction_spent_outputs)},
-          m_size{btck_transaction_spent_outputs_size(transaction_spent_outputs)}
+        : Handle{check(transaction_spent_outputs)}
     {
     }
     // Copy constructor and assignment
     TransactionSpentOutputs(const TransactionSpentOutputs& other)
-        : Handle{check(btck_transaction_spent_outputs_copy(other.impl()))},
-          m_size{other.m_size}
+        : Handle{check(btck_transaction_spent_outputs_copy(other.impl()))}
     {
     }
     TransactionSpentOutputs& operator=(const TransactionSpentOutputs& other)
     {
         if (this != &other) {
             reset(check(btck_transaction_spent_outputs_copy(other.impl())));
-            m_size = btck_transaction_spent_outputs_size(impl());
         }
         return *this;
     }
 
-    RefWrapper<Coin> GetCoin(uint64_t index) const
+    size_t Count() const
+    {
+        return btck_transaction_spent_outputs_count(impl());
+    }
+
+    RefWrapper<Coin> GetCoin(size_t index) const
     {
         return Coin{btck_transaction_spent_outputs_get_coin_at(impl(), index)};
+    }
+
+    auto Coins() const
+    {
+        return Range<TransactionSpentOutputs, &TransactionSpentOutputs::Count, &TransactionSpentOutputs::GetCoin>{*this};
     }
 };
 
 class BlockSpentOutputs : Handle<btck_BlockSpentOutputs, btck_block_spent_outputs_destroy>
 {
 public:
-    uint64_t m_size;
-
     BlockSpentOutputs(btck_BlockSpentOutputs* block_spent_outputs)
-        : Handle{check(block_spent_outputs)},
-          m_size{btck_block_spent_outputs_size(block_spent_outputs)}
+        : Handle{check(block_spent_outputs)}
     {
     }
 
     // Copy constructor and assignment
     BlockSpentOutputs(const BlockSpentOutputs& other)
-        : Handle{check(btck_block_spent_outputs_copy(other.impl()))},
-          m_size{other.m_size}
+        : Handle{check(btck_block_spent_outputs_copy(other.impl()))}
     {
     }
     BlockSpentOutputs& operator=(const BlockSpentOutputs& other)
     {
         if (this != &other) {
             reset(check(btck_block_spent_outputs_copy(other.impl())));
-            m_size = btck_block_spent_outputs_size(impl());
         }
         return *this;
     }
 
-    RefWrapper<TransactionSpentOutputs> GetTxSpentOutputs(uint64_t tx_undo_index) const
+    size_t Count() const
+    {
+        return btck_block_spent_outputs_count(impl());
+    }
+
+    RefWrapper<TransactionSpentOutputs> GetTxSpentOutputs(size_t tx_undo_index) const
     {
         return TransactionSpentOutputs{btck_block_spent_outputs_get_transaction_spent_outputs_at(impl(), tx_undo_index)};
+    }
+
+    auto TxsSpentOutputs() const
+    {
+        return Range<BlockSpentOutputs, &BlockSpentOutputs::Count, &BlockSpentOutputs::GetTxSpentOutputs>{*this};
     }
 };
 
@@ -819,10 +934,14 @@ public:
         return btck_chain_get_genesis(impl());
     }
 
-    std::optional<BlockTreeEntry> GetByHeight(int height) const
+    size_t CurrentHeight() const
+    {
+        return GetTip().GetHeight();
+    }
+
+    BlockTreeEntry GetByHeight(int height) const
     {
         auto index{btck_chain_get_by_height(impl(), height)};
-        if (!index) return std::nullopt;
         return index;
     }
 
@@ -836,6 +955,11 @@ public:
     bool Contains(BlockTreeEntry& entry) const
     {
         return btck_chain_contains(impl(), entry.impl());
+    }
+
+    auto Entries() const
+    {
+        return Range<Chain, &Chain::CurrentHeight, &Chain::GetByHeight>{*this};
     }
 };
 

@@ -413,18 +413,18 @@ btck_Transaction* btck_transaction_create(const void* raw_transaction, size_t ra
     }
 }
 
-uint64_t btck_transaction_count_outputs(const btck_Transaction* transaction)
+size_t btck_transaction_count_outputs(const btck_Transaction* transaction)
 {
     return transaction->m_tx->vout.size();
 }
 
-btck_TransactionOutput* btck_transaction_get_output_at(const btck_Transaction* transaction, uint64_t output_index)
+btck_TransactionOutput* btck_transaction_get_output_at(const btck_Transaction* transaction, size_t output_index)
 {
     assert(output_index < transaction->m_tx->vout.size());
     return new btck_TransactionOutput{&transaction->m_tx->vout[output_index], false};
 }
 
-uint64_t btck_transaction_count_inputs(const btck_Transaction* transaction)
+size_t btck_transaction_count_inputs(const btck_Transaction* transaction)
 {
     return transaction->m_tx->vin.size();
 }
@@ -935,12 +935,12 @@ btck_Block* btck_block_copy(const btck_Block* block)
     return new btck_Block{block->m_block};
 }
 
-uint64_t btck_block_count_transactions(const btck_Block* block)
+size_t btck_block_count_transactions(const btck_Block* block)
 {
     return block->m_block->vtx.size();
 }
 
-btck_Transaction* btck_block_get_transaction_at(const btck_Block* block, uint64_t index)
+btck_Transaction* btck_block_get_transaction_at(const btck_Block* block, size_t index)
 {
     assert(index < block->m_block->vtx.size());
     return new btck_Transaction{block->m_block->vtx[index]};
@@ -1043,12 +1043,12 @@ btck_BlockSpentOutputs* btck_block_spent_outputs_copy(const btck_BlockSpentOutpu
     return new btck_BlockSpentOutputs{block_spent_outputs->m_block_undo};
 }
 
-uint64_t btck_block_spent_outputs_size(const btck_BlockSpentOutputs* block_spent_outputs)
+size_t btck_block_spent_outputs_count(const btck_BlockSpentOutputs* block_spent_outputs)
 {
     return block_spent_outputs->m_block_undo->vtxundo.size();
 }
 
-btck_TransactionSpentOutputs* btck_block_spent_outputs_get_transaction_spent_outputs_at(const btck_BlockSpentOutputs* block_spent_outputs, uint64_t transaction_index)
+btck_TransactionSpentOutputs* btck_block_spent_outputs_get_transaction_spent_outputs_at(const btck_BlockSpentOutputs* block_spent_outputs, size_t transaction_index)
 {
     assert(transaction_index < block_spent_outputs->m_block_undo->vtxundo.size());
     const auto* tx_undo{&block_spent_outputs->m_block_undo->vtxundo.at(transaction_index)};
@@ -1067,7 +1067,7 @@ btck_TransactionSpentOutputs* btck_transaction_spent_outputs_copy(const btck_Tra
     return new btck_TransactionSpentOutputs{new CTxUndo{*transaction_spent_outputs->m_tx_undo}, true};
 }
 
-uint64_t btck_transaction_spent_outputs_size(const btck_TransactionSpentOutputs* transaction_spent_outputs)
+size_t btck_transaction_spent_outputs_count(const btck_TransactionSpentOutputs* transaction_spent_outputs)
 {
     return transaction_spent_outputs->m_tx_undo->vprevout.size();
 }
@@ -1082,7 +1082,7 @@ void btck_transaction_spent_outputs_destroy(btck_TransactionSpentOutputs* transa
     transaction_spent_outputs = nullptr;
 }
 
-btck_Coin* btck_transaction_spent_outputs_get_coin_at(const btck_TransactionSpentOutputs* transaction_spent_outputs, uint64_t coin_index)
+btck_Coin* btck_transaction_spent_outputs_get_coin_at(const btck_TransactionSpentOutputs* transaction_spent_outputs, size_t coin_index)
 {
     assert(coin_index < transaction_spent_outputs->m_tx_undo->vprevout.size());
     const Coin* coin{&transaction_spent_outputs->m_tx_undo->vprevout.at(coin_index)};
@@ -1151,10 +1151,7 @@ btck_BlockTreeEntry* btck_chain_get_genesis(const btck_Chain* chain)
 btck_BlockTreeEntry* btck_chain_get_by_height(const btck_Chain* chain, int height)
 {
     LOCK(::cs_main);
-    if (height < 0 || height > chain->m_chain->Height()) {
-        LogDebug(BCLog::KERNEL, "Block height is out of range.");
-        return nullptr;
-    }
+    assert(height >= 0 && height <= chain->m_chain->Height());
     return new btck_BlockTreeEntry{(*chain->m_chain)[height]};
 }
 
