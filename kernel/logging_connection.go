@@ -144,14 +144,13 @@ func DisableLogCategory(category LogCategory) {
 	C.btck_logging_disable_category(category.mustC())
 }
 
-// LogLevel represents the logging level
-type LogLevel int
-
 const (
-	LogLevelTrace LogLevel = iota
-	LogLevelDebug
-	LogLevelInfo
+	LogLevelTrace = C.btck_LogLevel_TRACE
+	LogLevelDebug = C.btck_LogLevel_DEBUG
+	LogLevelInfo  = C.btck_LogLevel_INFO
 )
+
+type LogLevel C.btck_LogLevel
 
 func (l LogLevel) mustC() C.btck_LogLevel {
 	c, err := l.c()
@@ -162,28 +161,29 @@ func (l LogLevel) mustC() C.btck_LogLevel {
 }
 
 func (l LogLevel) c() (C.btck_LogLevel, error) {
-	if l < LogLevelTrace || l > LogLevelInfo {
+	switch l {
+	case LogLevelTrace, LogLevelDebug, LogLevelInfo:
+		return C.btck_LogLevel(l), nil
+	default:
 		return 0, ErrInvalidLogLevel
 	}
-	return C.btck_LogLevel(l), nil
 }
 
-// LogCategory represents a logging category
-type LogCategory int
-
 const (
-	LogAll LogCategory = iota
-	LogBench
-	LogBlockStorage
-	LogCoinDB
-	LogLevelDB
-	LogMempool
-	LogPrune
-	LogRand
-	LogReindex
-	LogValidation
-	LogKernel
+	LogAll          = C.btck_LogCategory_ALL
+	LogBench        = C.btck_LogCategory_BENCH
+	LogBlockStorage = C.btck_LogCategory_BLOCKSTORAGE
+	LogCoinDB       = C.btck_LogCategory_COINDB
+	LogLevelDB      = C.btck_LogCategory_LEVELDB
+	LogMempool      = C.btck_LogCategory_MEMPOOL
+	LogPrune        = C.btck_LogCategory_PRUNE
+	LogRand         = C.btck_LogCategory_RAND
+	LogReindex      = C.btck_LogCategory_REINDEX
+	LogValidation   = C.btck_LogCategory_VALIDATION
+	LogKernel       = C.btck_LogCategory_KERNEL
 )
+
+type LogCategory C.btck_LogCategory
 
 func (c LogCategory) mustC() C.btck_LogCategory {
 	cType, err := c.c()
@@ -194,10 +194,12 @@ func (c LogCategory) mustC() C.btck_LogCategory {
 }
 
 func (c LogCategory) c() (C.btck_LogCategory, error) {
-	if c < LogAll || c > LogKernel {
+	switch c {
+	case LogAll, LogBench, LogBlockStorage, LogCoinDB, LogLevelDB, LogMempool, LogPrune, LogRand, LogReindex, LogValidation, LogKernel:
+		return C.btck_LogCategory(c), nil
+	default:
 		return 0, ErrInvalidLogCategory
 	}
-	return C.btck_LogCategory(c), nil
 }
 
 // LoggingOptions configures the format of log messages

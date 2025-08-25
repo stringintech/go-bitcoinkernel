@@ -39,7 +39,7 @@ func TestNewChainParameters(t *testing.T) {
 		},
 		{
 			name:      "Invalid chain type",
-			chainType: ChainType(999),
+			chainType: ChainType(99),
 			wantErr:   true,
 			errType:   ErrInvalidChainType,
 		},

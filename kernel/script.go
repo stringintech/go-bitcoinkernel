@@ -51,39 +51,34 @@ func VerifyScript(scriptPubkey *ScriptPubkey, amount int64, txTo *Transaction,
 	return nil
 }
 
-// ScriptFlags represents script verification flags
-type ScriptFlags uint
-
 const (
-	ScriptFlagsVerifyNone                = ScriptFlags(C.btck_SCRIPT_FLAGS_VERIFY_NONE)
-	ScriptFlagsVerifyP2SH                = ScriptFlags(C.btck_SCRIPT_FLAGS_VERIFY_P2SH)
-	ScriptFlagsVerifyDERSig              = ScriptFlags(C.btck_SCRIPT_FLAGS_VERIFY_DERSIG)
-	ScriptFlagsVerifyNullDummy           = ScriptFlags(C.btck_SCRIPT_FLAGS_VERIFY_NULLDUMMY)
-	ScriptFlagsVerifyCheckLockTimeVerify = ScriptFlags(C.btck_SCRIPT_FLAGS_VERIFY_CHECKLOCKTIMEVERIFY)
-	ScriptFlagsVerifyCheckSequenceVerify = ScriptFlags(C.btck_SCRIPT_FLAGS_VERIFY_CHECKSEQUENCEVERIFY)
-	ScriptFlagsVerifyWitness             = ScriptFlags(C.btck_SCRIPT_FLAGS_VERIFY_WITNESS)
-	ScriptFlagsVerifyTaproot             = ScriptFlags(C.btck_SCRIPT_FLAGS_VERIFY_TAPROOT)
-	ScriptFlagsVerifyAll                 = ScriptFlags(C.btck_SCRIPT_FLAGS_VERIFY_ALL)
+	ScriptFlagsVerifyNone                = C.btck_ScriptVerificationFlags_NONE
+	ScriptFlagsVerifyP2SH                = C.btck_ScriptVerificationFlags_P2SH
+	ScriptFlagsVerifyDERSig              = C.btck_ScriptVerificationFlags_DERSIG
+	ScriptFlagsVerifyNullDummy           = C.btck_ScriptVerificationFlags_NULLDUMMY
+	ScriptFlagsVerifyCheckLockTimeVerify = C.btck_ScriptVerificationFlags_CHECKLOCKTIMEVERIFY
+	ScriptFlagsVerifyCheckSequenceVerify = C.btck_ScriptVerificationFlags_CHECKSEQUENCEVERIFY
+	ScriptFlagsVerifyWitness             = C.btck_ScriptVerificationFlags_WITNESS
+	ScriptFlagsVerifyTaproot             = C.btck_ScriptVerificationFlags_TAPROOT
+	ScriptFlagsVerifyAll                 = C.btck_ScriptVerificationFlags_ALL
 )
+
+type ScriptFlags C.btck_ScriptVerificationFlags
 
 func (s ScriptFlags) c() C.uint {
 	return C.uint(s)
 }
 
-// ScriptVerifyStatus represents the status of script verification
-type ScriptVerifyStatus int
-
 const (
-	ScriptVerifyOK ScriptVerifyStatus = iota
-	ScriptVerifyErrorInvalidFlags
-	ScriptVerifyErrorInvalidFlagsCombination
-	ScriptVerifyErrorSpentOutputsRequired
+	ScriptVerifyOK                           = C.btck_ScriptVerifyStatus_SCRIPT_VERIFY_OK
+	ScriptVerifyErrorInvalidFlagsCombination = C.btck_ScriptVerifyStatus_ERROR_INVALID_FLAGS_COMBINATION
+	ScriptVerifyErrorSpentOutputsRequired    = C.btck_ScriptVerifyStatus_ERROR_SPENT_OUTPUTS_REQUIRED
 )
+
+type ScriptVerifyStatus C.btck_ScriptVerifyStatus
 
 func (s ScriptVerifyStatus) err() error {
 	switch s {
-	case ScriptVerifyErrorInvalidFlags:
-		return ErrKernelScriptVerifyInvalidFlags
 	case ScriptVerifyErrorInvalidFlagsCombination:
 		return ErrKernelScriptVerifyInvalidFlagsCombination
 	case ScriptVerifyErrorSpentOutputsRequired:

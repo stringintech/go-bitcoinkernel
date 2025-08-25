@@ -48,20 +48,21 @@ func (cp *ChainParameters) uninitializedError() error {
 	return ErrChainParametersUninitialized
 }
 
-// ChainType represents the Bitcoin network type
-type ChainType int
-
 const (
-	ChainTypeMainnet ChainType = iota
-	ChainTypeTestnet
-	ChainTypeTestnet4
-	ChainTypeSignet
-	ChainTypeRegtest
+	ChainTypeMainnet  = C.btck_ChainType_MAINNET
+	ChainTypeTestnet  = C.btck_ChainType_TESTNET
+	ChainTypeTestnet4 = C.btck_ChainType_TESTNET_4
+	ChainTypeSignet   = C.btck_ChainType_SIGNET
+	ChainTypeRegtest  = C.btck_ChainType_REGTEST
 )
 
+type ChainType C.btck_ChainType
+
 func (t ChainType) c() (C.btck_ChainType, error) {
-	if t < ChainTypeMainnet || t > ChainTypeRegtest {
+	switch t {
+	case ChainTypeMainnet, ChainTypeTestnet, ChainTypeTestnet4, ChainTypeSignet, ChainTypeRegtest:
+		return C.btck_ChainType(t), nil
+	default:
 		return 0, ErrInvalidChainType
 	}
-	return C.btck_ChainType(t), nil
 }

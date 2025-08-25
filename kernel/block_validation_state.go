@@ -32,26 +32,24 @@ func (bvs *BlockValidationState) uninitializedError() error {
 	return ErrBlockValidationStateUninitialized
 }
 
-// ValidationMode represents the validation state mode
-type ValidationMode int
-
 const (
-	ValidationStateValid ValidationMode = iota
-	ValidationStateInvalid
-	ValidationStateError
+	ValidationStateValid   = C.btck_ValidationMode_VALID
+	ValidationStateInvalid = C.btck_ValidationMode_INVALID
+	ValidationStateError   = C.btck_ValidationMode_INTERNAL_ERROR
 )
 
-// BlockValidationResult represents the validation result for a block
-type BlockValidationResult int
+type ValidationMode C.btck_ValidationMode
 
 const (
-	BlockResultUnset BlockValidationResult = iota
-	BlockConsensus
-	BlockCachedInvalid
-	BlockInvalidHeader
-	BlockMutated
-	BlockMissingPrev
-	BlockInvalidPrev
-	BlockTimeFuture
-	BlockHeaderLowWork
+	BlockResultUnset   = C.btck_BlockValidationResult_UNSET
+	BlockConsensus     = C.btck_BlockValidationResult_CONSENSUS
+	BlockCachedInvalid = C.btck_BlockValidationResult_CACHED_INVALID
+	BlockInvalidHeader = C.btck_BlockValidationResult_INVALID_HEADER
+	BlockMutated       = C.btck_BlockValidationResult_MUTATED
+	BlockMissingPrev   = C.btck_BlockValidationResult_MISSING_PREV
+	BlockInvalidPrev   = C.btck_BlockValidationResult_INVALID_PREV
+	BlockTimeFuture    = C.btck_BlockValidationResult_TIME_FUTURE
+	BlockHeaderLowWork = C.btck_BlockValidationResult_HEADER_LOW_WORK
 )
+
+type BlockValidationResult C.btck_BlockValidationResult

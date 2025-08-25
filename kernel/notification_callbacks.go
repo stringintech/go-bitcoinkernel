@@ -101,19 +101,17 @@ func go_notify_fatal_error_bridge(user_data unsafe.Pointer, message *C.char, mes
 	}
 }
 
-// SynchronizationState represents the current sync state passed to tip changed callbacks
-type SynchronizationState int
-
 const (
-	SyncStateInitReindex SynchronizationState = iota
-	SyncStateInitDownload
-	SyncStatePostInit
+	SyncStateInitReindex  = C.btck_SynchronizationState_INIT_REINDEX
+	SyncStateInitDownload = C.btck_SynchronizationState_INIT_DOWNLOAD
+	SyncStatePostInit     = C.btck_SynchronizationState_POST_INIT
 )
 
-// Warning represents possible warning types issued by validation
-type Warning int
+type SynchronizationState C.btck_SynchronizationState
 
 const (
-	WarningUnknownNewRulesActivated Warning = iota
-	WarningLargeWorkInvalidChain
+	WarningUnknownNewRulesActivated = C.btck_Warning_UNKNOWN_NEW_RULES_ACTIVATED
+	WarningLargeWorkInvalidChain    = C.btck_Warning_LARGE_WORK_INVALID_CHAIN
 )
+
+type Warning C.btck_Warning

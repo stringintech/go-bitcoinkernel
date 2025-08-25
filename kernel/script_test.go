@@ -120,6 +120,6 @@ func testVerifyScript(t *testing.T, scriptPubkeyHex string, amount int64, txToHe
 	}
 	defer txTo.Destroy()
 
-	flags := ScriptFlagsVerifyAll &^ ScriptFlagsVerifyTaproot
+	flags := ScriptFlags(ScriptFlagsVerifyAll &^ ScriptFlagsVerifyTaproot)
 	return VerifyScript(scriptPubkey, amount, txTo, nil, inputIndex, flags)
 }
