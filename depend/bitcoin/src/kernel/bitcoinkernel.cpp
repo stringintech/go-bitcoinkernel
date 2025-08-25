@@ -64,12 +64,6 @@ struct btck_BlockTreeEntry {
 
 namespace {
 
-/** Check that all specified flags are part of the libbitcoinkernel interface. */
-bool verify_flags(unsigned int flags)
-{
-    return (flags & ~(btck_SCRIPT_FLAGS_VERIFY_ALL)) == 0;
-}
-
 bool is_valid_flag_combination(unsigned int flags)
 {
     if (flags & SCRIPT_VERIFY_CLEANSTACK && ~flags & (SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS)) return false;
@@ -105,59 +99,59 @@ public:
     }
 };
 
-BCLog::Level get_bclog_level(const btck_LogLevel level)
+BCLog::Level get_bclog_level(btck_LogLevel level)
 {
     switch (level) {
-    case btck_LogLevel::btck_LOG_INFO: {
+    case btck_LogLevel_INFO: {
         return BCLog::Level::Info;
     }
-    case btck_LogLevel::btck_LOG_DEBUG: {
+    case btck_LogLevel_DEBUG: {
         return BCLog::Level::Debug;
     }
-    case btck_LogLevel::btck_LOG_TRACE: {
+    case btck_LogLevel_TRACE: {
         return BCLog::Level::Trace;
     }
-    } // no default case, so the compiler can warn about missing cases
+    }
     assert(false);
 }
 
-BCLog::LogFlags get_bclog_flag(const btck_LogCategory category)
+BCLog::LogFlags get_bclog_flag(btck_LogCategory category)
 {
     switch (category) {
-    case btck_LogCategory::btck_LOG_BENCH: {
+    case btck_LogCategory_BENCH: {
         return BCLog::LogFlags::BENCH;
     }
-    case btck_LogCategory::btck_LOG_BLOCKSTORAGE: {
+    case btck_LogCategory_BLOCKSTORAGE: {
         return BCLog::LogFlags::BLOCKSTORAGE;
     }
-    case btck_LogCategory::btck_LOG_COINDB: {
+    case btck_LogCategory_COINDB: {
         return BCLog::LogFlags::COINDB;
     }
-    case btck_LogCategory::btck_LOG_LEVELDB: {
+    case btck_LogCategory_LEVELDB: {
         return BCLog::LogFlags::LEVELDB;
     }
-    case btck_LogCategory::btck_LOG_MEMPOOL: {
+    case btck_LogCategory_MEMPOOL: {
         return BCLog::LogFlags::MEMPOOL;
     }
-    case btck_LogCategory::btck_LOG_PRUNE: {
+    case btck_LogCategory_PRUNE: {
         return BCLog::LogFlags::PRUNE;
     }
-    case btck_LogCategory::btck_LOG_RAND: {
+    case btck_LogCategory_RAND: {
         return BCLog::LogFlags::RAND;
     }
-    case btck_LogCategory::btck_LOG_REINDEX: {
+    case btck_LogCategory_REINDEX: {
         return BCLog::LogFlags::REINDEX;
     }
-    case btck_LogCategory::btck_LOG_VALIDATION: {
+    case btck_LogCategory_VALIDATION: {
         return BCLog::LogFlags::VALIDATION;
     }
-    case btck_LogCategory::btck_LOG_KERNEL: {
+    case btck_LogCategory_KERNEL: {
         return BCLog::LogFlags::KERNEL;
     }
-    case btck_LogCategory::btck_LOG_ALL: {
+    case btck_LogCategory_ALL: {
         return BCLog::LogFlags::ALL;
     }
-    } // no default case, so the compiler can warn about missing cases
+    }
     assert(false);
 }
 
@@ -165,11 +159,11 @@ btck_SynchronizationState cast_state(SynchronizationState state)
 {
     switch (state) {
     case SynchronizationState::INIT_REINDEX:
-        return btck_SynchronizationState::btck_INIT_REINDEX;
+        return btck_SynchronizationState_INIT_REINDEX;
     case SynchronizationState::INIT_DOWNLOAD:
-        return btck_SynchronizationState::btck_INIT_DOWNLOAD;
+        return btck_SynchronizationState_INIT_DOWNLOAD;
     case SynchronizationState::POST_INIT:
-        return btck_SynchronizationState::btck_POST_INIT;
+        return btck_SynchronizationState_POST_INIT;
     } // no default case, so the compiler can warn about missing cases
     assert(false);
 }
@@ -178,9 +172,9 @@ btck_Warning cast_btck_warning(kernel::Warning warning)
 {
     switch (warning) {
     case kernel::Warning::UNKNOWN_NEW_RULES_ACTIVATED:
-        return btck_Warning::btck_UNKNOWN_NEW_RULES_ACTIVATED;
+        return btck_Warning_UNKNOWN_NEW_RULES_ACTIVATED;
     case kernel::Warning::LARGE_WORK_INVALID_CHAIN:
-        return btck_Warning::btck_LARGE_WORK_INVALID_CHAIN;
+        return btck_Warning_LARGE_WORK_INVALID_CHAIN;
     } // no default case, so the compiler can warn about missing cases
     assert(false);
 }
@@ -521,23 +515,21 @@ int btck_script_pubkey_verify(const btck_ScriptPubkey* script_pubkey,
                           const btck_Transaction* tx_to,
                           const btck_TransactionOutput** spent_outputs_, size_t spent_outputs_len,
                           const unsigned int input_index,
-                          const unsigned int flags,
+                          const btck_ScriptVerificationFlags flags,
                           btck_ScriptVerifyStatus* status)
 {
     const CAmount amount{amount_};
 
-    if (!verify_flags(flags)) {
-        if (status) *status = btck_SCRIPT_VERIFY_ERROR_INVALID_FLAGS;
-        return 0;
-    }
+    // Assert that all specified flags are part of the interface before continuing
+    assert((flags & ~btck_ScriptVerificationFlags_ALL) == 0);
 
     if (!is_valid_flag_combination(flags)) {
-        if (status) *status = btck_SCRIPT_VERIFY_ERROR_INVALID_FLAGS_COMBINATION;
+        if (status) *status = btck_ScriptVerifyStatus_ERROR_INVALID_FLAGS_COMBINATION;
         return 0;
     }
 
-    if (flags & btck_SCRIPT_FLAGS_VERIFY_TAPROOT && spent_outputs_ == nullptr) {
-        if (status) *status = btck_SCRIPT_VERIFY_ERROR_SPENT_OUTPUTS_REQUIRED;
+    if (flags & btck_ScriptVerificationFlags_TAPROOT  && spent_outputs_ == nullptr) {
+        if (status) *status = btck_ScriptVerifyStatus_ERROR_SPENT_OUTPUTS_REQUIRED;
         return 0;
     }
 
@@ -555,7 +547,7 @@ int btck_script_pubkey_verify(const btck_ScriptPubkey* script_pubkey,
     assert(input_index < tx.vin.size());
     PrecomputedTransactionData txdata{tx};
 
-    if (spent_outputs_ != nullptr && flags & btck_SCRIPT_FLAGS_VERIFY_TAPROOT) {
+    if (spent_outputs_ != nullptr && flags & btck_ScriptVerificationFlags_TAPROOT) {
         txdata.Init(tx, std::move(spent_outputs));
     }
 
@@ -568,21 +560,21 @@ int btck_script_pubkey_verify(const btck_ScriptPubkey* script_pubkey,
     return result ? 1 : 0;
 }
 
-void btck_logging_set_level_category(const btck_LogCategory category, const btck_LogLevel level)
+void btck_logging_set_level_category(btck_LogCategory category, btck_LogLevel level)
 {
-    if (category == btck_LogCategory::btck_LOG_ALL) {
+    if (category == btck_LogCategory_ALL) {
         LogInstance().SetLogLevel(get_bclog_level(level));
     }
 
     LogInstance().AddCategoryLogLevel(get_bclog_flag(category), get_bclog_level(level));
 }
 
-void btck_logging_enable_category(const btck_LogCategory category)
+void btck_logging_enable_category(btck_LogCategory category)
 {
     LogInstance().EnableCategory(get_bclog_flag(category));
 }
 
-void btck_logging_disable_category(const btck_LogCategory category)
+void btck_logging_disable_category(btck_LogCategory category)
 {
     LogInstance().DisableCategory(get_bclog_flag(category));
 }
@@ -643,22 +635,22 @@ void btck_logging_connection_destroy(btck_LoggingConnection* connection)
 btck_ChainParameters* btck_chain_parameters_create(const btck_ChainType chain_type)
 {
     switch (chain_type) {
-    case btck_ChainType::btck_CHAIN_TYPE_MAINNET: {
+    case btck_ChainType_MAINNET: {
         return new btck_ChainParameters{CChainParams::Main()};
     }
-    case btck_ChainType::btck_CHAIN_TYPE_TESTNET: {
+    case btck_ChainType_TESTNET: {
         return new btck_ChainParameters{CChainParams::TestNet()};
     }
-    case btck_ChainType::btck_CHAIN_TYPE_TESTNET_4: {
+    case btck_ChainType_TESTNET_4: {
         return new btck_ChainParameters{CChainParams::TestNet4()};
     }
-    case btck_ChainType::btck_CHAIN_TYPE_SIGNET: {
+    case btck_ChainType_SIGNET: {
         return new btck_ChainParameters{CChainParams::SigNet({})};
     }
-    case btck_ChainType::btck_CHAIN_TYPE_REGTEST: {
+    case btck_ChainType_REGTEST: {
         return new btck_ChainParameters{CChainParams::RegTest({})};
     }
-    } // no default case, so the compiler can warn about missing cases
+    }
     assert(false);
 }
 
@@ -744,9 +736,9 @@ void btck_block_tree_entry_destroy(btck_BlockTreeEntry* block_tree_entry)
 btck_ValidationMode btck_block_validation_state_get_validation_mode(const btck_BlockValidationState* block_validation_state_)
 {
     auto& block_validation_state = *cast_block_validation_state(block_validation_state_);
-    if (block_validation_state.IsValid()) return btck_ValidationMode::btck_VALIDATION_STATE_VALID;
-    if (block_validation_state.IsInvalid()) return btck_ValidationMode::btck_VALIDATION_STATE_INVALID;
-    return btck_ValidationMode::btck_VALIDATION_STATE_ERROR;
+    if (block_validation_state.IsValid()) return btck_ValidationMode_VALID;
+    if (block_validation_state.IsInvalid()) return btck_ValidationMode_INVALID;
+    return btck_ValidationMode_INTERNAL_ERROR;
 }
 
 btck_BlockValidationResult btck_block_validation_state_get_block_validation_result(const btck_BlockValidationState* block_validation_state_)
@@ -754,23 +746,23 @@ btck_BlockValidationResult btck_block_validation_state_get_block_validation_resu
     auto& block_validation_state = *cast_block_validation_state(block_validation_state_);
     switch (block_validation_state.GetResult()) {
     case BlockValidationResult::BLOCK_RESULT_UNSET:
-        return btck_BlockValidationResult::btck_BLOCK_RESULT_UNSET;
+        return btck_BlockValidationResult_UNSET;
     case BlockValidationResult::BLOCK_CONSENSUS:
-        return btck_BlockValidationResult::btck_BLOCK_CONSENSUS;
+        return btck_BlockValidationResult_CONSENSUS;
     case BlockValidationResult::BLOCK_CACHED_INVALID:
-        return btck_BlockValidationResult::btck_BLOCK_CACHED_INVALID;
+        return btck_BlockValidationResult_CACHED_INVALID;
     case BlockValidationResult::BLOCK_INVALID_HEADER:
-        return btck_BlockValidationResult::btck_BLOCK_INVALID_HEADER;
+        return btck_BlockValidationResult_INVALID_HEADER;
     case BlockValidationResult::BLOCK_MUTATED:
-        return btck_BlockValidationResult::btck_BLOCK_MUTATED;
+        return btck_BlockValidationResult_MUTATED;
     case BlockValidationResult::BLOCK_MISSING_PREV:
-        return btck_BlockValidationResult::btck_BLOCK_MISSING_PREV;
+        return btck_BlockValidationResult_MISSING_PREV;
     case BlockValidationResult::BLOCK_INVALID_PREV:
-        return btck_BlockValidationResult::btck_BLOCK_INVALID_PREV;
+        return btck_BlockValidationResult_INVALID_PREV;
     case BlockValidationResult::BLOCK_TIME_FUTURE:
-        return btck_BlockValidationResult::btck_BLOCK_TIME_FUTURE;
+        return btck_BlockValidationResult_TIME_FUTURE;
     case BlockValidationResult::BLOCK_HEADER_LOW_WORK:
-        return btck_BlockValidationResult::btck_BLOCK_HEADER_LOW_WORK;
+        return btck_BlockValidationResult_HEADER_LOW_WORK;
     } // no default case, so the compiler can warn about missing cases
     assert(false);
 }
