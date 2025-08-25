@@ -60,15 +60,15 @@ std::vector<std::byte> hex_string_to_byte_vec(std::string_view hex)
     return bytes;
 }
 
+constexpr auto VERIFY_ALL_PRE_SEGWIT{ScriptVerificationFlags::P2SH | ScriptVerificationFlags::DERSIG |
+                                     ScriptVerificationFlags::NULLDUMMY | ScriptVerificationFlags::CHECKLOCKTIMEVERIFY |
+                                     ScriptVerificationFlags::CHECKSEQUENCEVERIFY};
+constexpr auto VERIFY_ALL_PRE_TAPROOT{VERIFY_ALL_PRE_SEGWIT | ScriptVerificationFlags::WITNESS};
+
 std::span<const std::byte> as_bytes(std::vector<unsigned char> data)
 {
     return std::span{reinterpret_cast<const std::byte*>(data.data()), data.size()};
 }
-
-constexpr auto VERIFY_ALL_PRE_SEGWIT{btck_SCRIPT_FLAGS_VERIFY_P2SH | btck_SCRIPT_FLAGS_VERIFY_DERSIG |
-                                     btck_SCRIPT_FLAGS_VERIFY_NULLDUMMY | btck_SCRIPT_FLAGS_VERIFY_CHECKLOCKTIMEVERIFY |
-                                     btck_SCRIPT_FLAGS_VERIFY_CHECKSEQUENCEVERIFY};
-constexpr auto VERIFY_ALL_PRE_TAPROOT{VERIFY_ALL_PRE_SEGWIT | btck_SCRIPT_FLAGS_VERIFY_WITNESS};
 
 void check_equal(std::span<const std::byte> _actual, std::span<const std::byte> _expected)
 {
@@ -105,17 +105,17 @@ struct TestDirectory {
 class TestKernelNotifications : public KernelNotifications<TestKernelNotifications>
 {
 public:
-    void HeaderTipHandler(btck_SynchronizationState state, int64_t height, int64_t timestamp, bool presync) override
+    void HeaderTipHandler(SynchronizationState state, int64_t height, int64_t timestamp, bool presync) override
     {
         BOOST_CHECK_GT(timestamp, 0);
     }
 
-    void WarningSetHandler(btck_Warning warning, std::string_view message) override
+    void WarningSetHandler(Warning warning, std::string_view message) override
     {
         std::cout << "Kernel warning is set: " << message << std::endl;
     }
 
-    void WarningUnsetHandler(btck_Warning warning) override
+    void WarningUnsetHandler(Warning warning) override
     {
         std::cout << "Kernel warning was unset." << std::endl;
     }
@@ -134,8 +134,6 @@ public:
 class TestValidationInterface : public ValidationInterface<TestValidationInterface>
 {
 public:
-    TestValidationInterface() : ValidationInterface() {}
-
     std::optional<std::vector<std::byte>> m_expected_valid_block = std::nullopt;
 
     void BlockChecked(const UnownedBlock block, const BlockValidationState state) override
@@ -147,47 +145,47 @@ public:
             }
         }
 
-        auto mode{state.ValidationMode()};
+        auto mode{state.GetValidationMode()};
         switch (mode) {
-        case btck_ValidationMode::btck_VALIDATION_STATE_VALID: {
+        case ValidationMode::VALID: {
             std::cout << "Valid block" << std::endl;
             return;
         }
-        case btck_ValidationMode::btck_VALIDATION_STATE_INVALID: {
+        case ValidationMode::INVALID: {
             std::cout << "Invalid block: ";
-            auto result{state.BlockValidationResult()};
+            auto result{state.GetBlockValidationResult()};
             switch (result) {
-            case btck_BlockValidationResult::btck_BLOCK_RESULT_UNSET:
+            case BlockValidationResult::UNSET:
                 std::cout << "initial value. Block has not yet been rejected" << std::endl;
                 break;
-            case btck_BlockValidationResult::btck_BLOCK_HEADER_LOW_WORK:
+            case BlockValidationResult::HEADER_LOW_WORK:
                 std::cout << "the block header may be on a too-little-work chain" << std::endl;
                 break;
-            case btck_BlockValidationResult::btck_BLOCK_CONSENSUS:
+            case BlockValidationResult::CONSENSUS:
                 std::cout << "invalid by consensus rules (excluding any below reasons)" << std::endl;
                 break;
-            case btck_BlockValidationResult::btck_BLOCK_CACHED_INVALID:
+            case BlockValidationResult::CACHED_INVALID:
                 std::cout << "this block was cached as being invalid and we didn't store the reason why" << std::endl;
                 break;
-            case btck_BlockValidationResult::btck_BLOCK_INVALID_HEADER:
+            case BlockValidationResult::INVALID_HEADER:
                 std::cout << "invalid proof of work or time too old" << std::endl;
                 break;
-            case btck_BlockValidationResult::btck_BLOCK_MUTATED:
+            case BlockValidationResult::MUTATED:
                 std::cout << "the block's data didn't match the data committed to by the PoW" << std::endl;
                 break;
-            case btck_BlockValidationResult::btck_BLOCK_MISSING_PREV:
+            case BlockValidationResult::MISSING_PREV:
                 std::cout << "We don't have the previous block the checked one is built on" << std::endl;
                 break;
-            case btck_BlockValidationResult::btck_BLOCK_INVALID_PREV:
+            case BlockValidationResult::INVALID_PREV:
                 std::cout << "A block this one builds on is invalid" << std::endl;
                 break;
-            case btck_BlockValidationResult::btck_BLOCK_TIME_FUTURE:
+            case BlockValidationResult::TIME_FUTURE:
                 std::cout << "block timestamp was > 2 hours in the future (or our clock is bad)" << std::endl;
                 break;
             }
             return;
         }
-        case btck_ValidationMode::btck_VALIDATION_STATE_ERROR: {
+        case ValidationMode::INTERNAL_ERROR: {
             std::cout << "Internal error" << std::endl;
             return;
         }
@@ -203,7 +201,7 @@ void run_verify_test(
     unsigned int input_index,
     bool taproot)
 {
-    auto status = btck_ScriptVerifyStatus::btck_SCRIPT_VERIFY_OK;
+    auto status = ScriptVerifyStatus::OK;
 
     if (taproot) {
         BOOST_CHECK(spent_script_pubkey.Verify(
@@ -211,19 +209,19 @@ void run_verify_test(
             spending_tx,
             spent_outputs,
             input_index,
-            btck_SCRIPT_FLAGS_VERIFY_ALL,
+            ScriptVerificationFlags::ALL,
             status));
-        BOOST_CHECK_EQUAL(status, btck_SCRIPT_VERIFY_OK);
+        BOOST_CHECK(status == ScriptVerifyStatus::OK);
     } else {
         BOOST_CHECK(!spent_script_pubkey.Verify(
             amount,
             spending_tx,
             spent_outputs,
             input_index,
-            btck_SCRIPT_FLAGS_VERIFY_ALL,
+            ScriptVerificationFlags::ALL,
             status));
-        BOOST_CHECK_EQUAL(status, btck_SCRIPT_VERIFY_ERROR_SPENT_OUTPUTS_REQUIRED);
-        status = btck_SCRIPT_VERIFY_OK;
+        BOOST_CHECK(status == ScriptVerifyStatus::ERROR_SPENT_OUTPUTS_REQUIRED);
+        status = ScriptVerifyStatus::OK;
     }
 
     BOOST_CHECK(spent_script_pubkey.Verify(
@@ -233,7 +231,7 @@ void run_verify_test(
         input_index,
         VERIFY_ALL_PRE_TAPROOT,
         status));
-    BOOST_CHECK_EQUAL(status, btck_SCRIPT_VERIFY_OK);
+    BOOST_CHECK(status == ScriptVerifyStatus::OK);
 
     BOOST_CHECK(spent_script_pubkey.Verify(
         0,
@@ -242,18 +240,9 @@ void run_verify_test(
         input_index,
         VERIFY_ALL_PRE_SEGWIT,
         status));
-    BOOST_CHECK_EQUAL(status, btck_SCRIPT_VERIFY_OK);
+    BOOST_CHECK(status == ScriptVerifyStatus::OK);
 
-    BOOST_CHECK(!spent_script_pubkey.Verify(
-        amount,
-        spending_tx,
-        spent_outputs,
-        input_index,
-        VERIFY_ALL_PRE_TAPROOT << 2,
-        status));
-    BOOST_CHECK_EQUAL(status, btck_SCRIPT_VERIFY_ERROR_INVALID_FLAGS);
-
-    status = btck_SCRIPT_VERIFY_OK;
+    status = ScriptVerifyStatus::OK;
 }
 
 BOOST_AUTO_TEST_CASE(btck_transaction_tests)
@@ -324,7 +313,7 @@ BOOST_AUTO_TEST_CASE(btck_script_verify_tests)
         /*is_taproot*/ true);
 }
 
-BOOST_AUTO_TEST_CASE(btck_logging_tests)
+BOOST_AUTO_TEST_CASE(logging_tests)
 {
     btck_LoggingOptions logging_options = {
         .log_timestamps = true,
@@ -334,15 +323,15 @@ BOOST_AUTO_TEST_CASE(btck_logging_tests)
         .always_print_category_levels = true,
     };
 
-    btck_logging_set_level_category(btck_LogCategory::btck_LOG_BENCH, btck_LogLevel::btck_LOG_TRACE);
-    btck_logging_disable_category(btck_LogCategory::btck_LOG_BENCH);
-    btck_logging_enable_category(btck_LogCategory::btck_LOG_VALIDATION);
-    btck_logging_disable_category(btck_LogCategory::btck_LOG_VALIDATION);
+    logging_set_level_category(LogCategory::BENCH, LogLevel::TRACE_LEVEL);
+    logging_disable_category(LogCategory::BENCH);
+    logging_enable_category(LogCategory::VALIDATION);
+    logging_disable_category(LogCategory::VALIDATION);
 
     // Check that connecting, connecting another, and then disconnecting and connecting a logger again works.
     {
-        btck_logging_set_level_category(btck_LogCategory::btck_LOG_KERNEL, btck_LogLevel::btck_LOG_TRACE);
-        btck_logging_enable_category(btck_LogCategory::btck_LOG_KERNEL);
+        logging_set_level_category(LogCategory::KERNEL, LogLevel::TRACE_LEVEL);
+        logging_enable_category(LogCategory::KERNEL);
         Logger logger{std::make_unique<TestLog>(TestLog{}), logging_options};
         Logger logger_2{std::make_unique<TestLog>(TestLog{}), logging_options};
     }
@@ -363,14 +352,14 @@ BOOST_AUTO_TEST_CASE(btck_context_tests)
     { // test with context options
         TestKernelNotifications notifications{};
         ContextOptions options{};
-        ChainParams params{btck_ChainType::btck_CHAIN_TYPE_MAINNET};
+        ChainParams params{ChainType::MAINNET};
         options.SetChainParams(params);
         options.SetNotifications(notifications);
         Context context{options};
     }
 }
 
-Context create_context(TestKernelNotifications& notifications, btck_ChainType chain_type, TestValidationInterface* validation_interface = nullptr)
+Context create_context(TestKernelNotifications& notifications, ChainType chain_type, TestValidationInterface* validation_interface = nullptr)
 {
     ContextOptions options{};
     ChainParams params{chain_type};
@@ -409,7 +398,7 @@ BOOST_AUTO_TEST_CASE(btck_chainman_tests)
     }
 
     TestKernelNotifications notifications{};
-    auto context{create_context(notifications, btck_ChainType::btck_CHAIN_TYPE_MAINNET)};
+    auto context{create_context(notifications, ChainType::MAINNET)};
 
     ChainstateManagerOptions chainman_opts{context, test_directory.m_directory.string(), (test_directory.m_directory / "blocks").string()};
     chainman_opts.SetWorkerThreads(4);
@@ -449,7 +438,7 @@ std::unique_ptr<ChainMan> create_chainman(TestDirectory& test_directory,
 void chainman_reindex_test(TestDirectory& test_directory)
 {
     TestKernelNotifications notifications{};
-    auto context{create_context(notifications, btck_ChainType::btck_CHAIN_TYPE_MAINNET)};
+    auto context{create_context(notifications, ChainType::MAINNET)};
     auto chainman{create_chainman(test_directory, true, false, false, false, context)};
 
     std::vector<std::string> import_files;
@@ -489,7 +478,7 @@ void chainman_reindex_test(TestDirectory& test_directory)
 void chainman_reindex_chainstate_test(TestDirectory& test_directory)
 {
     TestKernelNotifications notifications{};
-    auto context{create_context(notifications, btck_ChainType::btck_CHAIN_TYPE_MAINNET)};
+    auto context{create_context(notifications, ChainType::MAINNET)};
     auto chainman{create_chainman(test_directory, false, true, false, false, context)};
 
     std::vector<std::string> import_files;
@@ -501,7 +490,7 @@ void chainman_mainnet_validation_test(TestDirectory& test_directory)
 {
     TestKernelNotifications notifications{};
     TestValidationInterface validation_interface{};
-    auto context{create_context(notifications, btck_ChainType::btck_CHAIN_TYPE_MAINNET, &validation_interface)};
+    auto context{create_context(notifications, ChainType::MAINNET, &validation_interface)};
     auto chainman{create_chainman(test_directory, false, false, false, false, context)};
 
     {
@@ -567,7 +556,7 @@ BOOST_AUTO_TEST_CASE(btck_chainman_in_memory_tests)
     auto in_memory_test_directory{TestDirectory{"in-memory_test_bitcoin_kernel"}};
 
     TestKernelNotifications notifications{};
-    auto context{create_context(notifications, btck_ChainType::btck_CHAIN_TYPE_REGTEST)};
+    auto context{create_context(notifications, ChainType::REGTEST)};
     auto chainman{create_chainman(in_memory_test_directory, false, false, true, true, context)};
 
     for (auto& raw_block : REGTEST_BLOCK_DATA) {
@@ -586,7 +575,7 @@ BOOST_AUTO_TEST_CASE(btck_chainman_regtest_tests)
     auto test_directory{TestDirectory{"regtest_test_bitcoin_kernel"}};
 
     TestKernelNotifications notifications{};
-    auto context{create_context(notifications, btck_ChainType::btck_CHAIN_TYPE_REGTEST)};
+    auto context{create_context(notifications, ChainType::REGTEST)};
 
     // Validate 206 regtest blocks in total.
     // Stop halfway to check that it is possible to continue validating starting

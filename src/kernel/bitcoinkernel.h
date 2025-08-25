@@ -255,17 +255,15 @@ typedef struct btck_TransactionSpentOutputs btck_TransactionSpentOutputs;
 typedef struct btck_Coin btck_Coin;
 
 /** Current sync state passed to tip changed callbacks. */
-typedef enum {
-    btck_INIT_REINDEX,
-    btck_INIT_DOWNLOAD,
-    btck_POST_INIT
-} btck_SynchronizationState;
+typedef uint8_t btck_SynchronizationState;
+#define btck_SynchronizationState_INIT_REINDEX ((btck_SynchronizationState)(0))
+#define btck_SynchronizationState_INIT_DOWNLOAD ((btck_SynchronizationState)(1))
+#define btck_SynchronizationState_POST_INIT ((btck_SynchronizationState)(2))
 
 /** Possible warning types issued by validation. */
-typedef enum {
-    btck_UNKNOWN_NEW_RULES_ACTIVATED,
-    btck_LARGE_WORK_INVALID_CHAIN
-} btck_Warning;
+typedef uint8_t btck_Warning;
+#define btck_Warning_UNKNOWN_NEW_RULES_ACTIVATED ((btck_Warning)(0))
+#define btck_Warning_LARGE_WORK_INVALID_CHAIN ((btck_Warning)(1))
 
 /** Callback function types */
 
@@ -300,26 +298,24 @@ typedef int (*btck_WriteBytes)(const void* bytes, size_t size, void* userdata);
  * Whether a validated data structure is valid, invalid, or an error was
  * encountered during processing.
  */
-typedef enum {
-    btck_VALIDATION_STATE_VALID = 0,
-    btck_VALIDATION_STATE_INVALID,
-    btck_VALIDATION_STATE_ERROR,
-} btck_ValidationMode;
+typedef uint8_t btck_ValidationMode;
+#define btck_ValidationMode_VALID ((btck_ValidationMode)(0))
+#define btck_ValidationMode_INVALID ((btck_ValidationMode)(1))
+#define btck_ValidationMode_INTERNAL_ERROR ((btck_ValidationMode)(2))
 
 /**
  * A granular "reason" why a block was invalid.
  */
-typedef enum {
-    btck_BLOCK_RESULT_UNSET = 0, //!< initial value. Block has not yet been rejected
-    btck_BLOCK_CONSENSUS,        //!< invalid by consensus rules (excluding any below reasons)
-    btck_BLOCK_CACHED_INVALID,  //!< this block was cached as being invalid and we didn't store the reason why
-    btck_BLOCK_INVALID_HEADER,  //!< invalid proof of work or time too old
-    btck_BLOCK_MUTATED,         //!< the block's data didn't match the data committed to by the PoW
-    btck_BLOCK_MISSING_PREV,    //!< We don't have the previous block the checked one is built on
-    btck_BLOCK_INVALID_PREV,    //!< A block this one builds on is invalid
-    btck_BLOCK_TIME_FUTURE,     //!< block timestamp was > 2 hours in the future (or our clock is bad)
-    btck_BLOCK_HEADER_LOW_WORK, //!< the block header may be on a too-little-work chain
-} btck_BlockValidationResult;
+typedef uint32_t btck_BlockValidationResult;
+#define btck_BlockValidationResult_UNSET ((btck_BlockValidationResult)(0))           //!< initial value. Block has not yet been rejected
+#define btck_BlockValidationResult_CONSENSUS ((btck_BlockValidationResult)(1))       //!< invalid by consensus rules (excluding any below reasons)
+#define btck_BlockValidationResult_CACHED_INVALID ((btck_BlockValidationResult)(2))  //!< this block was cached as being invalid and we didn't store the reason why
+#define btck_BlockValidationResult_INVALID_HEADER ((btck_BlockValidationResult)(3))  //!< invalid proof of work or time too old
+#define btck_BlockValidationResult_MUTATED ((btck_BlockValidationResult)(4))         //!< the block's data didn't match the data committed to by the PoW
+#define btck_BlockValidationResult_MISSING_PREV ((btck_BlockValidationResult)(5))    //!< We don't have the previous block the checked one is built on
+#define btck_BlockValidationResult_INVALID_PREV ((btck_BlockValidationResult)(6))    //!< A block this one builds on is invalid
+#define btck_BlockValidationResult_TIME_FUTURE ((btck_BlockValidationResult)(7))     //!< block timestamp was > 2 hours in the future (or our clock is bad)
+#define btck_BlockValidationResult_HEADER_LOW_WORK ((btck_BlockValidationResult)(8)) //!< the block header may be on a too-little-work chain
 
 /**
  * Holds the validation interface callbacks. The user data pointer may be used
@@ -356,28 +352,26 @@ typedef struct {
 /**
  * A collection of logging categories that may be encountered by kernel code.
  */
-typedef enum {
-    btck_LOG_ALL = 0,
-    btck_LOG_BENCH,
-    btck_LOG_BLOCKSTORAGE,
-    btck_LOG_COINDB,
-    btck_LOG_LEVELDB,
-    btck_LOG_MEMPOOL,
-    btck_LOG_PRUNE,
-    btck_LOG_RAND,
-    btck_LOG_REINDEX,
-    btck_LOG_VALIDATION,
-    btck_LOG_KERNEL,
-} btck_LogCategory;
+typedef uint8_t btck_LogCategory;
+#define btck_LogCategory_ALL ((btck_LogCategory)(0))
+#define btck_LogCategory_BENCH ((btck_LogCategory)(1))
+#define btck_LogCategory_BLOCKSTORAGE ((btck_LogCategory)(2))
+#define btck_LogCategory_COINDB ((btck_LogCategory)(3))
+#define btck_LogCategory_LEVELDB ((btck_LogCategory)(4))
+#define btck_LogCategory_MEMPOOL ((btck_LogCategory)(5))
+#define btck_LogCategory_PRUNE ((btck_LogCategory)(6))
+#define btck_LogCategory_RAND ((btck_LogCategory)(7))
+#define btck_LogCategory_REINDEX ((btck_LogCategory)(8))
+#define btck_LogCategory_VALIDATION ((btck_LogCategory)(9))
+#define btck_LogCategory_KERNEL ((btck_LogCategory)(10))
 
 /**
  * The level at which logs should be produced.
  */
-typedef enum {
-    btck_LOG_TRACE = 0,
-    btck_LOG_DEBUG,
-    btck_LOG_INFO,
-} btck_LogLevel;
+typedef uint8_t btck_LogLevel;
+#define btck_LogLevel_TRACE ((btck_LogLevel)(0))
+#define btck_LogLevel_DEBUG ((btck_LogLevel)(1))
+#define btck_LogLevel_INFO ((btck_LogLevel)(2))
 
 /**
  * Options controlling the format of log messages.
@@ -395,46 +389,38 @@ typedef struct {
 /**
  * A collection of status codes that may be issued by the script verify function.
  */
-typedef enum {
-    btck_SCRIPT_VERIFY_OK = 0,
-    btck_SCRIPT_VERIFY_ERROR_INVALID_FLAGS, //!< The provided bitfield for the flags was invalid.
-    btck_SCRIPT_VERIFY_ERROR_INVALID_FLAGS_COMBINATION, //!< The flags very combined in an invalid way.
-    btck_SCRIPT_VERIFY_ERROR_SPENT_OUTPUTS_REQUIRED, //!< The taproot flag was set, so valid spent_outputs have to be provided.
-} btck_ScriptVerifyStatus;
+typedef uint8_t btck_ScriptVerifyStatus;
+#define btck_ScriptVerifyStatus_SCRIPT_VERIFY_OK ((btck_ScriptVerifyStatus)(0))
+#define btck_ScriptVerifyStatus_ERROR_INVALID_FLAGS_COMBINATION ((btck_ScriptVerifyStatus)(2)) //!< The flags very combined in an invalid way.
+#define btck_ScriptVerifyStatus_ERROR_SPENT_OUTPUTS_REQUIRED ((btck_ScriptVerifyStatus)(3))    //!< The taproot flag was set, so valid spent_outputs have to be provided.
 
 /**
  * Script verification flags that may be composed with each other.
  */
-typedef enum
-{
-    btck_SCRIPT_FLAGS_VERIFY_NONE                = 0,
-    btck_SCRIPT_FLAGS_VERIFY_P2SH                = (1U << 0), //!< evaluate P2SH (BIP16) subscripts
-    btck_SCRIPT_FLAGS_VERIFY_DERSIG              = (1U << 2), //!< enforce strict DER (BIP66) compliance
-    btck_SCRIPT_FLAGS_VERIFY_NULLDUMMY           = (1U << 4), //!< enforce NULLDUMMY (BIP147)
-    btck_SCRIPT_FLAGS_VERIFY_CHECKLOCKTIMEVERIFY = (1U << 9), //!< enable CHECKLOCKTIMEVERIFY (BIP65)
-    btck_SCRIPT_FLAGS_VERIFY_CHECKSEQUENCEVERIFY = (1U << 10), //!< enable CHECKSEQUENCEVERIFY (BIP112)
-    btck_SCRIPT_FLAGS_VERIFY_WITNESS             = (1U << 11), //!< enable WITNESS (BIP141)
+typedef uint32_t btck_ScriptVerificationFlags;
+#define btck_ScriptVerificationFlags_NONE ((btck_ScriptVerificationFlags)(0))
+#define btck_ScriptVerificationFlags_P2SH ((btck_ScriptVerificationFlags)(1U << 0)) //!< evaluate P2SH (BIP16) subscripts
+#define btck_ScriptVerificationFlags_DERSIG ((btck_ScriptVerificationFlags)(1U << 2)) //!< enforce strict DER (BIP66) compliance
+#define btck_ScriptVerificationFlags_NULLDUMMY ((btck_ScriptVerificationFlags)(1U << 4)) //!< enforce NULLDUMMY (BIP147)
+#define btck_ScriptVerificationFlags_CHECKLOCKTIMEVERIFY ((btck_ScriptVerificationFlags)(1U << 9)) //!< enable CHECKLOCKTIMEVERIFY (BIP65)
+#define btck_ScriptVerificationFlags_CHECKSEQUENCEVERIFY ((btck_ScriptVerificationFlags)(1U << 10)) //!< enable CHECKSEQUENCEVERIFY (BIP112)
+#define btck_ScriptVerificationFlags_WITNESS ((btck_ScriptVerificationFlags)(1U << 11)) //!< enable WITNESS (BIP141)
+#define btck_ScriptVerificationFlags_TAPROOT ((btck_ScriptVerificationFlags)(1U << 17)) //!< enable TAPROOT (BIPs 341 & 342)
+#define btck_ScriptVerificationFlags_ALL ((btck_ScriptVerificationFlags)(                              \
+                                                    btck_ScriptVerificationFlags_P2SH |                \
+                                                    btck_ScriptVerificationFlags_DERSIG |              \
+                                                    btck_ScriptVerificationFlags_NULLDUMMY |           \
+                                                    btck_ScriptVerificationFlags_CHECKLOCKTIMEVERIFY | \
+                                                    btck_ScriptVerificationFlags_CHECKSEQUENCEVERIFY | \
+                                                    btck_ScriptVerificationFlags_WITNESS |             \
+                                                    btck_ScriptVerificationFlags_TAPROOT))
 
-    btck_SCRIPT_FLAGS_VERIFY_TAPROOT             = (1U << 17), //!< enable TAPROOT (BIPs 341 & 342)
-    btck_SCRIPT_FLAGS_VERIFY_ALL                 = btck_SCRIPT_FLAGS_VERIFY_P2SH |
-                                                     btck_SCRIPT_FLAGS_VERIFY_DERSIG |
-                                                     btck_SCRIPT_FLAGS_VERIFY_NULLDUMMY |
-                                                     btck_SCRIPT_FLAGS_VERIFY_CHECKLOCKTIMEVERIFY |
-                                                     btck_SCRIPT_FLAGS_VERIFY_CHECKSEQUENCEVERIFY |
-                                                     btck_SCRIPT_FLAGS_VERIFY_WITNESS |
-                                                     btck_SCRIPT_FLAGS_VERIFY_TAPROOT
-} btck_ScriptFlags;
-
-/**
- * Chain type used for creating chain params.
- */
-typedef enum {
-    btck_CHAIN_TYPE_MAINNET = 0,
-    btck_CHAIN_TYPE_TESTNET,
-    btck_CHAIN_TYPE_TESTNET_4,
-    btck_CHAIN_TYPE_SIGNET,
-    btck_CHAIN_TYPE_REGTEST,
-} btck_ChainType;
+typedef uint8_t btck_ChainType;
+#define btck_ChainType_MAINNET ((btck_ChainType)(0))
+#define btck_ChainType_TESTNET ((btck_ChainType)(1))
+#define btck_ChainType_TESTNET_4 ((btck_ChainType)(2))
+#define btck_ChainType_SIGNET ((btck_ChainType)(3))
+#define btck_ChainType_REGTEST ((btck_ChainType)(4))
 
 /**
  * A type-safe block identifier.
@@ -686,7 +672,7 @@ BITCOINKERNEL_API void btck_logging_disable();
  *                     will be logged at the specified level and above.
  * @param[in] level    Log level at which the log category is set.
  */
-BITCOINKERNEL_API void btck_logging_set_level_category(const btck_LogCategory category, btck_LogLevel level);
+BITCOINKERNEL_API void btck_logging_set_level_category(btck_LogCategory category, btck_LogLevel level);
 
 /**
  * @brief Enable a specific log category for the global internal logger. This
@@ -696,7 +682,7 @@ BITCOINKERNEL_API void btck_logging_set_level_category(const btck_LogCategory ca
  *
  * @param[in] category If btck_LOG_ALL is chosen, all categories will be enabled.
  */
-BITCOINKERNEL_API void btck_logging_enable_category(const btck_LogCategory category);
+BITCOINKERNEL_API void btck_logging_enable_category(btck_LogCategory category);
 
 /**
  * @brief Disable a specific log category for the global internal logger. This
@@ -706,7 +692,7 @@ BITCOINKERNEL_API void btck_logging_enable_category(const btck_LogCategory categ
  *
  * @param[in] category If btck_LOG_ALL is chosen, all categories will be disabled.
  */
-BITCOINKERNEL_API void btck_logging_disable_category(const btck_LogCategory category);
+BITCOINKERNEL_API void btck_logging_disable_category(btck_LogCategory category);
 
 /**
  * @brief Start logging messages through the provided callback. Log messages
@@ -988,8 +974,10 @@ BITCOINKERNEL_API btck_ChainstateManager* BITCOINKERNEL_WARN_UNUSED_RESULT btck_
  * @param[in] block_file_paths_len Length of the block_file_paths array.
  * @return                         0 if the import blocks call was completed successfully, non-zero otherwise.
  */
-BITCOINKERNEL_API int btck_chainstate_manager_import_blocks( btck_ChainstateManager* chainstate_manager,
-                          const char** block_file_paths, size_t* block_file_paths_lens, size_t block_file_paths_len
+BITCOINKERNEL_API int btck_chainstate_manager_import_blocks(
+    btck_ChainstateManager* chainstate_manager,
+    const char** block_file_paths, size_t* block_file_paths_lens,
+    size_t block_file_paths_len
 ) BITCOINKERNEL_ARG_NONNULL(1, 2);
 
 /**
