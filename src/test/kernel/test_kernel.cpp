@@ -18,6 +18,7 @@
 #include <memory>
 #include <optional>
 #include <random>
+#include <ranges>
 #include <span>
 #include <string>
 #include <string_view>
@@ -269,12 +270,22 @@ BOOST_AUTO_TEST_CASE(btck_transaction_tests)
     // The following code is unsafe, but left here to show limitations of the
     // API, because we RVO-move the output beyond the lifetime of the
     // transaction. The reference wrapper should make this clear to the user.
-    auto get_output = [&]() -> RefWrapper<TransactionOutput> {
-        auto tx{Transaction{tx_data}};
-        return tx.GetOutput(0);
-    };
-    auto output_new = get_output();
-    BOOST_CHECK_EQUAL(output_new.Get().GetAmount(), 20737411);
+    // auto get_output = [&]() -> RefWrapper<TransactionOutput> {
+    //     auto tx{Transaction{tx_data}};
+    //     return tx.GetOutput(0);
+    // };
+    // auto output_new = get_output();
+    // BOOST_CHECK_EQUAL(output_new.Get().GetAmount(), 20737411);
+
+    auto amount = *(tx.Outputs()
+        | std::ranges::views::filter([](const auto& output) {
+            return output.Get().GetAmount() == 42130042;
+        })
+        | std::views::transform([](const auto& output) {
+            return output.Get().GetAmount();
+        })
+    ).begin();
+    BOOST_CHECK_EQUAL(amount, 42130042);
 
     ScriptPubkey script_pubkey_roundtrip{script_pubkey.Get().ToBytes()};
     check_equal(script_pubkey_roundtrip.ToBytes(), script_pubkey.Get().ToBytes());
@@ -448,7 +459,7 @@ void chainman_reindex_test(TestDirectory& test_directory)
     auto chain{chainman->GetChain()};
     auto genesis_index{chain.Get().GetGenesis()};
     auto genesis_block_raw{chainman->ReadBlock(genesis_index).value().ToBytes()};
-    auto first_index{chain.Get().GetByHeight(0).value()};
+    auto first_index{chain.Get().GetByHeight(0)};
     auto first_block_raw{chainman->ReadBlock(genesis_index).value().ToBytes()};
     check_equal(genesis_block_raw, first_block_raw);
     auto height{first_index.GetHeight()};
@@ -459,7 +470,7 @@ void chainman_reindex_test(TestDirectory& test_directory)
     auto next_block_data{chainman->ReadBlock(next_index).value().ToBytes()};
     auto tip_index{chain.Get().GetTip()};
     auto tip_block_data{chainman->ReadBlock(tip_index).value().ToBytes()};
-    auto second_index{chain.Get().GetByHeight(1).value()};
+    auto second_index{chain.Get().GetByHeight(1)};
     auto second_block{chainman->ReadBlock(second_index).value()};
     auto second_block_data{second_block.ToBytes()};
     auto second_height{second_index.GetHeight()};
@@ -507,7 +518,13 @@ void chainman_mainnet_validation_test(TestDirectory& test_directory)
     // mainnet block 1
     auto raw_block = hex_string_to_byte_vec("010000006fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000982051fd1e4ba744bbbe680e1fee14677ba1a3c3540bf7b1cdb606e857233e0e61bc6649ffff001d01e362990101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0704ffff001d0104ffffffff0100f2052a0100000043410496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858eeac00000000");
     Block block{raw_block};
-    Transaction tx{block.GetTransaction(block.CountOutputs() - 1)};
+    Transaction tx{block.GetTransaction(block.CountTransactions() - 1)};
+    auto output_counts = *(block.Transactions()
+        | std::views::transform([](const auto& tx) {
+            return tx.CountOutputs();
+        })
+    ).begin();
+    BOOST_CHECK_EQUAL(output_counts, 1);
 
     validation_interface.m_expected_valid_block.emplace(raw_block);
     auto ser_block{block.ToBytes()};
@@ -611,9 +628,9 @@ BOOST_AUTO_TEST_CASE(btck_chainman_regtest_tests)
     check_equal(read_block_2.ToBytes(), as_bytes(REGTEST_BLOCK_DATA[REGTEST_BLOCK_DATA.size() - 2]));
 
     BlockSpentOutputs block_spent_outputs{chainman->ReadBlockSpentOutputs(tip)};
-    BOOST_CHECK_EQUAL(block_spent_outputs.m_size, 1);
-    RefWrapper<TransactionSpentOutputs> transaction_spent_outputs{block_spent_outputs.GetTxSpentOutputs(block_spent_outputs.m_size - 1)};
-    RefWrapper<Coin> coin{transaction_spent_outputs.Get().GetCoin(transaction_spent_outputs.Get().m_size - 1)};
+    BOOST_CHECK_EQUAL(block_spent_outputs.Count(), 1);
+    RefWrapper<TransactionSpentOutputs> transaction_spent_outputs{block_spent_outputs.GetTxSpentOutputs(block_spent_outputs.Count()- 1)};
+    RefWrapper<Coin> coin{transaction_spent_outputs.Get().GetCoin(transaction_spent_outputs.Get().Count()- 1)};
     RefWrapper<TransactionOutput> output = coin.Get().GetOutput();
     uint32_t coin_height = coin.Get().GetConfirmationHeight();
     BOOST_CHECK_EQUAL(coin_height, 205);
@@ -623,6 +640,19 @@ BOOST_AUTO_TEST_CASE(btck_chainman_regtest_tests)
     BOOST_CHECK_EQUAL(script_pubkey_bytes.size(), 22);
     auto round_trip_script_pubkey{ScriptPubkey(script_pubkey_bytes)};
     BOOST_CHECK_EQUAL(round_trip_script_pubkey.ToBytes().size(), 22);
+
+    for (const auto& tx_spent_outputs : block_spent_outputs.TxsSpentOutputs()) {
+        for (const auto& coins : tx_spent_outputs.Get().Coins()) {
+            BOOST_CHECK_GT(coins.Get().GetOutput().Get().GetAmount(), 1);
+        }
+    }
+
+    int32_t count{0};
+    for (const auto& entry : chain.Get().Entries()) {
+        BOOST_CHECK_EQUAL(entry.GetHeight(), count);
+        ++count;
+    }
+    BOOST_CHECK_EQUAL(count, chain.Get().CurrentHeight());
 
     // Test that reading past the size returns null data
     // BOOST_CHECK_THROW(block_spent_outputs.GetTxSpentOutputs(block_spent_outputs.m_size), std::runtime_error);
