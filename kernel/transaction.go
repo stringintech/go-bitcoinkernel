@@ -66,7 +66,7 @@ func (t *Transaction) CountOutputs() (uint64, error) {
 func (t *Transaction) GetOutputAt(index uint64) (*TransactionOutput, error) {
 	checkReady(t)
 
-	ptr := C.btck_transaction_get_output_at(t.ptr, C.uint64_t(index))
+	ptr := C.btck_transaction_get_output_at(t.ptr, C.size_t(index))
 	if ptr == nil {
 		return nil, ErrKernelTransactionGetOutput
 	}

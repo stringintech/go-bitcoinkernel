@@ -65,6 +65,7 @@ var (
 
 	ErrChainParametersUninitialized = &UninitializedError{ObjectName: "chainParameters"}
 	ErrKernelChainParametersCreate  = &KernelError{Operation: "btck_chain_parameters_create"}
+	ErrKernelChainGetByHeight       = &KernelError{Operation: "btck_chain_get_by_height"}
 
 	ErrChainUninitialized = &UninitializedError{ObjectName: "chain"}
 

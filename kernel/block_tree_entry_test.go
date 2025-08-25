@@ -17,10 +17,7 @@ func TestBlockTreeEntryGetPrevious(t *testing.T) {
 	defer chain.Destroy()
 
 	// Get block at height 1
-	entry, err := chain.GetByHeight(1)
-	if err != nil {
-		t.Fatalf("GetByHeight(1) error = %v", err)
-	}
+	entry := chain.GetByHeight(1)
 	defer entry.Destroy()
 
 	// Test getting previous block (should be genesis)

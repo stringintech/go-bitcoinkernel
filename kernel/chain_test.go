@@ -69,10 +69,7 @@ func TestChain(t *testing.T) {
 	}
 
 	// Test GetByHeight
-	block1, err := chain.GetByHeight(1)
-	if err != nil {
-		t.Fatalf("GetByHeight(1) error = %v", err)
-	}
+	block1 := chain.GetByHeight(1)
 	defer block1.Destroy()
 
 	if block1.Height() != 1 {

@@ -41,17 +41,17 @@ func (c *Chain) GetGenesis() (*BlockTreeEntry, error) {
 	return entry, nil
 }
 
-// GetByHeight returns the block tree entry at the specified height or nil if no block at this height
-func (c *Chain) GetByHeight(height int) (*BlockTreeEntry, error) {
+// GetByHeight returns the block tree entry at the specified height
+func (c *Chain) GetByHeight(height int) *BlockTreeEntry {
 	checkReady(c)
 	ptr := C.btck_chain_get_by_height(c.ptr, C.int(height))
 	if ptr == nil {
-		return nil, nil
+		panic(ErrKernelChainGetByHeight)
 	}
 
 	entry := &BlockTreeEntry{ptr: ptr}
 	runtime.SetFinalizer(entry, (*BlockTreeEntry).destroy)
-	return entry, nil
+	return entry
 }
 
 // GetNextBlockTreeEntry returns the next block tree entry in the active chain, or nil if block tree entry is the chain tip or not in the chain

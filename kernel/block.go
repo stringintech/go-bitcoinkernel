@@ -81,7 +81,7 @@ func (b *Block) CountTransactions() (uint64, error) {
 func (b *Block) GetTransactionAt(index uint64) (*Transaction, error) {
 	checkReady(b)
 
-	ptr := C.btck_block_get_transaction_at(b.ptr, C.uint64_t(index))
+	ptr := C.btck_block_get_transaction_at(b.ptr, C.size_t(index))
 	if ptr == nil {
 		return nil, ErrKernelBlockGetTransaction
 	}

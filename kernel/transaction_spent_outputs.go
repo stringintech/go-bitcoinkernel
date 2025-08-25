@@ -15,16 +15,16 @@ type TransactionSpentOutputs struct {
 	ptr *C.btck_TransactionSpentOutputs
 }
 
-// Size returns the number of spent transaction outputs for the transaction
-func (tso *TransactionSpentOutputs) Size() uint64 {
+// Count returns the number of spent transaction outputs for the transaction
+func (tso *TransactionSpentOutputs) Count() uint64 {
 	checkReady(tso)
-	return uint64(C.btck_transaction_spent_outputs_size(tso.ptr))
+	return uint64(C.btck_transaction_spent_outputs_count(tso.ptr))
 }
 
 // GetCoinAt returns a coin contained in the transaction spent outputs at the specified index
 func (tso *TransactionSpentOutputs) GetCoinAt(index uint64) (*Coin, error) {
 	checkReady(tso)
-	ptr := C.btck_transaction_spent_outputs_get_coin_at(tso.ptr, C.uint64_t(index))
+	ptr := C.btck_transaction_spent_outputs_get_coin_at(tso.ptr, C.size_t(index))
 	if ptr == nil {
 		return nil, ErrKernelTransactionSpentOutputsGetCoinAt
 	}

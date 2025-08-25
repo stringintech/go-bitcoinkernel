@@ -15,16 +15,16 @@ type BlockSpentOutputs struct {
 	ptr *C.btck_BlockSpentOutputs
 }
 
-// Size returns the number of transaction spent outputs contained in block spent outputs
-func (bso *BlockSpentOutputs) Size() uint64 {
+// Count returns the number of transaction spent outputs contained in block spent outputs
+func (bso *BlockSpentOutputs) Count() uint64 {
 	checkReady(bso)
-	return uint64(C.btck_block_spent_outputs_size(bso.ptr))
+	return uint64(C.btck_block_spent_outputs_count(bso.ptr))
 }
 
 // GetTransactionSpentOutputsAt returns the transaction spent outputs at the specified index
 func (bso *BlockSpentOutputs) GetTransactionSpentOutputsAt(index uint64) (*TransactionSpentOutputs, error) {
 	checkReady(bso)
-	ptr := C.btck_block_spent_outputs_get_transaction_spent_outputs_at(bso.ptr, C.uint64_t(index))
+	ptr := C.btck_block_spent_outputs_get_transaction_spent_outputs_at(bso.ptr, C.size_t(index))
 	if ptr == nil {
 		return nil, ErrKernelBlockSpentOutputsGetTransactionSpentOutputsAt
 	}

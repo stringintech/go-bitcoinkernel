@@ -28,10 +28,7 @@ func (s *ChainstateManagerTestSuite) TestBlockSpentOutputs(t *testing.T) {
 	}
 	defer chain.Destroy()
 
-	blockIndex, err := chain.GetByHeight(202)
-	if err != nil {
-		t.Fatalf("GetByHeight(202) error = %v", err)
-	}
+	blockIndex := chain.GetByHeight(202)
 	defer blockIndex.Destroy()
 
 	blockSpentOutputs, err := s.Manager.ReadBlockSpentOutputs(blockIndex)
@@ -41,7 +38,7 @@ func (s *ChainstateManagerTestSuite) TestBlockSpentOutputs(t *testing.T) {
 	defer blockSpentOutputs.Destroy()
 
 	// Test transaction spent outputs count
-	txCount := blockSpentOutputs.Size()
+	txCount := blockSpentOutputs.Count()
 	if txCount != 20 {
 		t.Errorf("Expected 20 transactions, got %d", txCount)
 	}
@@ -54,7 +51,7 @@ func (s *ChainstateManagerTestSuite) TestBlockSpentOutputs(t *testing.T) {
 		}
 		defer txSpentOutputs.Destroy()
 
-		spentOutputSize := txSpentOutputs.Size()
+		spentOutputSize := txSpentOutputs.Count()
 		if spentOutputSize != 1 {
 			t.Errorf("Expected transaction spent output size 1, got %d", spentOutputSize)
 		}
