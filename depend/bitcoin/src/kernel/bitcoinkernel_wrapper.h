@@ -517,16 +517,13 @@ concept Log = requires(T a, std::string_view message) {
 template <Log T>
 class Logger : Handle<btck_LoggingConnection, btck_logging_connection_destroy>
 {
-private:
-    std::unique_ptr<T> m_log;
-
 public:
     Logger(std::unique_ptr<T> log, const btck_LoggingOptions& logging_options)
         : Handle{check(btck_logging_connection_create(
-              [](void* user_data, const char* message, size_t message_len) { static_cast<T*>(user_data)->LogMessage({message, message_len}); },
-              log.get(),
-              logging_options))},
-          m_log{std::move(log)}
+              +[](void* user_data, const char* message, size_t message_len) { static_cast<T*>(user_data)->LogMessage({message, message_len}); },
+              log.release(),
+              +[](void* user_data) { delete static_cast<T*>(user_data); },
+              logging_options))}
     {
     }
 };
@@ -571,34 +568,7 @@ public:
 template <typename T>
 class KernelNotifications
 {
-private:
-    btck_NotificationInterfaceCallbacks MakeCallbacks()
-    {
-        return btck_NotificationInterfaceCallbacks{
-            .user_data = this,
-            .block_tip = [](void* user_data, btck_SynchronizationState state, btck_BlockTreeEntry* entry, double verification_progress) {
-                static_cast<T*>(user_data)->BlockTipHandler(static_cast<SynchronizationState>(state), BlockTreeEntry{entry}, verification_progress);
-            },
-            .header_tip = [](void* user_data, btck_SynchronizationState state, int64_t height, int64_t timestamp, int presync) {
-                static_cast<T*>(user_data)->HeaderTipHandler(static_cast<SynchronizationState>(state), height, timestamp, presync == 1);
-            },
-            .progress = [](void* user_data, const char* title, size_t title_len, int progress_percent, int resume_possible) {
-                static_cast<T*>(user_data)->ProgressHandler({title, title_len}, progress_percent, resume_possible == 1);
-            },
-            .warning_set = [](void* user_data, btck_Warning warning, const char* message, size_t message_len) {
-                static_cast<T*>(user_data)->WarningSetHandler(static_cast<Warning>(warning), {message, message_len});
-            },
-            .warning_unset = [](void* user_data, btck_Warning warning) { static_cast<T*>(user_data)->WarningUnsetHandler(static_cast<Warning>(warning)); },
-            .flush_error = [](void* user_data, const char* error, size_t error_len) { static_cast<T*>(user_data)->FlushErrorHandler({error, error_len}); },
-            .fatal_error = [](void* user_data, const char* error, size_t error_len) { static_cast<T*>(user_data)->FatalErrorHandler({error, error_len}); },
-        };
-    }
-
-    const btck_NotificationInterfaceCallbacks m_notifications;
-
 public:
-    KernelNotifications() : m_notifications{MakeCallbacks()} {}
-
     virtual ~KernelNotifications() = default;
 
     virtual void BlockTipHandler(SynchronizationState state, BlockTreeEntry entry, double verification_progress) {}
@@ -614,8 +584,6 @@ public:
     virtual void FlushErrorHandler(std::string_view error) {}
 
     virtual void FatalErrorHandler(std::string_view error) {}
-
-    friend class ContextOptions;
 };
 
 class UnownedBlock
@@ -669,24 +637,10 @@ public:
 template <typename T>
 class ValidationInterface
 {
-private:
-    const btck_ValidationInterfaceCallbacks m_validation_interface;
-
 public:
-    ValidationInterface() : m_validation_interface{btck_ValidationInterfaceCallbacks{
-                                .user_data = this,
-                                .block_checked = [](void* user_data, const btck_BlockPointer* block, const btck_BlockValidationState* state) {
-                                    static_cast<T*>(user_data)->BlockChecked(UnownedBlock{block}, BlockValidationState{state});
-                                },
-                            }}
-    {
-    }
-
     virtual ~ValidationInterface() = default;
 
     virtual void BlockChecked(UnownedBlock block, const BlockValidationState state) {}
-
-    friend class ContextOptions;
 };
 
 class ChainParams : Handle<btck_ChainParameters, btck_chain_parameters_destroy>
@@ -708,15 +662,51 @@ public:
     }
 
     template <typename T>
-    void SetNotifications(KernelNotifications<T>& notifications)
+    void SetNotifications(std::shared_ptr<T> notifications)
     {
-        btck_context_options_set_notifications(impl(), notifications.m_notifications);
+        static_assert(std::is_base_of_v<KernelNotifications<T>, T>);
+        auto heap_notifications = std::make_unique<std::shared_ptr<T>>(std::move(notifications));
+        using user_type = std::shared_ptr<T>*;
+        btck_context_options_set_notifications(
+            impl(),
+            btck_NotificationInterfaceCallbacks{
+                .user_data = heap_notifications.release(),
+                .user_data_destroy = +[](void* user_data) { delete static_cast<user_type>(user_data); },
+                .block_tip = +[](void* user_data, btck_SynchronizationState state, btck_BlockTreeEntry* entry, double verification_progress) {
+                    (*static_cast<user_type>(user_data))->BlockTipHandler(static_cast<SynchronizationState>(state), BlockTreeEntry{entry}, verification_progress);
+                },
+                .header_tip = +[](void* user_data, btck_SynchronizationState state, int64_t height, int64_t timestamp, int presync) {
+                    (*static_cast<user_type>(user_data))->HeaderTipHandler(static_cast<SynchronizationState>(state), height, timestamp, presync == 1);
+                },
+                .progress = +[](void* user_data, const char* title, size_t title_len, int progress_percent, int resume_possible) {
+                    (*static_cast<user_type>(user_data))->ProgressHandler({title, title_len}, progress_percent, resume_possible == 1);
+                },
+                .warning_set = +[](void* user_data, btck_Warning warning, const char* message, size_t message_len) {
+                    (*static_cast<user_type>(user_data))->WarningSetHandler(static_cast<Warning>(warning), {message, message_len});
+                },
+                .warning_unset = +[](void* user_data, btck_Warning warning) { (*static_cast<user_type>(user_data))->WarningUnsetHandler(static_cast<Warning>(warning)); },
+                .flush_error = +[](void* user_data, const char* error, size_t error_len) { (*static_cast<user_type>(user_data))->FlushErrorHandler({error, error_len}); },
+                .fatal_error = +[](void* user_data, const char* error, size_t error_len) { (*static_cast<user_type>(user_data))->FatalErrorHandler({error, error_len}); },
+            }
+        );
     }
 
     template <typename T>
-    void SetValidationInterface(ValidationInterface<T>& validation_interface)
+    void SetValidationInterface(std::shared_ptr<T> validation_interface)
     {
-        btck_context_options_set_validation_interface(impl(), validation_interface.m_validation_interface);
+        static_assert(std::is_base_of_v<ValidationInterface<T>, T>);
+        auto heap_vi = std::make_unique<std::shared_ptr<T>>(std::move(validation_interface));
+        using user_type = std::shared_ptr<T>*;
+        btck_context_options_set_validation_interface(
+            impl(),
+            btck_ValidationInterfaceCallbacks{
+                .user_data = heap_vi.release(),
+                .user_data_destroy = +[](void* user_data) { delete static_cast<user_type>(user_data); },
+                .block_checked = +[](void* user_data, const btck_BlockPointer* block, const btck_BlockValidationState* state) {
+                    (*static_cast<user_type>(user_data))->BlockChecked(UnownedBlock{block}, BlockValidationState{state});
+                },
+            }
+        );
     }
 
     friend class Context;
@@ -942,13 +932,6 @@ public:
     BlockTreeEntry GetByHeight(int height) const
     {
         auto index{btck_chain_get_by_height(impl(), height)};
-        return index;
-    }
-
-    std::optional<BlockTreeEntry> GetNextBlockTreeEntry(BlockTreeEntry& block_index) const
-    {
-        auto index{btck_chain_get_next_block_tree_entry(impl(), block_index.impl())};
-        if (!index) return std::nullopt;
         return index;
     }
 

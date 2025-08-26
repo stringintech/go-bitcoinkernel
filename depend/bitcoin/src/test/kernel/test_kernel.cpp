@@ -361,23 +361,22 @@ BOOST_AUTO_TEST_CASE(btck_context_tests)
     }
 
     { // test with context options
-        TestKernelNotifications notifications{};
         ContextOptions options{};
         ChainParams params{ChainType::MAINNET};
         options.SetChainParams(params);
-        options.SetNotifications(notifications);
+        options.SetNotifications(std::make_shared<TestKernelNotifications>());
         Context context{options};
     }
 }
 
-Context create_context(TestKernelNotifications& notifications, ChainType chain_type, TestValidationInterface* validation_interface = nullptr)
+Context create_context(std::shared_ptr<TestKernelNotifications> notifications, ChainType chain_type, std::shared_ptr<TestValidationInterface> validation_interface = nullptr)
 {
     ContextOptions options{};
     ChainParams params{chain_type};
     options.SetChainParams(params);
     options.SetNotifications(notifications);
     if (validation_interface) {
-        options.SetValidationInterface(*validation_interface);
+        options.SetValidationInterface(validation_interface);
     }
     auto context{Context{options}};
     return context;
@@ -408,7 +407,7 @@ BOOST_AUTO_TEST_CASE(btck_chainman_tests)
         ChainMan chainman{context, chainman_opts};
     }
 
-    TestKernelNotifications notifications{};
+    auto notifications{std::make_shared<TestKernelNotifications>()};
     auto context{create_context(notifications, ChainType::MAINNET)};
 
     ChainstateManagerOptions chainman_opts{context, test_directory.m_directory.string(), (test_directory.m_directory / "blocks").string()};
@@ -448,7 +447,18 @@ std::unique_ptr<ChainMan> create_chainman(TestDirectory& test_directory,
 
 void chainman_reindex_test(TestDirectory& test_directory)
 {
-    TestKernelNotifications notifications{};
+    btck_LoggingOptions logging_options = {
+        .log_timestamps = true,
+        .log_time_micros = true,
+        .log_threadnames = false,
+        .log_sourcelocations = false,
+        .always_print_category_levels = true,
+    };
+    Logger logger{std::make_unique<TestLog>(TestLog{}), logging_options};
+
+    auto mainnet_test_directory{TestDirectory{"mainnet_test_bitcoin_kernel"}};
+
+    auto notifications{std::make_shared<TestKernelNotifications>()};
     auto context{create_context(notifications, ChainType::MAINNET)};
     auto chainman{create_chainman(test_directory, true, false, false, false, context)};
 
@@ -465,7 +475,7 @@ void chainman_reindex_test(TestDirectory& test_directory)
     auto height{first_index.GetHeight()};
     BOOST_CHECK_EQUAL(height, 0);
 
-    auto next_index{chain.Get().GetNextBlockTreeEntry(first_index).value()};
+    auto next_index{chain.Get().GetByHeight(first_index.GetHeight() + 1)};
     BOOST_CHECK(chain.Get().Contains(next_index));
     auto next_block_data{chainman->ReadBlock(next_index).value().ToBytes()};
     auto tip_index{chain.Get().GetTip()};
@@ -488,7 +498,7 @@ void chainman_reindex_test(TestDirectory& test_directory)
 
 void chainman_reindex_chainstate_test(TestDirectory& test_directory)
 {
-    TestKernelNotifications notifications{};
+    auto notifications{std::make_shared<TestKernelNotifications>()};
     auto context{create_context(notifications, ChainType::MAINNET)};
     auto chainman{create_chainman(test_directory, false, true, false, false, context)};
 
@@ -499,9 +509,9 @@ void chainman_reindex_chainstate_test(TestDirectory& test_directory)
 
 void chainman_mainnet_validation_test(TestDirectory& test_directory)
 {
-    TestKernelNotifications notifications{};
-    TestValidationInterface validation_interface{};
-    auto context{create_context(notifications, ChainType::MAINNET, &validation_interface)};
+    auto notifications{std::make_shared<TestKernelNotifications>()};
+    auto validation_interface{std::make_shared<TestValidationInterface>()};
+    auto context{create_context(notifications, ChainType::MAINNET, validation_interface)};
     auto chainman{create_chainman(test_directory, false, false, false, false, context)};
 
     {
@@ -526,7 +536,7 @@ void chainman_mainnet_validation_test(TestDirectory& test_directory)
     ).begin();
     BOOST_CHECK_EQUAL(output_counts, 1);
 
-    validation_interface.m_expected_valid_block.emplace(raw_block);
+    validation_interface->m_expected_valid_block.emplace(raw_block);
     auto ser_block{block.ToBytes()};
     check_equal(ser_block, raw_block);
     bool new_block = false;
@@ -572,7 +582,7 @@ BOOST_AUTO_TEST_CASE(btck_chainman_in_memory_tests)
 {
     auto in_memory_test_directory{TestDirectory{"in-memory_test_bitcoin_kernel"}};
 
-    TestKernelNotifications notifications{};
+    auto notifications{std::make_shared<TestKernelNotifications>()};
     auto context{create_context(notifications, ChainType::REGTEST)};
     auto chainman{create_chainman(in_memory_test_directory, false, false, true, true, context)};
 
@@ -591,7 +601,7 @@ BOOST_AUTO_TEST_CASE(btck_chainman_regtest_tests)
 {
     auto test_directory{TestDirectory{"regtest_test_bitcoin_kernel"}};
 
-    TestKernelNotifications notifications{};
+    auto notifications{std::make_shared<TestKernelNotifications>()};
     auto context{create_context(notifications, ChainType::REGTEST)};
 
     // Validate 206 regtest blocks in total.

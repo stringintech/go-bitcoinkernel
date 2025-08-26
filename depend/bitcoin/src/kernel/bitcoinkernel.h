@@ -274,7 +274,12 @@ typedef uint8_t btck_Warning;
 typedef void (*btck_LogCallback)(void* user_data, const char* message, size_t message_len);
 
 /**
- * Function signatures for the kernel notifications.
+ * Function signature for freeing user data.
+ */
+typedef void (*btck_DestroyCallback)(void* user_data);
+
+/**
+* Function signatures for the kernel notifications.
  */
 typedef void (*btck_NotifyBlockTip)(void* user_data, btck_SynchronizationState state, btck_BlockTreeEntry* entry, double verification_progress);
 typedef void (*btck_NotifyHeaderTip)(void* user_data, btck_SynchronizationState state, int64_t height, int64_t timestamp, int presync);
@@ -324,8 +329,10 @@ typedef uint32_t btck_BlockValidationResult;
  * execution when they are called.
  */
 typedef struct {
-    const void* user_data;                              //!< Holds a user-defined opaque structure that is passed to the validation
-                                                        //!< interface callbacks.
+    void* user_data;                                    //!< Holds a user-defined opaque structure that is passed to the validation
+                                                        //!< interface callbacks. If user_data_destroy is also defined ownership of the
+                                                        //!< user_data is passed to the created context options and subsequently context.
+    btck_DestroyCallback user_data_destroy;             //!< Frees the provided user data structure.
     btck_ValidationInterfaceBlockChecked block_checked; //!< Called when a new block has been checked. Contains the
                                                         //!< result of its validation.
 } btck_ValidationInterfaceCallbacks;
@@ -339,14 +346,17 @@ typedef struct {
  * safe unwinding.
  */
 typedef struct {
-    const void* user_data;                 //!< Holds a user-defined opaque structure that is passed to the notification callbacks.
-    btck_NotifyBlockTip block_tip;         //!< The chain's tip was updated to the provided block entry.
-    btck_NotifyHeaderTip header_tip;       //!< A new best block header was added.
-    btck_NotifyProgress progress;          //!< Reports on current block synchronization progress.
-    btck_NotifyWarningSet warning_set;     //!< A warning issued by the kernel library during validation.
-    btck_NotifyWarningUnset warning_unset; //!< A previous condition leading to the issuance of a warning is no longer given.
-    btck_NotifyFlushError flush_error;     //!< An error encountered when flushing data to disk.
-    btck_NotifyFatalError fatal_error;     //!< A un-recoverable system error encountered by the library.
+    void* user_data;                        //!< Holds a user-defined opaque structure that is passed to the notification callbacks.
+                                            //!< If user_data_destroy is also defined ownership of the user_data is passed to the
+                                            //!< created context options and subsequently context.
+    btck_DestroyCallback user_data_destroy; //!< Frees the provided user data structure.
+    btck_NotifyBlockTip block_tip;          //!< The chain's tip was updated to the provided block entry.
+    btck_NotifyHeaderTip header_tip;        //!< A new best block header was added.
+    btck_NotifyProgress progress;           //!< Reports on current block synchronization progress.
+    btck_NotifyWarningSet warning_set;      //!< A warning issued by the kernel library during validation.
+    btck_NotifyWarningUnset warning_unset;  //!< A previous condition leading to the issuance of a warning is no longer given.
+    btck_NotifyFlushError flush_error;      //!< An error encountered when flushing data to disk.
+    btck_NotifyFatalError fatal_error;      //!< A un-recoverable system error encountered by the library.
 } btck_NotificationInterfaceCallbacks;
 
 /**
@@ -699,15 +709,19 @@ BITCOINKERNEL_API void btck_logging_disable_category(btck_LogCategory category);
  * produced before this function is first called are buffered and on calling this
  * function are logged immediately.
  *
- * @param[in] callback  Non-null, function through which messages will be logged.
- * @param[in] user_data Nullable, holds a user-defined opaque structure. Is passed back
- *                      to the user through the callback.
- * @param[in] options   Sets formatting options of the log messages.
- * @return              A new kernel logging connection, or null on error.
+ * @param[in] log_callback               Non-null, function through which messages will be logged.
+ * @param[in] user_data                  Nullable, holds a user-defined opaque structure. Is passed back
+ *                                       to the user through the callback. If the user_data_destroy_callback
+ *                                       is also defined it is assumed that ownership of the user_data is passed
+ *                                       to the created logging connection.
+ * @param[in] user_data_destroy_callback Nullable, function for freeing the user data.
+ * @param[in] options                    Sets formatting options of the log messages.
+ * @return                               A new kernel logging connection, or null on error.
  */
 BITCOINKERNEL_API btck_LoggingConnection* BITCOINKERNEL_WARN_UNUSED_RESULT btck_logging_connection_create(
-    btck_LogCallback callback,
-    const void* user_data,
+    btck_LogCallback log_callback,
+    void* user_data,
+    btck_DestroyCallback user_data_destroy_callback,
     const btck_LoggingOptions options
 ) BITCOINKERNEL_ARG_NONNULL(1);
 
@@ -1213,21 +1227,6 @@ BITCOINKERNEL_API btck_BlockTreeEntry* BITCOINKERNEL_WARN_UNUSED_RESULT btck_cha
     const btck_Chain* chain,
     int block_height
 ) BITCOINKERNEL_ARG_NONNULL(1);
-
-/**
- * @brief Return the next block index in the currently active chain, or null if
- * the current block index is the tip, or is not in the currently active
- * chain.
- *
- * @param[in] chain            Non-null.
- * @param[in] block_tree_entry Non-null.
- * @return                     The next block index in the currently active chain, or null if
- *                             the block tree entry is the chain tip, or not in the chain.
- */
-BITCOINKERNEL_API btck_BlockTreeEntry* BITCOINKERNEL_WARN_UNUSED_RESULT btck_chain_get_next_block_tree_entry(
-    const btck_Chain* chain,
-    const btck_BlockTreeEntry* block_tree_entry
-) BITCOINKERNEL_ARG_NONNULL(1, 2);
 
 /**
  * @brief Return true if the passed in chain contains the block tree entry.
