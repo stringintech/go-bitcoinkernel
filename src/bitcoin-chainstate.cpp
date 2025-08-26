@@ -182,10 +182,8 @@ int main(int argc, char* argv[])
     ChainParams params{ChainType::MAINNET};
     options.SetChainParams(params);
 
-    TestKernelNotifications notifications{};
-    options.SetNotifications(notifications);
-    TestValidationInterface validation_interface{};
-    options.SetValidationInterface(validation_interface);
+    options.SetNotifications(std::make_shared<TestKernelNotifications>());
+    options.SetValidationInterface(std::make_shared<TestValidationInterface>());
 
     Context context{options};
 

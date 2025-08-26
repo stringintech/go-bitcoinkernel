@@ -190,43 +190,61 @@ public:
     {
     }
 
+    ~KernelNotifications()
+    {
+        if (m_cbs.user_data && m_cbs.user_data_destroy) {
+            m_cbs.user_data_destroy(m_cbs.user_data);
+        }
+        m_cbs.user_data_destroy = nullptr;
+        m_cbs.user_data = nullptr;
+    }
+
     kernel::InterruptResult blockTip(SynchronizationState state, CBlockIndex& index, double verification_progress) override
     {
-        if (m_cbs.block_tip) m_cbs.block_tip((void*)m_cbs.user_data, cast_state(state), new btck_BlockTreeEntry{&index}, verification_progress);
+        if (m_cbs.block_tip) m_cbs.block_tip(m_cbs.user_data, cast_state(state), new btck_BlockTreeEntry{&index}, verification_progress);
         return {};
     }
     void headerTip(SynchronizationState state, int64_t height, int64_t timestamp, bool presync) override
     {
-        if (m_cbs.header_tip) m_cbs.header_tip((void*)m_cbs.user_data, cast_state(state), height, timestamp, presync ? 1 : 0);
+        if (m_cbs.header_tip) m_cbs.header_tip(m_cbs.user_data, cast_state(state), height, timestamp, presync ? 1 : 0);
     }
     void progress(const bilingual_str& title, int progress_percent, bool resume_possible) override
     {
-        if (m_cbs.progress) m_cbs.progress((void*)m_cbs.user_data, title.original.c_str(), title.original.length(), progress_percent, resume_possible ? 1 : 0);
+        if (m_cbs.progress) m_cbs.progress(m_cbs.user_data, title.original.c_str(), title.original.length(), progress_percent, resume_possible ? 1 : 0);
     }
     void warningSet(kernel::Warning id, const bilingual_str& message) override
     {
-        if (m_cbs.warning_set) m_cbs.warning_set((void*)m_cbs.user_data, cast_btck_warning(id), message.original.c_str(), message.original.length());
+        if (m_cbs.warning_set) m_cbs.warning_set(m_cbs.user_data, cast_btck_warning(id), message.original.c_str(), message.original.length());
     }
     void warningUnset(kernel::Warning id) override
     {
-        if (m_cbs.warning_unset) m_cbs.warning_unset((void*)m_cbs.user_data, cast_btck_warning(id));
+        if (m_cbs.warning_unset) m_cbs.warning_unset(m_cbs.user_data, cast_btck_warning(id));
     }
     void flushError(const bilingual_str& message) override
     {
-        if (m_cbs.flush_error) m_cbs.flush_error((void*)m_cbs.user_data, message.original.c_str(), message.original.length());
+        if (m_cbs.flush_error) m_cbs.flush_error(m_cbs.user_data, message.original.c_str(), message.original.length());
     }
     void fatalError(const bilingual_str& message) override
     {
-        if (m_cbs.fatal_error) m_cbs.fatal_error((void*)m_cbs.user_data, message.original.c_str(), message.original.length());
+        if (m_cbs.fatal_error) m_cbs.fatal_error(m_cbs.user_data, message.original.c_str(), message.original.length());
     }
 };
 
 class KernelValidationInterface final : public CValidationInterface
 {
 public:
-    const btck_ValidationInterfaceCallbacks m_cbs;
+    btck_ValidationInterfaceCallbacks m_cbs;
 
     explicit KernelValidationInterface(const btck_ValidationInterfaceCallbacks vi_cbs) : m_cbs{vi_cbs} {}
+
+    ~KernelValidationInterface()
+    {
+        if (m_cbs.user_data && m_cbs.user_data_destroy) {
+            m_cbs.user_data_destroy(m_cbs.user_data);
+        }
+        m_cbs.user_data = nullptr;
+        m_cbs.user_data_destroy = nullptr;
+    }
 
 protected:
     void BlockChecked(const CBlock& block, const BlockValidationState& stateIn) override
@@ -242,8 +260,8 @@ protected:
 struct ContextOptions {
     mutable Mutex m_mutex;
     std::unique_ptr<const CChainParams> m_chainparams GUARDED_BY(m_mutex);
-    std::unique_ptr<const KernelNotifications> m_notifications GUARDED_BY(m_mutex);
-    std::unique_ptr<const KernelValidationInterface> m_validation_interface GUARDED_BY(m_mutex);
+    std::shared_ptr<KernelNotifications> m_notifications GUARDED_BY(m_mutex);
+    std::shared_ptr<KernelValidationInterface> m_validation_interface GUARDED_BY(m_mutex);
 };
 
 class Context
@@ -251,7 +269,7 @@ class Context
 public:
     std::unique_ptr<kernel::Context> m_context;
 
-    std::unique_ptr<KernelNotifications> m_notifications;
+    std::shared_ptr<KernelNotifications> m_notifications;
 
     std::unique_ptr<util::SignalInterrupt> m_interrupt;
 
@@ -259,7 +277,7 @@ public:
 
     std::unique_ptr<const CChainParams> m_chainparams;
 
-    std::unique_ptr<KernelValidationInterface> m_validation_interface;
+    std::shared_ptr<KernelValidationInterface> m_validation_interface;
 
     Context(const ContextOptions* options, bool& sane)
         : m_context{std::make_unique<kernel::Context>()},
@@ -272,11 +290,11 @@ public:
                 m_chainparams = std::make_unique<const CChainParams>(*options->m_chainparams);
             }
             if (options->m_notifications) {
-                m_notifications = std::make_unique<KernelNotifications>(*options->m_notifications);
+                m_notifications = options->m_notifications;
             }
             if (options->m_validation_interface) {
-                m_validation_interface = std::make_unique<KernelValidationInterface>(*options->m_validation_interface);
-                m_signals->RegisterValidationInterface(m_validation_interface.get());
+                m_validation_interface = options->m_validation_interface;
+                m_signals->RegisterSharedValidationInterface(m_validation_interface);
             }
         }
 
@@ -284,8 +302,8 @@ public:
             m_chainparams = CChainParams::Main();
         }
         if (!m_notifications) {
-            m_notifications = std::make_unique<KernelNotifications>(btck_NotificationInterfaceCallbacks{
-                nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr});
+            m_notifications = std::make_shared<KernelNotifications>(btck_NotificationInterfaceCallbacks{
+                nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr});
         }
 
         if (!kernel::SanityChecks(*m_context)) {
@@ -295,7 +313,7 @@ public:
 
     ~Context()
     {
-        m_signals->UnregisterValidationInterface(m_validation_interface.get());
+        m_signals->UnregisterSharedValidationInterface(m_validation_interface);
     }
 };
 
@@ -357,6 +375,15 @@ struct btck_ScriptPubkey {
 
 struct btck_LoggingConnection {
     std::unique_ptr<std::list<std::function<void(const std::string&)>>::iterator> m_connection;
+    void* user_data;
+    std::function<void(void* user_data)> m_deleter;
+
+    ~btck_LoggingConnection()
+    {
+        if (user_data && m_deleter) {
+            m_deleter(user_data);
+        }
+    }
 };
 
 struct btck_ContextOptions {
@@ -585,7 +612,8 @@ void btck_logging_disable()
 }
 
 btck_LoggingConnection* btck_logging_connection_create(btck_LogCallback callback,
-                                                           const void* user_data,
+                                                           void* user_data,
+                                                           btck_DestroyCallback user_data_destroy_callback,
                                                            const btck_LoggingOptions options)
 {
     LogInstance().m_log_timestamps = options.log_timestamps;
@@ -601,17 +629,19 @@ btck_LoggingConnection* btck_logging_connection_create(btck_LogCallback callback
         if (LogInstance().NumConnections() == 1 && !LogInstance().StartLogging()) {
             LogError("Logger start failed.");
             LogInstance().DeleteCallback(connection);
+            user_data_destroy_callback(user_data);
             return nullptr;
         }
     } catch (std::exception& e) {
         LogError("Logger start failed: %s", e.what());
         LogInstance().DeleteCallback(connection);
+        user_data_destroy_callback(user_data);
         return nullptr;
     }
 
     LogDebug(BCLog::KERNEL, "Logger connected.");
 
-    return new btck_LoggingConnection{std::make_unique<std::list<std::function<void(const std::string&)>>::iterator>(connection)};
+    return new btck_LoggingConnection{std::make_unique<std::list<std::function<void(const std::string&)>>::iterator>(connection), user_data, user_data_destroy_callback};
 }
 
 void btck_logging_connection_destroy(btck_LoggingConnection* connection)
@@ -677,13 +707,13 @@ void btck_context_options_set_notifications(btck_ContextOptions* options, btck_N
 {
     // The KernelNotifications are copy-initialized, so the caller can free them again.
     LOCK(options->m_opts->m_mutex);
-    options->m_opts->m_notifications = std::make_unique<const KernelNotifications>(notifications);
+    options->m_opts->m_notifications = std::make_shared<KernelNotifications>(notifications);
 }
 
 void btck_context_options_set_validation_interface(btck_ContextOptions* options, btck_ValidationInterfaceCallbacks vi_cbs)
 {
     LOCK(options->m_opts->m_mutex);
-    options->m_opts->m_validation_interface = std::make_unique<KernelValidationInterface>(KernelValidationInterface(vi_cbs));
+    options->m_opts->m_validation_interface = std::make_shared<KernelValidationInterface>(vi_cbs);
 }
 
 void btck_context_options_destroy(btck_ContextOptions* options)
@@ -1153,17 +1183,6 @@ btck_BlockTreeEntry* btck_chain_get_by_height(const btck_Chain* chain, int heigh
     LOCK(::cs_main);
     assert(height >= 0 && height <= chain->m_chain->Height());
     return new btck_BlockTreeEntry{(*chain->m_chain)[height]};
-}
-
-btck_BlockTreeEntry* btck_chain_get_next_block_tree_entry(const btck_Chain* chain, const btck_BlockTreeEntry* entry)
-{
-    auto next_block_index{chain->m_chain->Next(entry->m_block_index)};
-
-    if (!next_block_index) {
-        LogTrace(BCLog::KERNEL, "The block index is the tip of the current chain, it does not have a next.");
-    }
-
-    return new btck_BlockTreeEntry{next_block_index};
 }
 
 int btck_chain_contains(const btck_Chain* chain, const btck_BlockTreeEntry* entry)
