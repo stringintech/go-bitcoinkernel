@@ -16,12 +16,11 @@ var _ cManagedResource = &Context{}
 //
 // A constructed context can be safely used from multiple threads.
 type Context struct {
-	ptr *C.btck_Context
+	ptr     *C.btck_Context
+	options *ContextOptions
 }
 
 // NewContext creates a new kernel context with the specified options.
-// Kernel copies all necessary data from the options during context creation,
-// so the caller can safely free the options object after this call returns.
 func NewContext(options *ContextOptions) (*Context, error) {
 	if err := validateReady(options); err != nil {
 		return nil, err
@@ -32,21 +31,20 @@ func NewContext(options *ContextOptions) (*Context, error) {
 		return nil, ErrKernelContextCreate
 	}
 
-	ctx := &Context{ptr: ptr}
+	ctx := &Context{
+		ptr:     ptr,
+		options: options,
+	}
 	runtime.SetFinalizer(ctx, (*Context).destroy)
 	return ctx, nil
 }
 
 // NewDefaultContext creates a new kernel context with default mainnet parameters.
-// The defer statements are safe here because the Kernel copies all necessary
-// data during context creation, so the caller can safely free the options and
-// parameters objects immediately after the context is created.
 func NewDefaultContext() (*Context, error) {
 	opts, err := NewContextOptions()
 	if err != nil {
 		return nil, err
 	}
-	defer opts.Destroy()
 
 	params, err := NewChainParameters(ChainTypeMainnet)
 	if err != nil {
@@ -68,6 +66,10 @@ func (ctx *Context) destroy() {
 	if ctx.ptr != nil {
 		C.btck_context_destroy(ctx.ptr)
 		ctx.ptr = nil
+	}
+	if ctx.options != nil {
+		ctx.options.Destroy()
+		ctx.options = nil
 	}
 }
 

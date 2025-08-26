@@ -54,23 +54,6 @@ func (c *Chain) GetByHeight(height int) *BlockTreeEntry {
 	return entry
 }
 
-// GetNextBlockTreeEntry returns the next block tree entry in the active chain, or nil if block tree entry is the chain tip or not in the chain
-func (c *Chain) GetNextBlockTreeEntry(blockTreeEntry *BlockTreeEntry) (*BlockTreeEntry, error) {
-	checkReady(c)
-	if err := validateReady(blockTreeEntry); err != nil {
-		return nil, err
-	}
-
-	ptr := C.btck_chain_get_next_block_tree_entry(c.ptr, blockTreeEntry.ptr)
-	if ptr == nil {
-		return nil, nil
-	}
-
-	nextEntry := &BlockTreeEntry{ptr: ptr}
-	runtime.SetFinalizer(nextEntry, (*BlockTreeEntry).destroy)
-	return nextEntry, nil
-}
-
 // Contains returns true if the chain contains the block tree entry
 func (c *Chain) Contains(blockTreeEntry *BlockTreeEntry) bool {
 	checkReady(c)

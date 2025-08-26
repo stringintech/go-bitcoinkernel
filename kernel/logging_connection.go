@@ -8,12 +8,6 @@ package kernel
 // Bridge function: exported Go function that C library can call
 // user_data contains the cgo.Handle ID as void* for callback identification
 extern void go_log_callback_bridge(void* user_data, char* message, size_t message_len);
-
-// Wrapper function: C helper to create logging connection with Go callback
-// Converts Handle ID to void* and passes to C library
-static inline btck_LoggingConnection* create_logging_connection_wrapper(uintptr_t context, btck_LoggingOptions options) {
-    return btck_logging_connection_create((btck_LogCallback)go_log_callback_bridge, (void*)context, options);
-}
 */
 import "C"
 import (
@@ -62,9 +56,14 @@ func NewLoggingConnection(callback LogCallback, options LoggingOptions) (*Loggin
 		return nil, ErrLoggingConnectionUninitialized //FIXME
 	}
 
+	connection := &LoggingConnection{
+		ptr:    nil,
+		handle: 0,
+	}
+
 	// Create a handle for the callback - this prevents garbage collection
 	// and provides a stable ID that can be passed through C code safely
-	handle := cgo.NewHandle(callback)
+	connection.handle = cgo.NewHandle(callback)
 
 	cOptions := C.btck_LoggingOptions{
 		log_timestamps:               boolToInt(options.LogTimestamps),
@@ -74,15 +73,11 @@ func NewLoggingConnection(callback LogCallback, options LoggingOptions) (*Loggin
 		always_print_category_levels: boolToInt(options.AlwaysPrintCategoryLevel),
 	}
 
-	ptr := C.create_logging_connection_wrapper(C.uintptr_t(handle), cOptions)
-	if ptr == nil {
-		handle.Delete()
+	connection.ptr = C.btck_logging_connection_create((C.btck_LogCallback)(C.go_log_callback_bridge),
+		unsafe.Pointer(connection.handle), nil, cOptions)
+	if connection.ptr == nil {
+		connection.handle.Delete()
 		return nil, ErrKernelLoggingConnectionCreate
-	}
-
-	connection := &LoggingConnection{
-		ptr:    ptr,
-		handle: handle,
 	}
 
 	runtime.SetFinalizer(connection, (*LoggingConnection).destroy)

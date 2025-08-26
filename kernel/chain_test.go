@@ -76,20 +76,6 @@ func TestChain(t *testing.T) {
 		t.Errorf("Expected block height 1, got %d", block1.Height())
 	}
 
-	// Test GetNextBlockTreeEntry
-	nextEntry, err := chain.GetNextBlockTreeEntry(genesis)
-	if err != nil {
-		t.Fatalf("Chain.GetNextBlockTreeEntry() error = %v", err)
-	}
-	if nextEntry == nil {
-		t.Fatal("Next block tree entry is nil")
-	}
-	defer nextEntry.Destroy()
-
-	if nextEntry.Height() != 1 {
-		t.Errorf("Expected next block height 1, got %d", nextEntry.Height())
-	}
-
 	// Test Contains
 	containsGenesis := chain.Contains(genesis)
 	if !containsGenesis {

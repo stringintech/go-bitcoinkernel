@@ -15,42 +15,18 @@ extern void go_notify_warning_unset_bridge(void* user_data, btck_Warning warning
 extern void go_notify_flush_error_bridge(void* user_data, const char* message, size_t message_len);
 extern void go_notify_fatal_error_bridge(void* user_data, const char* message, size_t message_len);
 extern void go_validation_interface_block_checked_bridge(void* user_data, const btck_BlockPointer* block, const btck_BlockValidationState* state);
-
-// Wrapper function: C helper to set notifications with Go callbacks
-// Converts Handle ID to void* and passes to C library
-static inline void set_notifications_wrapper(btck_ContextOptions* opts, uintptr_t handle) {
-    btck_NotificationInterfaceCallbacks callbacks = {
-        .user_data = (void*)handle,
-        .block_tip = (btck_NotifyBlockTip)go_notify_block_tip_bridge,
-        .header_tip = (btck_NotifyHeaderTip)go_notify_header_tip_bridge,
-        .progress = (btck_NotifyProgress)go_notify_progress_bridge,
-        .warning_set = (btck_NotifyWarningSet)go_notify_warning_set_bridge,
-        .warning_unset = (btck_NotifyWarningUnset)go_notify_warning_unset_bridge,
-        .flush_error = (btck_NotifyFlushError)go_notify_flush_error_bridge,
-        .fatal_error = (btck_NotifyFatalError)go_notify_fatal_error_bridge,
-    };
-    btck_context_options_set_notifications(opts, callbacks);
-}
-
-// Wrapper function: C helper to set validation interface with Go callbacks
-// Converts Handle ID to void* and passes to C library
-static inline void set_validation_interface_wrapper(btck_ContextOptions* opts, uintptr_t handle) {
-    btck_ValidationInterfaceCallbacks callbacks = {
-        .user_data = (void*)handle,
-        .block_checked = (btck_ValidationInterfaceBlockChecked)go_validation_interface_block_checked_bridge,
-    };
-    btck_context_options_set_validation_interface(opts, callbacks);
-}
 */
 import "C"
 import (
 	"runtime"
 	"runtime/cgo"
+	"unsafe"
 )
 
 var _ cManagedResource = &ContextOptions{}
 
-// ContextOptions wraps the C btck_ContextOptions
+// ContextOptions wraps the C btck_ContextOptions.
+// Once the options is set on a context, the context is responsible for its lifetime and should not be destroyed manually.
 type ContextOptions struct {
 	ptr                *C.btck_ContextOptions
 	notificationHandle cgo.Handle // Prevents notification callbacks GC until Destroy() called
@@ -87,15 +63,29 @@ func (opts *ContextOptions) SetNotifications(callbacks *NotificationCallbacks) e
 		return ErrNilNotificationCallbacks
 	}
 
+	// Clean up existing handle if present
+	if opts.notificationHandle != 0 {
+		opts.notificationHandle.Delete()
+		opts.notificationHandle = 0
+	}
+
 	// Create a handle for the callbacks - this prevents garbage collection
 	// and provides a stable ID that can be passed through C code safely
-	handle := cgo.NewHandle(callbacks)
+	opts.notificationHandle = cgo.NewHandle(callbacks)
 
-	// Call the C wrapper function to set all notification callbacks
-	C.set_notifications_wrapper(opts.ptr, C.uintptr_t(handle))
-
-	// Store the handle to prevent GC and allow cleanup
-	opts.notificationHandle = handle
+	// Create notification callbacks struct and call C library directly
+	notificationCallbacks := C.btck_NotificationInterfaceCallbacks{
+		user_data:         unsafe.Pointer(opts.notificationHandle),
+		user_data_destroy: nil, // Go handles memory management via cgo.Handle
+		block_tip:         C.btck_NotifyBlockTip(C.go_notify_block_tip_bridge),
+		header_tip:        C.btck_NotifyHeaderTip(C.go_notify_header_tip_bridge),
+		progress:          C.btck_NotifyProgress(C.go_notify_progress_bridge),
+		warning_set:       C.btck_NotifyWarningSet(C.go_notify_warning_set_bridge),
+		warning_unset:     C.btck_NotifyWarningUnset(C.go_notify_warning_unset_bridge),
+		flush_error:       C.btck_NotifyFlushError(C.go_notify_flush_error_bridge),
+		fatal_error:       C.btck_NotifyFatalError(C.go_notify_fatal_error_bridge),
+	}
+	C.btck_context_options_set_notifications(opts.ptr, notificationCallbacks)
 	return nil
 }
 
@@ -107,15 +97,23 @@ func (opts *ContextOptions) SetValidationInterface(callbacks *ValidationInterfac
 		return ErrNilValidationInterfaceCallbacks
 	}
 
+	// Clean up existing handle if present
+	if opts.validationHandle != 0 {
+		opts.validationHandle.Delete()
+		opts.validationHandle = 0
+	}
+
 	// Create a handle for the callbacks - this prevents garbage collection
 	// and provides a stable ID that can be passed through C code safely
-	handle := cgo.NewHandle(callbacks)
+	opts.validationHandle = cgo.NewHandle(callbacks)
 
-	// Call the C wrapper function to set all validation interface callbacks
-	C.set_validation_interface_wrapper(opts.ptr, C.uintptr_t(handle))
-
-	// Store the handle to prevent GC and allow cleanup
-	opts.validationHandle = handle
+	// Create validation callbacks struct and call C library directly
+	validationCallbacks := C.btck_ValidationInterfaceCallbacks{
+		user_data:         unsafe.Pointer(opts.validationHandle),
+		user_data_destroy: nil, // Go handles memory management via cgo.Handle
+		block_checked:     C.btck_ValidationInterfaceBlockChecked(C.go_validation_interface_block_checked_bridge),
+	}
+	C.btck_context_options_set_validation_interface(opts.ptr, validationCallbacks)
 	return nil
 }
 
