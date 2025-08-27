@@ -205,12 +205,6 @@ typedef struct btck_ChainstateManager btck_ChainstateManager;
 typedef struct btck_Block btck_Block;
 
 /**
- * Opaque data structure for holding a non-owned block. This is typically a
- * block available to the user through one of the validation callbacks.
- */
-typedef struct btck_BlockPointer btck_BlockPointer;
-
-/**
  * Opaque data structure for holding the state of a block during validation.
  *
  * Contains information indicating whether validation was successful, and if not
@@ -292,7 +286,7 @@ typedef void (*btck_NotifyFatalError)(void* user_data, const char* message, size
 /**
  * Function signatures for the validation interface.
  */
-typedef void (*btck_ValidationInterfaceBlockChecked)(void* user_data, const btck_BlockPointer* block, const btck_BlockValidationState* state);
+typedef void (*btck_ValidationInterfaceBlockChecked)(void* user_data, btck_Block* block, const btck_BlockValidationState* state);
 
 /**
  * Function signature for serializing data.
@@ -1119,16 +1113,6 @@ BITCOINKERNEL_API btck_BlockHash* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_ge
     const btck_Block* block
 ) BITCOINKERNEL_ARG_NONNULL(1);
 
-/**
- * @brief Calculate and return the hash of a block.
- *
- * @param[in] block Non-null.
- * @return    The block hash.
- */
-BITCOINKERNEL_API btck_BlockHash* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_pointer_get_hash(
-    const btck_BlockPointer* block
-) BITCOINKERNEL_ARG_NONNULL(1);
-
 /*
  * @brief Serializes the block through the passed in callback to bytes.
  * This is consensus serialization that is also used for the p2p network.
@@ -1141,22 +1125,6 @@ BITCOINKERNEL_API btck_BlockHash* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_po
  */
 BITCOINKERNEL_API int btck_block_to_bytes(
     const btck_Block* block,
-    btck_WriteBytes writer,
-    void* user_data
-) BITCOINKERNEL_ARG_NONNULL(1, 2);
-
-/*
- * @brief Serializes the block pointer through the passed in callback to bytes.
- * This is consensus serialization that is also used for the p2p network.
- *
- * @param[in] block     Non-null.
- * @param[in] writer    Non-null, callback to a write bytes function.
- * @param[in] user_data Holds a user-defined opaque structure that will be
- *                      passed back through the writer callback.
- * @return              True on success.
- */
-BITCOINKERNEL_API int btck_block_pointer_to_bytes(
-    const btck_BlockPointer* block,
     btck_WriteBytes writer,
     void* user_data
 ) BITCOINKERNEL_ARG_NONNULL(1, 2);

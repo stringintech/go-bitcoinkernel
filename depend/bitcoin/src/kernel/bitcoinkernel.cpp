@@ -62,6 +62,10 @@ struct btck_BlockTreeEntry {
     CBlockIndex* m_block_index;
 };
 
+struct btck_Block {
+    std::shared_ptr<const CBlock> m_block;
+};
+
 namespace {
 
 bool is_valid_flag_combination(unsigned int flags)
@@ -247,11 +251,11 @@ public:
     }
 
 protected:
-    void BlockChecked(const CBlock& block, const BlockValidationState& stateIn) override
+    void BlockChecked(const std::shared_ptr<const CBlock>& block, const BlockValidationState& stateIn) override
     {
         if (m_cbs.block_checked) {
             m_cbs.block_checked((void*)m_cbs.user_data,
-                                reinterpret_cast<const btck_BlockPointer*>(&block),
+                                new btck_Block{block},
                                 reinterpret_cast<const btck_BlockValidationState*>(&stateIn));
         }
     }
@@ -351,12 +355,6 @@ const BlockValidationState* cast_block_validation_state(const btck_BlockValidati
     return reinterpret_cast<const BlockValidationState*>(block_validation_state);
 }
 
-const CBlock* cast_const_cblock(const btck_BlockPointer* block)
-{
-    assert(block);
-    return reinterpret_cast<const CBlock*>(block);
-}
-
 } // namespace
 
 struct btck_Transaction {
@@ -405,10 +403,6 @@ struct btck_ChainstateManagerOptions {
 struct btck_ChainstateManager {
     std::unique_ptr<ChainstateManager> m_chainman;
     std::shared_ptr<Context> m_context;
-};
-
-struct btck_Block {
-    std::shared_ptr<CBlock> m_block;
 };
 
 struct btck_Chain {
@@ -987,30 +981,9 @@ int btck_block_to_bytes(const btck_Block* block, btck_WriteBytes writer, void* u
     }
 }
 
-int btck_block_pointer_to_bytes(const btck_BlockPointer* block_, btck_WriteBytes writer, void* user_data)
-{
-    auto block{cast_const_cblock(block_)};
-    try {
-        WriterStream ws{writer, user_data};
-        ws << TX_WITH_WITNESS(*block);
-        return 0;
-    } catch (...) {
-        return -1;
-    }
-}
-
 btck_BlockHash* btck_block_get_hash(const btck_Block* block)
 {
     auto hash{block->m_block->GetHash()};
-    auto block_hash = new btck_BlockHash{};
-    std::memcpy(block_hash->hash, hash.begin(), sizeof(hash));
-    return block_hash;
-}
-
-btck_BlockHash* btck_block_pointer_get_hash(const btck_BlockPointer* block_)
-{
-    auto block{cast_const_cblock(block_)};
-    auto hash{block->GetHash()};
     auto block_hash = new btck_BlockHash{};
     std::memcpy(block_hash->hash, hash.begin(), sizeof(hash));
     return block_hash;
