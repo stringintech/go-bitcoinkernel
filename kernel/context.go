@@ -68,7 +68,7 @@ func (ctx *Context) destroy() {
 		ctx.ptr = nil
 	}
 	if ctx.options != nil {
-		ctx.options.Destroy()
+		ctx.options.destroy()
 		ctx.options = nil
 	}
 }

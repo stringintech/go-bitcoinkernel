@@ -228,7 +228,6 @@ func (s *ChainstateManagerTestSuite) Setup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewContextOptions() error = %v", err)
 	}
-	t.Cleanup(func() { contextOpts.Destroy() })
 
 	chainParams, err := NewChainParameters(ChainTypeRegtest)
 	if err != nil {

@@ -18,19 +18,20 @@ extern void go_validation_interface_block_checked_bridge(void* user_data, const 
 */
 import "C"
 import (
+	"fmt"
 	"runtime"
 	"runtime/cgo"
 	"unsafe"
 )
 
-var _ cManagedResource = &ContextOptions{}
+var _ cResource = &ContextOptions{}
 
 // ContextOptions wraps the C btck_ContextOptions.
-// Once the options is set on a context, the context is responsible for its lifetime and should not be destroyed manually.
+// Once the options is set on a context, the context is responsible for its lifetime; otherwise it is garbage collected
 type ContextOptions struct {
 	ptr                *C.btck_ContextOptions
-	notificationHandle cgo.Handle // Prevents notification callbacks GC until Destroy() called
-	validationHandle   cgo.Handle // Prevents validation callbacks GC until Destroy() called
+	notificationHandle cgo.Handle
+	validationHandle   cgo.Handle
 }
 
 func NewContextOptions() (*ContextOptions, error) {
@@ -40,7 +41,7 @@ func NewContextOptions() (*ContextOptions, error) {
 	}
 
 	opts := &ContextOptions{ptr: ptr}
-	runtime.SetFinalizer(opts, (*ContextOptions).destroy)
+	runtime.SetFinalizer(opts, (*ContextOptions).finalize)
 	return opts, nil
 }
 
@@ -60,13 +61,10 @@ func (opts *ContextOptions) SetChainParams(chainParams *ChainParameters) {
 func (opts *ContextOptions) SetNotifications(callbacks *NotificationCallbacks) error {
 	checkReady(opts)
 	if callbacks == nil {
-		return ErrNilNotificationCallbacks
+		return fmt.Errorf("nil notification callbacks")
 	}
-
-	// Clean up existing handle if present
 	if opts.notificationHandle != 0 {
-		opts.notificationHandle.Delete()
-		opts.notificationHandle = 0
+		return fmt.Errorf("notification callbacks already set")
 	}
 
 	// Create a handle for the callbacks - this prevents garbage collection
@@ -94,13 +92,10 @@ func (opts *ContextOptions) SetNotifications(callbacks *NotificationCallbacks) e
 func (opts *ContextOptions) SetValidationInterface(callbacks *ValidationInterfaceCallbacks) error {
 	checkReady(opts)
 	if callbacks == nil {
-		return ErrNilValidationInterfaceCallbacks
+		return fmt.Errorf("nil validation interface callbacks")
 	}
-
-	// Clean up existing handle if present
 	if opts.validationHandle != 0 {
-		opts.validationHandle.Delete()
-		opts.validationHandle = 0
+		return fmt.Errorf("validation interface callbacks already set")
 	}
 
 	// Create a handle for the callbacks - this prevents garbage collection
@@ -118,6 +113,11 @@ func (opts *ContextOptions) SetValidationInterface(callbacks *ValidationInterfac
 }
 
 func (opts *ContextOptions) destroy() {
+	opts.finalize()
+	runtime.SetFinalizer(opts, nil)
+}
+
+func (opts *ContextOptions) finalize() {
 	if opts.ptr != nil {
 		C.btck_context_options_destroy(opts.ptr)
 		opts.ptr = nil
@@ -132,11 +132,6 @@ func (opts *ContextOptions) destroy() {
 		opts.validationHandle.Delete()
 		opts.validationHandle = 0
 	}
-}
-
-func (opts *ContextOptions) Destroy() {
-	runtime.SetFinalizer(opts, nil)
-	opts.destroy()
 }
 
 func (opts *ContextOptions) isReady() bool {

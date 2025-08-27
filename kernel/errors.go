@@ -42,7 +42,6 @@ var (
 	ErrKernelScriptPubkeyCreate                  = &KernelError{Operation: "btck_script_pubkey_create"}
 	ErrKernelScriptPubkeyCopy                    = &KernelError{Operation: "btck_script_pubkey_copy"}
 	ErrKernelScriptVerify                        = &KernelError{Operation: "btck_verify_script"}
-	ErrKernelScriptVerifyInvalidFlags            = &KernelError{Operation: "btck_verify_script", Detail: "the provided bitfield for the flags was invalid"}
 	ErrKernelScriptVerifyInvalidFlagsCombination = &KernelError{Operation: "btck_verify_script", Detail: "the flags were combined in an invalid way"}
 	ErrKernelScriptVerifySpentOutputsRequired    = &KernelError{Operation: "btck_verify_script", Detail: "the taproot flag was set, so valid spent_outputs have to be provided"}
 	ErrEmptyScriptPubkeyData                     = errors.New("empty script pubkey data") // constructor error
@@ -75,12 +74,10 @@ var (
 	ErrLoggingConnectionUninitialized = &UninitializedError{ObjectName: "loggingConnection"}
 	ErrKernelLoggingConnectionCreate  = &KernelError{Operation: "btck_logging_connection_create"}
 
-	ErrInvalidChainType                = errors.New("invalid chain type")
-	ErrInvalidLogLevel                 = errors.New("invalid log level")
-	ErrInvalidLogCategory              = errors.New("invalid log category")
-	ErrInvalidScriptVerifyStatus       = errors.New("invalid script verify status")
-	ErrNilNotificationCallbacks        = errors.New("nil notification callbacks")
-	ErrNilValidationInterfaceCallbacks = errors.New("nil validation interface callbacks")
+	ErrInvalidChainType          = errors.New("invalid chain type")
+	ErrInvalidLogLevel           = errors.New("invalid log level")
+	ErrInvalidLogCategory        = errors.New("invalid log category")
+	ErrInvalidScriptVerifyStatus = errors.New("invalid script verify status")
 )
 
 // UninitializedError is returned when an operation is attempted on a
