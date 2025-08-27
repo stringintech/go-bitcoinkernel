@@ -1,6 +1,6 @@
 # go-bitcoinkernel
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/stringintech/go-bitcoinkernel.svg)](https://pkg.go.dev/github.com/stringintech/go-bitcoinkernel@v0.1.0-alpha.1)
+[![Go Reference](https://pkg.go.dev/badge/github.com/stringintech/go-bitcoinkernel.svg)](https://pkg.go.dev/github.com/stringintech/go-bitcoinkernel@v0.1.0-alpha.2)
 [![Go Report Card](https://goreportcard.com/badge/github.com/stringintech/go-bitcoinkernel)](https://goreportcard.com/report/github.com/stringintech/go-bitcoinkernel)
 [![License](https://img.shields.io/github/license/stringintech/go-bitcoinkernel)](https://github.com/stringintech/go-bitcoinkernel/blob/main/LICENSE)
 [![GitHub Actions](https://github.com/stringintech/go-bitcoinkernel/actions/workflows/ci.yml/badge.svg)](https://github.com/stringintech/go-bitcoinkernel/actions)
