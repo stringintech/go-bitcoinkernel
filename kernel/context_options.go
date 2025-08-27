@@ -14,7 +14,7 @@ extern void go_notify_warning_set_bridge(void* user_data, btck_Warning warning, 
 extern void go_notify_warning_unset_bridge(void* user_data, btck_Warning warning);
 extern void go_notify_flush_error_bridge(void* user_data, const char* message, size_t message_len);
 extern void go_notify_fatal_error_bridge(void* user_data, const char* message, size_t message_len);
-extern void go_validation_interface_block_checked_bridge(void* user_data, const btck_BlockPointer* block, const btck_BlockValidationState* state);
+extern void go_validation_interface_block_checked_bridge(void* user_data, btck_Block* block, const btck_BlockValidationState* state);
 */
 import "C"
 import (

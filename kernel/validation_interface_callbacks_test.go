@@ -11,7 +11,7 @@ func TestValidationInterfaceCallbacks(t *testing.T) {
 	var lastBlockData []byte
 
 	callbacks := &ValidationInterfaceCallbacks{
-		OnBlockChecked: func(block *BlockPointer, state *BlockValidationState) {
+		OnBlockChecked: func(block *Block, state *BlockValidationState) {
 			blockCheckedCalled = true
 			lastValidationMode = state.ValidationMode()
 			var err error
