@@ -489,6 +489,63 @@ bool ScriptPubkey::Verify(int64_t amount,
     return result == 1;
 }
 
+struct BlockHashDeleter {
+    void operator()(btck_BlockHash* ptr) const
+    {
+        btck_block_hash_destroy(ptr);
+    }
+};
+
+class Block : Handle<btck_Block, btck_block_destroy>
+{
+public:
+
+    Block(const std::span<const std::byte> raw_block)
+        : Handle{check(btck_block_create(raw_block.data(), raw_block.size()))}
+    {
+    }
+
+    Block(btck_Block* block) : Handle{check(block)} {}
+
+    // Copy constructor and assignment
+    Block(const Block& other)
+        : Handle{check(btck_block_copy(other.impl()))} {}
+    Block& operator=(const Block& other)
+    {
+        if (this != &other) {
+            reset(check(btck_block_copy(other.impl())));
+        }
+        return *this;
+    }
+
+    size_t CountTransactions() const
+    {
+        return btck_block_count_transactions(impl());
+    }
+
+    Transaction GetTransaction(size_t index) const
+    {
+        return Transaction{btck_block_get_transaction_at(impl(), index)};
+    }
+
+    auto Transactions() const
+    {
+        return Range<Block, &Block::CountTransactions, &Block::GetTransaction>{*this};
+    }
+
+    std::unique_ptr<btck_BlockHash, BlockHashDeleter> GetHash() const
+    {
+        return std::unique_ptr<btck_BlockHash, BlockHashDeleter>(btck_block_get_hash(impl()));
+    }
+
+    std::vector<std::byte> ToBytes() const
+    {
+        return write_bytes(impl(), btck_block_to_bytes);
+    }
+
+    friend class ChainMan;
+};
+
 void logging_disable()
 {
     btck_logging_disable();
@@ -527,14 +584,6 @@ public:
     {
     }
 };
-
-struct BlockHashDeleter {
-    void operator()(btck_BlockHash* ptr) const
-    {
-        btck_block_hash_destroy(ptr);
-    }
-};
-
 
 class BlockTreeEntry : Handle<btck_BlockTreeEntry, btck_block_tree_entry_destroy>
 {
@@ -586,30 +635,6 @@ public:
     virtual void FatalErrorHandler(std::string_view error) {}
 };
 
-class UnownedBlock
-{
-private:
-    const btck_BlockPointer* m_block;
-
-public:
-    UnownedBlock(const btck_BlockPointer* block) : m_block{block} {}
-
-    UnownedBlock(const UnownedBlock&) = delete;
-    UnownedBlock& operator=(const UnownedBlock&) = delete;
-    UnownedBlock(UnownedBlock&&) = delete;
-    UnownedBlock& operator=(UnownedBlock&&) = delete;
-
-    std::unique_ptr<btck_BlockHash, BlockHashDeleter> GetHash() const
-    {
-        return std::unique_ptr<btck_BlockHash, BlockHashDeleter>(btck_block_pointer_get_hash(m_block));
-    }
-
-    std::vector<std::byte> ToBytes() const
-    {
-        return write_bytes(m_block, btck_block_pointer_to_bytes);
-    }
-};
-
 class BlockValidationState
 {
 private:
@@ -640,7 +665,7 @@ class ValidationInterface
 public:
     virtual ~ValidationInterface() = default;
 
-    virtual void BlockChecked(UnownedBlock block, const BlockValidationState state) {}
+    virtual void BlockChecked(Block block, const BlockValidationState state) {}
 };
 
 class ChainParams : Handle<btck_ChainParameters, btck_chain_parameters_destroy>
@@ -702,8 +727,8 @@ public:
             btck_ValidationInterfaceCallbacks{
                 .user_data = heap_vi.release(),
                 .user_data_destroy = +[](void* user_data) { delete static_cast<user_type>(user_data); },
-                .block_checked = +[](void* user_data, const btck_BlockPointer* block, const btck_BlockValidationState* state) {
-                    (*static_cast<user_type>(user_data))->BlockChecked(UnownedBlock{block}, BlockValidationState{state});
+                .block_checked = +[](void* user_data, btck_Block* block, const btck_BlockValidationState* state) {
+                    (*static_cast<user_type>(user_data))->BlockChecked(Block{block}, BlockValidationState{state});
                 },
             }
         );
@@ -754,56 +779,6 @@ public:
     void SetChainstateDbInMemory(bool chainstate_db_in_memory)
     {
         btck_chainstate_manager_options_set_chainstate_db_in_memory(impl(), chainstate_db_in_memory);
-    }
-
-    friend class ChainMan;
-};
-
-class Block : Handle<btck_Block, btck_block_destroy>
-{
-public:
-
-    Block(const std::span<const std::byte> raw_block)
-        : Handle{check(btck_block_create(raw_block.data(), raw_block.size()))}
-    {
-    }
-
-    Block(btck_Block* block) : Handle{check(block)} {}
-
-    // Copy constructor and assignment
-    Block(const Block& other)
-        : Handle{check(btck_block_copy(other.impl()))} {}
-    Block& operator=(const Block& other)
-    {
-        if (this != &other) {
-            reset(check(btck_block_copy(other.impl())));
-        }
-        return *this;
-    }
-
-    size_t CountTransactions() const
-    {
-        return btck_block_count_transactions(impl());
-    }
-
-    Transaction GetTransaction(size_t index) const
-    {
-        return Transaction{btck_block_get_transaction_at(impl(), index)};
-    }
-
-    auto Transactions() const
-    {
-        return Range<Block, &Block::CountTransactions, &Block::GetTransaction>{*this};
-    }
-
-    std::unique_ptr<btck_BlockHash, BlockHashDeleter> GetHash() const
-    {
-        return std::unique_ptr<btck_BlockHash, BlockHashDeleter>(btck_block_get_hash(impl()));
-    }
-
-    std::vector<std::byte> ToBytes() const
-    {
-        return write_bytes(impl(), btck_block_to_bytes);
     }
 
     friend class ChainMan;
