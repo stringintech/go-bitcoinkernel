@@ -5,40 +5,26 @@ package kernel
 */
 import "C"
 import (
-	"runtime"
 	"unsafe"
 )
 
-var _ cManagedResource = &BlockHash{}
+type blockHashCFuncs struct{}
 
-// BlockHash wraps the C btck_BlockHash
+func (blockHashCFuncs) destroy(ptr unsafe.Pointer) {
+	C.btck_block_hash_destroy((*C.btck_BlockHash)(ptr))
+}
+
 type BlockHash struct {
-	ptr *C.btck_BlockHash
+	*uniqueHandle
+}
+
+func newBlockHash(ptr *C.btck_BlockHash) *BlockHash {
+	h := newUniqueHandle(unsafe.Pointer(ptr), blockHashCFuncs{})
+	return &BlockHash{uniqueHandle: h}
 }
 
 // Bytes returns the raw hash bytes
 func (bh *BlockHash) Bytes() []byte {
-	checkReady(bh)
 	// BlockHash is a 32-byte array in the C struct
-	return C.GoBytes(unsafe.Pointer(&bh.ptr.hash[0]), 32)
-}
-
-func (bh *BlockHash) destroy() {
-	if bh.ptr != nil {
-		C.btck_block_hash_destroy(bh.ptr)
-		bh.ptr = nil
-	}
-}
-
-func (bh *BlockHash) Destroy() {
-	runtime.SetFinalizer(bh, nil)
-	bh.destroy()
-}
-
-func (bh *BlockHash) isReady() bool {
-	return bh != nil && bh.ptr != nil
-}
-
-func (bh *BlockHash) uninitializedError() error {
-	return ErrBlockHashUninitialized
+	return C.GoBytes(unsafe.Pointer(&(*C.btck_BlockHash)(bh.ptr).hash[0]), 32)
 }

@@ -5,102 +5,81 @@ package kernel
 */
 import "C"
 import (
-	"runtime"
 	"unsafe"
 )
 
-var _ cManagedResource = &Transaction{}
+type transactionCFuncs struct{}
 
-// Transaction wraps the C btck_Transaction
+func (transactionCFuncs) destroy(ptr unsafe.Pointer) {
+	C.btck_transaction_destroy((*C.btck_Transaction)(ptr))
+}
+
+func (transactionCFuncs) copy(ptr unsafe.Pointer) unsafe.Pointer {
+	return unsafe.Pointer(C.btck_transaction_copy((*C.btck_Transaction)(ptr)))
+}
+
 type Transaction struct {
+	*handle
+	transactionApi
+}
+
+func newTransaction(ptr *C.btck_Transaction, fromOwned bool) *Transaction {
+	h := newHandle(unsafe.Pointer(ptr), transactionCFuncs{}, fromOwned)
+	return &Transaction{handle: h, transactionApi: transactionApi{(*C.btck_Transaction)(h.ptr)}}
+}
+
+// NewTransaction creates a new transaction from raw serialized data
+func NewTransaction(rawTransaction []byte) (*Transaction, error) {
+	ptr := C.btck_transaction_create(unsafe.Pointer(&rawTransaction[0]), C.size_t(len(rawTransaction)))
+	if ptr == nil {
+		return nil, &InternalError{"Failed to create transaction from bytes"}
+	}
+	return newTransaction(ptr, true), nil
+}
+
+type TransactionView struct {
+	transactionApi
 	ptr *C.btck_Transaction
 }
 
-// NewTransactionFromRaw creates a new transaction from raw serialized data
-func NewTransactionFromRaw(rawTransaction []byte) (*Transaction, error) {
-	if len(rawTransaction) == 0 {
-		return nil, ErrEmptyTransactionData
+func newTransactionView(ptr *C.btck_Transaction) *TransactionView {
+	return &TransactionView{
+		transactionApi: transactionApi{ptr},
+		ptr:            ptr,
 	}
-	ptr := C.btck_transaction_create(unsafe.Pointer(&rawTransaction[0]), C.size_t(len(rawTransaction)))
-	if ptr == nil {
-		return nil, ErrKernelTransactionCreate
+}
+
+type transactionApi struct {
+	ptr *C.btck_Transaction
+}
+
+func (t *transactionApi) Copy() *Transaction {
+	return newTransaction(t.ptr, false)
+}
+
+func (t *transactionApi) CountInputs() uint64 {
+	return uint64(C.btck_transaction_count_inputs(t.ptr))
+}
+
+func (t *transactionApi) CountOutputs() uint64 {
+	return uint64(C.btck_transaction_count_outputs(t.ptr))
+}
+
+func (t *transactionApi) GetOutput(index uint64) (*TransactionOutputView, error) {
+	if index >= t.CountOutputs() {
+		return nil, ErrKernelIndexOutOfBounds
 	}
-
-	transaction := &Transaction{ptr: ptr}
-	runtime.SetFinalizer(transaction, (*Transaction).destroy)
-	return transaction, nil
-}
-
-// Copy creates a copy of the transaction. Transactions are reference counted,
-// so this just increments the reference count.
-func (t *Transaction) Copy() (*Transaction, error) {
-	checkReady(t)
-
-	ptr := C.btck_transaction_copy(t.ptr)
-	if ptr == nil {
-		return nil, ErrKernelTransactionCopy
-	}
-
-	transaction := &Transaction{ptr: ptr}
-	runtime.SetFinalizer(transaction, (*Transaction).destroy)
-	return transaction, nil
-}
-
-// CountInputs returns the number of inputs in the transaction
-func (t *Transaction) CountInputs() (uint64, error) {
-	checkReady(t)
-
-	count := C.btck_transaction_count_inputs(t.ptr)
-	return uint64(count), nil
-}
-
-// CountOutputs returns the number of outputs in the transaction
-func (t *Transaction) CountOutputs() (uint64, error) {
-	checkReady(t)
-
-	count := C.btck_transaction_count_outputs(t.ptr)
-	return uint64(count), nil
-}
-
-// GetOutputAt returns the transaction output at the specified index.
-func (t *Transaction) GetOutputAt(index uint64) (*TransactionOutput, error) {
-	checkReady(t)
-
 	ptr := C.btck_transaction_get_output_at(t.ptr, C.size_t(index))
-	if ptr == nil {
-		return nil, ErrKernelTransactionGetOutput
-	}
-
-	output := &TransactionOutput{ptr: ptr}
-	runtime.SetFinalizer(output, (*TransactionOutput).destroy)
-	return output, nil
+	return newTransactionOutputView(check(ptr)), nil
 }
 
-// ToBytes serializes the transaction to bytes using consensus serialization
-func (t *Transaction) ToBytes() ([]byte, error) {
-	checkReady(t)
-
-	return writeToBytes(func(writer C.btck_WriteBytes, userData unsafe.Pointer) C.int {
+// Bytes returns the consensus serialized transaction
+func (t *transactionApi) Bytes() ([]byte, error) {
+	bytes, ok := writeToBytes(func(writer C.btck_WriteBytes, userData unsafe.Pointer) C.int {
 		return C.btck_transaction_to_bytes(t.ptr, writer, userData)
 	})
-}
-
-func (t *Transaction) destroy() {
-	if t.ptr != nil {
-		C.btck_transaction_destroy(t.ptr)
-		t.ptr = nil
+	if !ok {
+		return nil, &SerializationError{"Failed to serialize transaction"}
 	}
-}
-
-func (t *Transaction) Destroy() {
-	runtime.SetFinalizer(t, nil)
-	t.destroy()
-}
-
-func (t *Transaction) isReady() bool {
-	return t != nil && t.ptr != nil
-}
-
-func (t *Transaction) uninitializedError() error {
-	return ErrTransactionUninitialized
+	return bytes, nil
 }

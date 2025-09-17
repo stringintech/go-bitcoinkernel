@@ -6,132 +6,81 @@ package kernel
 */
 import "C"
 import (
-	"runtime"
 	"unsafe"
 )
 
-var _ cManagedResource = &ChainstateManager{}
+type chainstateManagerCFuncs struct{}
 
-// ChainstateManager wraps the C btck_ChainstateManager
+func (chainstateManagerCFuncs) destroy(ptr unsafe.Pointer) {
+	C.btck_chainstate_manager_destroy((*C.btck_ChainstateManager)(ptr))
+}
+
 type ChainstateManager struct {
-	ptr     *C.btck_ChainstateManager
-	context *Context
+	*uniqueHandle
+}
+
+func newChainstateManager(ptr *C.btck_ChainstateManager) *ChainstateManager {
+	h := newUniqueHandle(unsafe.Pointer(ptr), chainstateManagerCFuncs{})
+	return &ChainstateManager{uniqueHandle: h}
 }
 
 // NewChainstateManager creates a new chainstate manager.
 // Kernel copies all necessary data from the options during construction,
 // so the caller can safely free the options object after this call returns successfully.
-// However, the context must remain valid for the entire lifetime of the returned ChainstateManager.
-func NewChainstateManager(context *Context, options *ChainstateManagerOptions) (*ChainstateManager, error) {
-	if err := validateReady(context); err != nil {
-		return nil, err
-	}
-	if err := validateReady(options); err != nil {
-		return nil, err
-	}
-
-	ptr := C.btck_chainstate_manager_create(options.ptr)
+func NewChainstateManager(options *ChainstateManagerOptions) (*ChainstateManager, error) {
+	ptr := C.btck_chainstate_manager_create((*C.btck_ChainstateManagerOptions)(options.ptr))
 	if ptr == nil {
-		return nil, ErrKernelChainstateManagerCreate
+		return nil, &InternalError{"Failed to create chainstate manager"}
 	}
-
-	manager := &ChainstateManager{
-		ptr:     ptr,
-		context: context,
-	}
-	runtime.SetFinalizer(manager, (*ChainstateManager).destroy)
-	return manager, nil
+	return newChainstateManager(ptr), nil
 }
 
-// ReadBlock reads a block using the provided block tree entry
 func (cm *ChainstateManager) ReadBlock(blockTreeEntry *BlockTreeEntry) (*Block, error) {
-	checkReady(cm)
-	if err := validateReady(blockTreeEntry); err != nil {
-		return nil, err
-	}
-
-	ptr := C.btck_block_read(cm.ptr, blockTreeEntry.ptr)
+	ptr := C.btck_block_read((*C.btck_ChainstateManager)(cm.ptr), blockTreeEntry.ptr)
 	if ptr == nil {
-		return nil, ErrKernelChainstateManagerReadBlock
+		return nil, &InternalError{"Failed to read block"}
 	}
-	return newBlockFromPtr(ptr), nil
+	return newBlock(ptr, true), nil
 }
 
-// ReadBlockSpentOutputs reads block spent outputs data for a given block tree entry
 func (cm *ChainstateManager) ReadBlockSpentOutputs(blockTreeEntry *BlockTreeEntry) (*BlockSpentOutputs, error) {
-	checkReady(cm)
-	if err := validateReady(blockTreeEntry); err != nil {
-		return nil, err
-	}
-
-	ptr := C.btck_block_spent_outputs_read(cm.ptr, blockTreeEntry.ptr)
+	ptr := C.btck_block_spent_outputs_read((*C.btck_ChainstateManager)(cm.ptr), blockTreeEntry.ptr)
 	if ptr == nil {
-		return nil, ErrKernelChainstateManagerReadBlockUndo
+		return nil, &InternalError{"Failed to read block spent outputs"}
 	}
-
-	blockSpentOutputs := &BlockSpentOutputs{ptr: ptr}
-	runtime.SetFinalizer(blockSpentOutputs, (*BlockSpentOutputs).destroy)
-	return blockSpentOutputs, nil
+	return newBlockSpentOutputs(ptr, true), nil
 }
 
-// ProcessBlock processes and validates a block
-func (cm *ChainstateManager) ProcessBlock(block *Block) (bool, bool, error) {
-	checkReady(cm)
-	if err := validateReady(block); err != nil {
-		return false, false, err
-	}
-
+// ProcessBlock processes and validates the given block with the chainstate manager.
+// It returns ok=true if processing was successful (including for duplicate blocks)
+// and duplicate=true if this block was processed before.
+func (cm *ChainstateManager) ProcessBlock(block *Block) (ok bool, duplicate bool) {
 	var newBlock C.int
-	result := C.btck_chainstate_manager_process_block(
-		cm.ptr,
-		block.ptr,
-		&newBlock,
-	)
-	if result != 0 {
-		return false, false, ErrKernelChainstateManagerProcessBlock
-	}
-	return true, newBlock != 0, nil
+	result := C.btck_chainstate_manager_process_block((*C.btck_ChainstateManager)(cm.ptr), (*C.btck_Block)(block.ptr), &newBlock)
+	ok = result == 0
+	duplicate = newBlock == 0
+	return
 }
 
-// GetActiveChain returns the currently active chain
-func (cm *ChainstateManager) GetActiveChain() (*Chain, error) {
-	checkReady(cm)
-
-	ptr := C.btck_chainstate_manager_get_active_chain(cm.ptr)
-	if ptr == nil {
-		return nil, ErrChainUninitialized
-	}
-
-	chain := &Chain{ptr: ptr}
-	runtime.SetFinalizer(chain, (*Chain).destroy)
-	return chain, nil
+func (cm *ChainstateManager) GetActiveChain() *Chain {
+	return &Chain{C.btck_chainstate_manager_get_active_chain((*C.btck_ChainstateManager)(cm.ptr))}
 }
 
 // GetBlockTreeEntryByHash returns the block tree entry for a given block hash, or null if the hash is not found
-func (cm *ChainstateManager) GetBlockTreeEntryByHash(blockHash *BlockHash) (*BlockTreeEntry, error) {
-	checkReady(cm)
-	if err := validateReady(blockHash); err != nil {
-		return nil, err
-	}
-
-	ptr := C.btck_chainstate_manager_get_block_tree_entry_by_hash(cm.ptr, blockHash.ptr)
+func (cm *ChainstateManager) GetBlockTreeEntryByHash(blockHash *BlockHash) *BlockTreeEntry {
+	ptr := C.btck_chainstate_manager_get_block_tree_entry_by_hash((*C.btck_ChainstateManager)(cm.ptr), (*C.btck_BlockHash)(blockHash.ptr))
 	if ptr == nil {
-		return nil, nil
+		return nil
 	}
-
-	blockTreeEntry := &BlockTreeEntry{ptr: ptr}
-	runtime.SetFinalizer(blockTreeEntry, (*BlockTreeEntry).destroy)
-	return blockTreeEntry, nil
+	return &BlockTreeEntry{ptr: ptr}
 }
 
-// ImportBlocks imports blocks from the specified file paths
+// ImportBlocks triggers a reindex if the option was previously set and can also import
+// existing block files from the specified filesystem paths.
 func (cm *ChainstateManager) ImportBlocks(blockFilePaths []string) error {
-	checkReady(cm)
-
 	// Convert Go strings to C strings
 	cPaths := make([]*C.char, len(blockFilePaths))
 	cLens := make([]C.size_t, len(blockFilePaths))
-
 	for i, path := range blockFilePaths {
 		cPaths[i] = C.CString(path)
 		cLens[i] = C.size_t(len(path))
@@ -154,35 +103,13 @@ func (cm *ChainstateManager) ImportBlocks(blockFilePaths []string) error {
 	}
 
 	success := C.btck_chainstate_manager_import_blocks(
-		cm.ptr,
+		(*C.btck_ChainstateManager)(cm.ptr),
 		cPathsPtr,
 		cLensPtr,
 		C.size_t(len(blockFilePaths)),
 	)
-
 	if success != 0 {
-		return ErrKernelImportBlocks
+		return &InternalError{"Failed to import blocks"}
 	}
 	return nil
-}
-
-func (cm *ChainstateManager) destroy() {
-	if cm.isReady() {
-		C.btck_chainstate_manager_destroy(cm.ptr)
-		cm.ptr = nil
-		cm.context = nil
-	}
-}
-
-func (cm *ChainstateManager) Destroy() {
-	runtime.SetFinalizer(cm, nil)
-	cm.destroy()
-}
-
-func (cm *ChainstateManager) isReady() bool {
-	return cm != nil && cm.ptr != nil && cm.context.isReady()
-}
-
-func (cm *ChainstateManager) uninitializedError() error {
-	return ErrChainstateManagerUninitialized
 }

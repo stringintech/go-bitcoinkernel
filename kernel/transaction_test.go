@@ -7,16 +7,11 @@ import (
 )
 
 func TestInvalidTransactionData(t *testing.T) {
-	// Test with empty data
-	_, err := NewTransactionFromRaw([]byte{})
-	if !errors.Is(err, ErrEmptyTransactionData) {
-		t.Errorf("Expected ErrEmptyTransactionData, got %v", err)
-	}
-
 	// Test with invalid data
-	_, err = NewTransactionFromRaw([]byte{0x00, 0x01, 0x02})
-	if !errors.Is(err, ErrKernelTransactionCreate) {
-		t.Errorf("Expected ErrKernelTransactionCreate, got %v", err)
+	_, err := NewTransaction([]byte{0x00, 0x01, 0x02})
+	var internalErr *InternalError
+	if !errors.As(err, &internalErr) {
+		t.Errorf("Expected InternalError, got %v", err)
 	}
 }
 
@@ -27,7 +22,7 @@ func TestTransactionFromRaw(t *testing.T) {
 		t.Fatalf("Failed to decode transaction hex: %v", err)
 	}
 
-	tx, err := NewTransactionFromRaw(txBytes)
+	tx, err := NewTransaction(txBytes)
 	if err != nil {
 		t.Fatalf("NewTransactionFromRaw() error = %v", err)
 	}
@@ -36,7 +31,7 @@ func TestTransactionFromRaw(t *testing.T) {
 	}
 	defer tx.Destroy()
 
-	if tx.ptr == nil {
+	if tx.handle.ptr == nil {
 		t.Error("Transaction pointer is nil")
 	}
 }
@@ -48,23 +43,20 @@ func TestTransactionCopy(t *testing.T) {
 		t.Fatalf("Failed to decode transaction hex: %v", err)
 	}
 
-	tx, err := NewTransactionFromRaw(txBytes)
+	tx, err := NewTransaction(txBytes)
 	if err != nil {
 		t.Fatalf("NewTransactionFromRaw() error = %v", err)
 	}
 	defer tx.Destroy()
 
 	// Test copying transaction
-	txCopy, err := tx.Copy()
-	if err != nil {
-		t.Fatalf("Transaction.Copy() error = %v", err)
-	}
+	txCopy := tx.Copy()
 	if txCopy == nil {
 		t.Fatal("Copied transaction is nil")
 	}
 	defer txCopy.Destroy()
 
-	if txCopy.ptr == nil {
+	if txCopy.handle.ptr == nil {
 		t.Error("Copied transaction pointer is nil")
 	}
 }
@@ -76,26 +68,20 @@ func TestTransactionCountInputsOutputs(t *testing.T) {
 		t.Fatalf("Failed to decode transaction hex: %v", err)
 	}
 
-	tx, err := NewTransactionFromRaw(txBytes)
+	tx, err := NewTransaction(txBytes)
 	if err != nil {
 		t.Fatalf("NewTransactionFromRaw() error = %v", err)
 	}
 	defer tx.Destroy()
 
 	// Test counting inputs (this is a coinbase transaction with 1 input)
-	inputCount, err := tx.CountInputs()
-	if err != nil {
-		t.Fatalf("Transaction.CountInputs() error = %v", err)
-	}
+	inputCount := tx.CountInputs()
 	if inputCount != 1 {
 		t.Errorf("Expected 1 input, got %d", inputCount)
 	}
 
 	// Test counting outputs (this transaction has 1 output)
-	outputCount, err := tx.CountOutputs()
-	if err != nil {
-		t.Fatalf("Transaction.CountOutputs() error = %v", err)
-	}
+	outputCount := tx.CountOutputs()
 	if outputCount != 1 {
 		t.Errorf("Expected 1 output, got %d", outputCount)
 	}
@@ -108,22 +94,20 @@ func TestTransactionGetOutputAt(t *testing.T) {
 		t.Fatalf("Failed to decode transaction hex: %v", err)
 	}
 
-	tx, err := NewTransactionFromRaw(txBytes)
+	tx, err := NewTransaction(txBytes)
 	if err != nil {
 		t.Fatalf("NewTransactionFromRaw() error = %v", err)
 	}
 	defer tx.Destroy()
 
 	// Test getting output at index 0
-	output, err := tx.GetOutputAt(0)
+	output, err := tx.GetOutput(0)
 	if err != nil {
 		t.Fatalf("Transaction.GetOutputAt(0) error = %v", err)
 	}
 	if output == nil {
 		t.Fatal("Output is nil")
 	}
-	defer output.Destroy()
-
 	if output.ptr == nil {
 		t.Error("Output pointer is nil")
 	}
@@ -136,14 +120,14 @@ func TestTransactionToBytes(t *testing.T) {
 		t.Fatalf("Failed to decode transaction hex: %v", err)
 	}
 
-	tx, err := NewTransactionFromRaw(txBytes)
+	tx, err := NewTransaction(txBytes)
 	if err != nil {
 		t.Fatalf("NewTransactionFromRaw() error = %v", err)
 	}
 	defer tx.Destroy()
 
 	// Test serializing transaction back to bytes
-	serialized, err := tx.ToBytes()
+	serialized, err := tx.Bytes()
 	if err != nil {
 		t.Fatalf("Transaction.ToBytes() error = %v", err)
 	}

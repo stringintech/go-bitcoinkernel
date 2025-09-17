@@ -6,58 +6,45 @@ package kernel
 */
 import "C"
 import (
-	"runtime"
 	"unsafe"
 )
 
-var _ cManagedResource = &ChainstateManagerOptions{}
+type chainstateManagerOptionsCFuncs struct{}
 
-// ChainstateManagerOptions wraps the C btck_ChainstateManagerOptions
-type ChainstateManagerOptions struct {
-	ptr     *C.btck_ChainstateManagerOptions
-	context *Context
+func (chainstateManagerOptionsCFuncs) destroy(ptr unsafe.Pointer) {
+	C.btck_chainstate_manager_options_destroy((*C.btck_ChainstateManagerOptions)(ptr))
 }
 
-// NewChainstateManagerOptions creates new chainstate manager options.
-// The context must remain valid for the entire lifetime of the returned options.
-func NewChainstateManagerOptions(context *Context, dataDir, blocksDir string) (*ChainstateManagerOptions, error) {
-	if err := validateReady(context); err != nil {
-		return nil, err
-	}
+type ChainstateManagerOptions struct {
+	*uniqueHandle
+}
 
+func newChainstateManagerOptions(ptr *C.btck_ChainstateManagerOptions) *ChainstateManagerOptions {
+	h := newUniqueHandle(unsafe.Pointer(ptr), chainstateManagerOptionsCFuncs{})
+	return &ChainstateManagerOptions{uniqueHandle: h}
+}
+
+func NewChainstateManagerOptions(context *Context, dataDir, blocksDir string) (*ChainstateManagerOptions, error) {
 	cDataDir := C.CString(dataDir)
 	defer C.free(unsafe.Pointer(cDataDir))
 
 	cBlocksDir := C.CString(blocksDir)
 	defer C.free(unsafe.Pointer(cBlocksDir))
 
-	ptr := C.btck_chainstate_manager_options_create(
-		context.ptr,
-		cDataDir,
-		C.size_t(len(dataDir)),
-		cBlocksDir,
-		C.size_t(len(blocksDir)),
-	)
+	ptr := C.btck_chainstate_manager_options_create((*C.btck_Context)(context.ptr), cDataDir, C.size_t(len(dataDir)),
+		cBlocksDir, C.size_t(len(blocksDir)))
 	if ptr == nil {
-		return nil, ErrKernelChainstateManagerOptionsCreate
+		return nil, &InternalError{"Failed to create chainstate manager options"}
 	}
-
-	opts := &ChainstateManagerOptions{
-		ptr:     ptr,
-		context: context,
-	}
-	runtime.SetFinalizer(opts, (*ChainstateManagerOptions).destroy)
-	return opts, nil
+	return newChainstateManagerOptions(ptr), nil
 }
 
 // SetWorkerThreads sets the number of worker threads for validation
 func (opts *ChainstateManagerOptions) SetWorkerThreads(threads int) {
-	checkReady(opts)
-	C.btck_chainstate_manager_options_set_worker_threads_num(opts.ptr, C.int(threads))
+	C.btck_chainstate_manager_options_set_worker_threads_num((*C.btck_ChainstateManagerOptions)(opts.ptr), C.int(threads))
 }
 
-func (opts *ChainstateManagerOptions) SetWipeDBs(wipeBlockTree, wipeChainstate bool) bool {
-	checkReady(opts)
+func (opts *ChainstateManagerOptions) SetWipeDBs(wipeBlockTree, wipeChainstate bool) error {
 	wipeBlockTreeInt := 0
 	if wipeBlockTree {
 		wipeBlockTreeInt = 1
@@ -66,48 +53,25 @@ func (opts *ChainstateManagerOptions) SetWipeDBs(wipeBlockTree, wipeChainstate b
 	if wipeChainstate {
 		wipeChainstateInt = 1
 	}
-	return C.btck_chainstate_manager_options_set_wipe_dbs(
-		opts.ptr,
-		C.int(wipeBlockTreeInt),
-		C.int(wipeChainstateInt),
-	) != 0
+	result := C.btck_chainstate_manager_options_set_wipe_dbs((*C.btck_ChainstateManagerOptions)(opts.ptr), C.int(wipeBlockTreeInt), C.int(wipeChainstateInt))
+	if result != 0 {
+		return &InternalError{"Failed to set wipe db"}
+	}
+	return nil
 }
 
 func (opts *ChainstateManagerOptions) SetBlockTreeDBInMemory(inMemory bool) {
-	checkReady(opts)
 	inMemoryInt := 0
 	if inMemory {
 		inMemoryInt = 1
 	}
-	C.btck_chainstate_manager_options_set_block_tree_db_in_memory(opts.ptr, C.int(inMemoryInt))
+	C.btck_chainstate_manager_options_set_block_tree_db_in_memory((*C.btck_ChainstateManagerOptions)(opts.ptr), C.int(inMemoryInt))
 }
 
 func (opts *ChainstateManagerOptions) SetChainstateDBInMemory(inMemory bool) {
-	checkReady(opts)
 	inMemoryInt := 0
 	if inMemory {
 		inMemoryInt = 1
 	}
-	C.btck_chainstate_manager_options_set_chainstate_db_in_memory(opts.ptr, C.int(inMemoryInt))
-}
-
-func (opts *ChainstateManagerOptions) destroy() {
-	if opts.ptr != nil {
-		C.btck_chainstate_manager_options_destroy(opts.ptr)
-		opts.ptr = nil
-		opts.context = nil
-	}
-}
-
-func (opts *ChainstateManagerOptions) Destroy() {
-	runtime.SetFinalizer(opts, nil)
-	opts.destroy()
-}
-
-func (opts *ChainstateManagerOptions) isReady() bool {
-	return opts != nil && opts.ptr != nil
-}
-
-func (opts *ChainstateManagerOptions) uninitializedError() error {
-	return ErrChainstateManagerOptionsUninitialized
+	C.btck_chainstate_manager_options_set_chainstate_db_in_memory((*C.btck_ChainstateManagerOptions)(opts.ptr), C.int(inMemoryInt))
 }

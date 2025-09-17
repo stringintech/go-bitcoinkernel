@@ -2,21 +2,8 @@ package kernel
 
 import (
 	"encoding/hex"
-	"errors"
 	"testing"
 )
-
-func TestInvalidTransactionOutput(t *testing.T) {
-	_, err := NewTransactionOutput(nil, 1000)
-	if !errors.Is(err, ErrScriptPubkeyUninitialized) {
-		t.Errorf("Expected ErrScriptPubkeyUninitialized, got %v", err)
-	}
-
-	_, err = NewTransactionOutput(&ScriptPubkey{ptr: nil}, 1000)
-	if !errors.Is(err, ErrScriptPubkeyUninitialized) {
-		t.Errorf("Expected ErrScriptPubkeyUninitialized, got %v", err)
-	}
-}
 
 func TestTransactionOutputCreation(t *testing.T) {
 	scriptHex := "76a914389ffce9cd9ae88dcc0631e88a821ffdbe9bfe26158088ac"
@@ -25,17 +12,14 @@ func TestTransactionOutputCreation(t *testing.T) {
 		t.Fatalf("Failed to decode script hex: %v", err)
 	}
 
-	scriptPubkey, err := NewScriptPubkeyFromRaw(scriptBytes)
+	scriptPubkey, err := NewScriptPubkey(scriptBytes)
 	if err != nil {
 		t.Fatalf("Failed to create script pubkey: %v", err)
 	}
 	defer scriptPubkey.Destroy()
 
 	amount := int64(5000000000)
-	output, err := NewTransactionOutput(scriptPubkey, amount)
-	if err != nil {
-		t.Fatalf("NewTransactionOutput() error = %v", err)
-	}
+	output := NewTransactionOutput(scriptPubkey, amount)
 	defer output.Destroy()
 
 	gotAmount := output.Amount()
@@ -44,11 +28,7 @@ func TestTransactionOutputCreation(t *testing.T) {
 	}
 
 	// Test getting script pubkey
-	gotScript, err := output.ScriptPubkey()
-	if err != nil {
-		t.Fatalf("TransactionOutput.ScriptPubkey() error = %v", err)
-	}
-	defer gotScript.Destroy()
+	gotScript := output.ScriptPubkey()
 
 	scriptData, err := gotScript.Bytes()
 	if err != nil {
@@ -72,30 +52,24 @@ func TestTransactionOutputCopy(t *testing.T) {
 		t.Fatalf("Failed to decode script hex: %v", err)
 	}
 
-	scriptPubkey, err := NewScriptPubkeyFromRaw(scriptBytes)
+	scriptPubkey, err := NewScriptPubkey(scriptBytes)
 	if err != nil {
 		t.Fatalf("Failed to create script pubkey: %v", err)
 	}
 	defer scriptPubkey.Destroy()
 
 	amount := int64(5000000000)
-	output, err := NewTransactionOutput(scriptPubkey, amount)
-	if err != nil {
-		t.Fatalf("NewTransactionOutput() error = %v", err)
-	}
+	output := NewTransactionOutput(scriptPubkey, amount)
 	defer output.Destroy()
 
 	// Test copying transaction output
-	outputCopy, err := output.Copy()
-	if err != nil {
-		t.Fatalf("TransactionOutput.Copy() error = %v", err)
-	}
+	outputCopy := output.Copy()
 	if outputCopy == nil {
 		t.Fatal("Copied transaction output is nil")
 	}
 	defer outputCopy.Destroy()
 
-	if outputCopy.ptr == nil {
+	if outputCopy.handle.ptr == nil {
 		t.Error("Copied transaction output pointer is nil")
 	}
 

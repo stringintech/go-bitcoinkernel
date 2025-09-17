@@ -5,73 +5,59 @@ package kernel
 */
 import "C"
 import (
-	"runtime"
+	"unsafe"
 )
 
-var _ cManagedResource = &Coin{}
+type coinCFuncs struct{}
 
-// Coin wraps the C btck_Coin
+func (coinCFuncs) destroy(ptr unsafe.Pointer) {
+	C.btck_coin_destroy((*C.btck_Coin)(ptr))
+}
+
+func (coinCFuncs) copy(ptr unsafe.Pointer) unsafe.Pointer {
+	return unsafe.Pointer(C.btck_coin_copy((*C.btck_Coin)(ptr)))
+}
+
 type Coin struct {
+	*handle
+	coinApi
+}
+
+func newCoin(ptr *C.btck_Coin, fromOwned bool) *Coin {
+	h := newHandle(unsafe.Pointer(ptr), coinCFuncs{}, fromOwned)
+	return &Coin{handle: h, coinApi: coinApi{(*C.btck_Coin)(h.ptr)}}
+}
+
+type CoinView struct {
+	coinApi
 	ptr *C.btck_Coin
 }
 
-// GetOutput returns the transaction output held within the coin
-func (c *Coin) GetOutput() (*TransactionOutput, error) {
-	checkReady(c)
-	ptr := C.btck_coin_get_output(c.ptr)
-	if ptr == nil {
-		return nil, ErrKernelTransactionOutputCreate
+func newCoinView(ptr *C.btck_Coin) *CoinView {
+	return &CoinView{
+		coinApi: coinApi{ptr},
+		ptr:     ptr,
 	}
-
-	output := &TransactionOutput{ptr: ptr}
-	runtime.SetFinalizer(output, (*TransactionOutput).destroy)
-	return output, nil
 }
 
-// ConfirmationHeight returns the block height at which this coin was confirmed
-func (c *Coin) ConfirmationHeight() uint32 {
-	checkReady(c)
+type coinApi struct {
+	ptr *C.btck_Coin
+}
+
+func (c *coinApi) Copy() *Coin {
+	return newCoin(c.ptr, false)
+}
+
+func (c *coinApi) GetOutput() *TransactionOutputView {
+	ptr := C.btck_coin_get_output(c.ptr)
+	return newTransactionOutputView(check(ptr))
+}
+
+func (c *coinApi) ConfirmationHeight() uint32 {
 	return uint32(C.btck_coin_confirmation_height(c.ptr))
 }
 
 // IsCoinbase returns true if this coin is from a coinbase transaction
-func (c *Coin) IsCoinbase() bool {
-	checkReady(c)
+func (c *coinApi) IsCoinbase() bool {
 	return int(C.btck_coin_is_coinbase(c.ptr)) != 0
-}
-
-func (c *Coin) destroy() {
-	if c.ptr != nil {
-		C.btck_coin_destroy(c.ptr)
-		c.ptr = nil
-	}
-}
-
-func (c *Coin) Destroy() {
-	runtime.SetFinalizer(c, nil)
-	c.destroy()
-}
-
-func (c *Coin) isReady() bool {
-	return c != nil && c.ptr != nil
-}
-
-func (c *Coin) uninitializedError() error {
-	return ErrCoinUninitialized
-}
-
-// Copy creates a copy of the coin
-func (c *Coin) Copy() (*Coin, error) {
-	if !c.isReady() {
-		return nil, c.uninitializedError()
-	}
-
-	ptr := C.btck_coin_copy(c.ptr)
-	if ptr == nil {
-		return nil, ErrKernelCoinCopy
-	}
-
-	coin := &Coin{ptr: ptr}
-	runtime.SetFinalizer(coin, (*Coin).destroy)
-	return coin, nil
 }

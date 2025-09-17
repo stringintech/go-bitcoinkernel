@@ -5,80 +5,59 @@ package kernel
 */
 import "C"
 import (
-	"runtime"
+	"unsafe"
 )
 
-var _ cManagedResource = &TransactionOutput{}
+type transactionOutputCFuncs struct{}
 
-// TransactionOutput wraps the C btck_TransactionOutput
+func (transactionOutputCFuncs) destroy(ptr unsafe.Pointer) {
+	C.btck_transaction_output_destroy((*C.btck_TransactionOutput)(ptr))
+}
+
+func (transactionOutputCFuncs) copy(ptr unsafe.Pointer) unsafe.Pointer {
+	return unsafe.Pointer(C.btck_transaction_output_copy((*C.btck_TransactionOutput)(ptr)))
+}
+
 type TransactionOutput struct {
+	*handle
+	transactionOutputApi
+}
+
+func newTransactionOutput(ptr *C.btck_TransactionOutput, fromOwned bool) *TransactionOutput {
+	h := newHandle(unsafe.Pointer(ptr), transactionOutputCFuncs{}, fromOwned)
+	return &TransactionOutput{handle: h, transactionOutputApi: transactionOutputApi{(*C.btck_TransactionOutput)(h.ptr)}}
+}
+
+func NewTransactionOutput(scriptPubkey *ScriptPubkey, amount int64) *TransactionOutput {
+	ptr := C.btck_transaction_output_create((*C.btck_ScriptPubkey)(scriptPubkey.handle.ptr), C.int64_t(amount))
+	return newTransactionOutput(check(ptr), true)
+}
+
+type TransactionOutputView struct {
+	transactionOutputApi
 	ptr *C.btck_TransactionOutput
 }
 
-func NewTransactionOutput(scriptPubkey *ScriptPubkey, amount int64) (*TransactionOutput, error) {
-	if err := validateReady(scriptPubkey); err != nil {
-		return nil, err
+func newTransactionOutputView(ptr *C.btck_TransactionOutput) *TransactionOutputView {
+	return &TransactionOutputView{
+		transactionOutputApi: transactionOutputApi{ptr},
+		ptr:                  ptr,
 	}
-
-	ptr := C.btck_transaction_output_create(scriptPubkey.ptr, C.int64_t(amount))
-	if ptr == nil {
-		return nil, ErrKernelTransactionOutputCreate
-	}
-
-	output := &TransactionOutput{ptr: ptr}
-	runtime.SetFinalizer(output, (*TransactionOutput).destroy)
-	return output, nil
 }
 
-// ScriptPubkey returns the script pubkey from this transaction output
-func (t *TransactionOutput) ScriptPubkey() (*ScriptPubkey, error) {
-	checkReady(t)
+type transactionOutputApi struct {
+	ptr *C.btck_TransactionOutput
+}
 
+func (t *transactionOutputApi) Copy() *TransactionOutput {
+	return newTransactionOutput(t.ptr, false)
+}
+
+func (t *transactionOutputApi) ScriptPubkey() *ScriptPubkeyView {
 	ptr := C.btck_transaction_output_get_script_pubkey(t.ptr)
-	if ptr == nil {
-		return nil, ErrKernelCopyScriptPubkeyFromOutput
-	}
-
-	scriptPubkey := &ScriptPubkey{ptr: ptr}
-	runtime.SetFinalizer(scriptPubkey, (*ScriptPubkey).destroy)
-	return scriptPubkey, nil
+	return newScriptPubkeyView(check(ptr))
 }
 
-func (t *TransactionOutput) Amount() int64 {
-	checkReady(t)
+func (t *transactionOutputApi) Amount() int64 {
 	return int64(C.btck_transaction_output_get_amount(t.ptr))
-}
-
-// Copy creates a copy of the transaction output
-func (t *TransactionOutput) Copy() (*TransactionOutput, error) {
-	checkReady(t)
-
-	ptr := C.btck_transaction_output_copy(t.ptr)
-	if ptr == nil {
-		return nil, ErrKernelTransactionOutputCopy
-	}
-
-	output := &TransactionOutput{ptr: ptr}
-	runtime.SetFinalizer(output, (*TransactionOutput).destroy)
-	return output, nil
-}
-
-func (t *TransactionOutput) destroy() {
-	if t.ptr != nil {
-		C.btck_transaction_output_destroy(t.ptr)
-		t.ptr = nil
-	}
-}
-
-func (t *TransactionOutput) Destroy() {
-	runtime.SetFinalizer(t, nil)
-	t.destroy()
-}
-
-func (t *TransactionOutput) isReady() bool {
-	return t != nil && t.ptr != nil
-}
-
-func (t *TransactionOutput) uninitializedError() error {
-	return ErrTransactionOutputUninitialized
 }

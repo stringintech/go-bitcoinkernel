@@ -34,7 +34,7 @@ func TestLogger(t *testing.T) {
 	}
 	defer viewer.Destroy()
 
-	_, err = kernel.NewBlockFromRaw([]byte{0xab})
+	_, err = kernel.NewBlock([]byte{0xab})
 	if err == nil {
 		t.Error("Expected error for invalid block data")
 	}

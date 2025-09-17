@@ -28,14 +28,6 @@ func TestNewContext(t *testing.T) {
 			},
 			wantErr: false,
 		},
-		{
-			name: "Nil context options",
-			setupOption: func() *ContextOptions {
-				return nil
-			},
-			wantErr: true,
-			errType: ErrContextOptionsUninitialized,
-		},
 	}
 
 	for _, tt := range tests {
@@ -72,23 +64,5 @@ func TestNewContext(t *testing.T) {
 			// Clean up
 			ctx.Destroy()
 		})
-	}
-}
-
-func TestNewDefaultContext(t *testing.T) {
-	ctx, err := NewDefaultContext()
-
-	if err != nil {
-		t.Errorf("NewDefaultContext() error = %v, want nil", err)
-		return
-	}
-
-	if ctx == nil {
-		t.Error("NewDefaultContext() returned nil Context")
-		return
-	}
-
-	if ctx.ptr == nil {
-		t.Error("Context has nil pointer")
 	}
 }

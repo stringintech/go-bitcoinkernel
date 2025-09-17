@@ -12,28 +12,17 @@ func TestChain(t *testing.T) {
 	}
 	suite.Setup(t)
 
-	chain, err := suite.Manager.GetActiveChain()
-	if err != nil {
-		t.Fatalf("GetActiveChain() error = %v", err)
-	}
-	defer chain.Destroy()
+	chain := suite.Manager.GetActiveChain()
 
 	// Test GetGenesis
-	genesis, err := chain.GetGenesis()
-	if err != nil {
-		t.Fatalf("GetGenesis() error = %v", err)
-	}
-	defer genesis.Destroy()
+	genesis := chain.GetGenesis()
 
 	height := genesis.Height()
 	if height != 0 {
 		t.Errorf("Expected genesis height 0, got %d", height)
 	}
 
-	genesisHash, err := genesis.Hash()
-	if err != nil {
-		t.Fatalf("BlockIndex.Hash() error = %v", err)
-	}
+	genesisHash := genesis.Hash()
 	defer genesisHash.Destroy()
 
 	hashBytes := genesisHash.Bytes()
@@ -42,21 +31,14 @@ func TestChain(t *testing.T) {
 	}
 
 	// Test GetTip
-	tip, err := chain.GetTip()
-	if err != nil {
-		t.Fatalf("GetTip() error = %v", err)
-	}
-	defer tip.Destroy()
+	tip := chain.GetTip()
 
 	tipHeight := tip.Height()
 	if tipHeight <= 0 {
 		t.Errorf("Expected tip height > 0, got %d", tipHeight)
 	}
 
-	tipHash, err := tip.Hash()
-	if err != nil {
-		t.Fatalf("Failed to get tip hash: %v", err)
-	}
+	tipHash := tip.Hash()
 	defer tipHash.Destroy()
 
 	tipHashBytes := tipHash.Bytes()
@@ -68,9 +50,14 @@ func TestChain(t *testing.T) {
 		t.Errorf("Expected tip height %d, got %d", suite.ImportedBlocksCount, tip.Height())
 	}
 
+	// Test GetHeight
+	chainHeight := chain.GetHeight()
+	if chainHeight != tipHeight {
+		t.Errorf("Expected chain height %d to match tip height %d", chainHeight, tipHeight)
+	}
+
 	// Test GetByHeight
 	block1 := chain.GetByHeight(1)
-	defer block1.Destroy()
 
 	if block1.Height() != 1 {
 		t.Errorf("Expected block height 1, got %d", block1.Height())

@@ -5,65 +5,41 @@ package kernel
 */
 import "C"
 import (
-	"runtime"
+	"unsafe"
 )
 
-var _ cManagedResource = &BlockSpentOutputs{}
+type blockSpentOutputsCFuncs struct{}
 
-// BlockSpentOutputs wraps the C btck_BlockSpentOutputs
-type BlockSpentOutputs struct {
-	ptr *C.btck_BlockSpentOutputs
+func (blockSpentOutputsCFuncs) destroy(ptr unsafe.Pointer) {
+	C.btck_block_spent_outputs_destroy((*C.btck_BlockSpentOutputs)(ptr))
 }
 
-// Count returns the number of transaction spent outputs contained in block spent outputs
+func (blockSpentOutputsCFuncs) copy(ptr unsafe.Pointer) unsafe.Pointer {
+	return unsafe.Pointer(C.btck_block_spent_outputs_copy((*C.btck_BlockSpentOutputs)(ptr)))
+}
+
+type BlockSpentOutputs struct {
+	*handle
+}
+
+func newBlockSpentOutputs(ptr *C.btck_BlockSpentOutputs, fromOwned bool) *BlockSpentOutputs {
+	h := newHandle(unsafe.Pointer(ptr), blockSpentOutputsCFuncs{}, fromOwned)
+	return &BlockSpentOutputs{handle: h}
+}
+
 func (bso *BlockSpentOutputs) Count() uint64 {
-	checkReady(bso)
-	return uint64(C.btck_block_spent_outputs_count(bso.ptr))
+	return uint64(C.btck_block_spent_outputs_count((*C.btck_BlockSpentOutputs)(bso.ptr)))
 }
 
 // GetTransactionSpentOutputsAt returns the transaction spent outputs at the specified index
-func (bso *BlockSpentOutputs) GetTransactionSpentOutputsAt(index uint64) (*TransactionSpentOutputs, error) {
-	checkReady(bso)
-	ptr := C.btck_block_spent_outputs_get_transaction_spent_outputs_at(bso.ptr, C.size_t(index))
-	if ptr == nil {
-		return nil, ErrKernelBlockSpentOutputsGetTransactionSpentOutputsAt
+func (bso *BlockSpentOutputs) GetTransactionSpentOutputsAt(index uint64) (*TransactionSpentOutputsView, error) {
+	if index >= bso.Count() {
+		return nil, ErrKernelIndexOutOfBounds
 	}
-
-	txSpentOutputs := &TransactionSpentOutputs{ptr: ptr}
-	runtime.SetFinalizer(txSpentOutputs, (*TransactionSpentOutputs).destroy)
-	return txSpentOutputs, nil
+	ptr := C.btck_block_spent_outputs_get_transaction_spent_outputs_at((*C.btck_BlockSpentOutputs)(bso.ptr), C.size_t(index))
+	return newTransactionSpentOutputsView(check(ptr)), nil
 }
 
-// Copy creates a copy of the block spent outputs
-func (bso *BlockSpentOutputs) Copy() (*BlockSpentOutputs, error) {
-	checkReady(bso)
-
-	ptr := C.btck_block_spent_outputs_copy(bso.ptr)
-	if ptr == nil {
-		return nil, ErrKernelBlockSpentOutputsCopy
-	}
-
-	outputs := &BlockSpentOutputs{ptr: ptr}
-	runtime.SetFinalizer(outputs, (*BlockSpentOutputs).destroy)
-	return outputs, nil
-}
-
-func (bso *BlockSpentOutputs) destroy() {
-	if bso.ptr != nil {
-		C.btck_block_spent_outputs_destroy(bso.ptr)
-		bso.ptr = nil
-	}
-}
-
-func (bso *BlockSpentOutputs) Destroy() {
-	runtime.SetFinalizer(bso, nil)
-	bso.destroy()
-}
-
-func (bso *BlockSpentOutputs) isReady() bool {
-	return bso != nil && bso.ptr != nil
-}
-
-func (bso *BlockSpentOutputs) uninitializedError() error {
-	return ErrBlockSpentOutputsUninitialized
+func (bso *BlockSpentOutputs) Copy() *BlockSpentOutputs {
+	return newBlockSpentOutputs((*C.btck_BlockSpentOutputs)(bso.ptr), false)
 }

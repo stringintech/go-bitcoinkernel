@@ -5,65 +5,57 @@ package kernel
 */
 import "C"
 import (
-	"runtime"
+	"unsafe"
 )
 
-var _ cManagedResource = &TransactionSpentOutputs{}
+type transactionSpentOutputsCFuncs struct{}
 
-// TransactionSpentOutputs wraps the C btck_TransactionSpentOutputs
+func (transactionSpentOutputsCFuncs) destroy(ptr unsafe.Pointer) {
+	C.btck_transaction_spent_outputs_destroy((*C.btck_TransactionSpentOutputs)(ptr))
+}
+
+func (transactionSpentOutputsCFuncs) copy(ptr unsafe.Pointer) unsafe.Pointer {
+	return unsafe.Pointer(C.btck_transaction_spent_outputs_copy((*C.btck_TransactionSpentOutputs)(ptr)))
+}
+
 type TransactionSpentOutputs struct {
+	*handle
+	transactionSpentOutputsApi
+}
+
+func newTransactionSpentOutputs(ptr *C.btck_TransactionSpentOutputs, fromOwned bool) *TransactionSpentOutputs {
+	h := newHandle(unsafe.Pointer(ptr), transactionSpentOutputsCFuncs{}, fromOwned)
+	return &TransactionSpentOutputs{handle: h, transactionSpentOutputsApi: transactionSpentOutputsApi{(*C.btck_TransactionSpentOutputs)(h.ptr)}}
+}
+
+type TransactionSpentOutputsView struct {
+	transactionSpentOutputsApi
 	ptr *C.btck_TransactionSpentOutputs
 }
 
-// Count returns the number of spent transaction outputs for the transaction
-func (tso *TransactionSpentOutputs) Count() uint64 {
-	checkReady(tso)
-	return uint64(C.btck_transaction_spent_outputs_count(tso.ptr))
-}
-
-// GetCoinAt returns a coin contained in the transaction spent outputs at the specified index
-func (tso *TransactionSpentOutputs) GetCoinAt(index uint64) (*Coin, error) {
-	checkReady(tso)
-	ptr := C.btck_transaction_spent_outputs_get_coin_at(tso.ptr, C.size_t(index))
-	if ptr == nil {
-		return nil, ErrKernelTransactionSpentOutputsGetCoinAt
-	}
-
-	coin := &Coin{ptr: ptr}
-	runtime.SetFinalizer(coin, (*Coin).destroy)
-	return coin, nil
-}
-
-// Copy creates a copy of the transaction spent outputs
-func (tso *TransactionSpentOutputs) Copy() (*TransactionSpentOutputs, error) {
-	checkReady(tso)
-
-	ptr := C.btck_transaction_spent_outputs_copy(tso.ptr)
-	if ptr == nil {
-		return nil, ErrKernelTransactionSpentOutputsCopy
-	}
-
-	outputs := &TransactionSpentOutputs{ptr: ptr}
-	runtime.SetFinalizer(outputs, (*TransactionSpentOutputs).destroy)
-	return outputs, nil
-}
-
-func (tso *TransactionSpentOutputs) destroy() {
-	if tso.ptr != nil {
-		C.btck_transaction_spent_outputs_destroy(tso.ptr)
-		tso.ptr = nil
+func newTransactionSpentOutputsView(ptr *C.btck_TransactionSpentOutputs) *TransactionSpentOutputsView {
+	return &TransactionSpentOutputsView{
+		transactionSpentOutputsApi: transactionSpentOutputsApi{ptr},
+		ptr:                        ptr,
 	}
 }
 
-func (tso *TransactionSpentOutputs) Destroy() {
-	runtime.SetFinalizer(tso, nil)
-	tso.destroy()
+type transactionSpentOutputsApi struct {
+	ptr *C.btck_TransactionSpentOutputs
 }
 
-func (tso *TransactionSpentOutputs) isReady() bool {
-	return tso != nil && tso.ptr != nil
+func (t *transactionSpentOutputsApi) Copy() *TransactionSpentOutputs {
+	return newTransactionSpentOutputs(t.ptr, false)
 }
 
-func (tso *TransactionSpentOutputs) uninitializedError() error {
-	return ErrTransactionSpentOutputsUninitialized
+func (t *transactionSpentOutputsApi) Count() uint64 {
+	return uint64(C.btck_transaction_spent_outputs_count(t.ptr))
+}
+
+func (t *transactionSpentOutputsApi) GetCoinAt(index uint64) (*CoinView, error) {
+	if index >= t.Count() {
+		return nil, ErrKernelIndexOutOfBounds
+	}
+	ptr := C.btck_transaction_spent_outputs_get_coin_at(t.ptr, C.size_t(index))
+	return newCoinView(check(ptr)), nil
 }

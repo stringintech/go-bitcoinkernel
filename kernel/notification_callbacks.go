@@ -22,9 +22,7 @@ type NotificationCallbacks struct {
 
 //export go_notify_block_tip_bridge
 func go_notify_block_tip_bridge(user_data unsafe.Pointer, state C.btck_SynchronizationState, entry *C.btck_BlockTreeEntry, verification_progress C.double) {
-	// Convert void* back to Handle - user_data contains Handle ID
 	handle := cgo.Handle(user_data)
-	// Retrieve original Go callback struct
 	callbacks := handle.Value().(*NotificationCallbacks)
 
 	if callbacks.OnBlockTip != nil {

@@ -37,12 +37,6 @@ func TestNewChainParameters(t *testing.T) {
 			chainType: ChainTypeRegtest,
 			wantErr:   false,
 		},
-		{
-			name:      "Invalid chain type",
-			chainType: ChainType(99),
-			wantErr:   true,
-			errType:   ErrInvalidChainType,
-		},
 	}
 
 	for _, tt := range tests {

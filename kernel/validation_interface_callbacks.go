@@ -16,12 +16,9 @@ type ValidationInterfaceCallbacks struct {
 
 //export go_validation_interface_block_checked_bridge
 func go_validation_interface_block_checked_bridge(user_data unsafe.Pointer, block *C.btck_Block, state *C.btck_BlockValidationState) {
-	// Convert void* back to Handle - user_data contains Handle ID
 	handle := cgo.Handle(user_data)
-	// Retrieve original Go callback struct
 	callbacks := handle.Value().(*ValidationInterfaceCallbacks)
-
 	if callbacks.OnBlockChecked != nil {
-		callbacks.OnBlockChecked(newBlockFromPtr(block), &BlockValidationState{ptr: state})
+		callbacks.OnBlockChecked(newBlock(block, true), &BlockValidationState{ptr: state})
 	}
 }

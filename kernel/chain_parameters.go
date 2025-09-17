@@ -4,48 +4,36 @@ package kernel
 #include "kernel/bitcoinkernel.h"
 */
 import "C"
-import "runtime"
+import (
+	"unsafe"
+)
 
-var _ cManagedResource = &ChainParameters{}
+type chainParametersCFuncs struct{}
 
-// ChainParameters wraps the C btck_ChainParameters
+func (chainParametersCFuncs) destroy(ptr unsafe.Pointer) {
+	C.btck_chain_parameters_destroy((*C.btck_ChainParameters)(ptr))
+}
+
+func (chainParametersCFuncs) copy(ptr unsafe.Pointer) unsafe.Pointer {
+	return unsafe.Pointer(C.btck_chain_parameters_copy((*C.btck_ChainParameters)(ptr)))
+}
+
 type ChainParameters struct {
-	ptr *C.btck_ChainParameters
+	*handle
+}
+
+func newChainParameters(ptr *C.btck_ChainParameters, fromOwned bool) *ChainParameters {
+	h := newHandle(unsafe.Pointer(ptr), chainParametersCFuncs{}, fromOwned)
+	return &ChainParameters{handle: h}
 }
 
 func NewChainParameters(chainType ChainType) (*ChainParameters, error) {
-	cType, err := chainType.c()
-	if err != nil {
-		return nil, err
-	}
-	ptr := C.btck_chain_parameters_create(cType)
-	if ptr == nil {
-		return nil, ErrKernelChainParametersCreate
-	}
-
-	cp := &ChainParameters{ptr: ptr}
-	runtime.SetFinalizer(cp, (*ChainParameters).destroy)
-	return cp, nil
+	ptr := C.btck_chain_parameters_create(chainType.c())
+	return newChainParameters(check(ptr), true), nil
 }
 
-func (cp *ChainParameters) destroy() {
-	if cp.ptr != nil {
-		C.btck_chain_parameters_destroy(cp.ptr)
-		cp.ptr = nil
-	}
-}
-
-func (cp *ChainParameters) Destroy() {
-	runtime.SetFinalizer(cp, nil)
-	cp.destroy()
-}
-
-func (cp *ChainParameters) isReady() bool {
-	return cp != nil && cp.ptr != nil
-}
-
-func (cp *ChainParameters) uninitializedError() error {
-	return ErrChainParametersUninitialized
+func (cp *ChainParameters) Copy() *ChainParameters {
+	return newChainParameters((*C.btck_ChainParameters)(cp.ptr), false)
 }
 
 const (
@@ -58,11 +46,11 @@ const (
 
 type ChainType C.btck_ChainType
 
-func (t ChainType) c() (C.btck_ChainType, error) {
+func (t ChainType) c() C.btck_ChainType {
 	switch t {
 	case ChainTypeMainnet, ChainTypeTestnet, ChainTypeTestnet4, ChainTypeSignet, ChainTypeRegtest:
-		return C.btck_ChainType(t), nil
+		return C.btck_ChainType(t)
 	default:
-		return 0, ErrInvalidChainType
+		panic("Invalid chain type")
 	}
 }

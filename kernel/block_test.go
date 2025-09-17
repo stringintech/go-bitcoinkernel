@@ -7,16 +7,10 @@ import (
 )
 
 func TestInvalidBlockData(t *testing.T) {
-	// Test with empty data
-	_, err := NewBlockFromRaw([]byte{})
-	if !errors.Is(err, ErrEmptyBlockData) {
-		t.Errorf("Expected ErrEmptyBlockData, got %v", err)
-	}
-
-	// Test with invalid data
-	_, err = NewBlockFromRaw([]byte{0x00, 0x01, 0x02})
-	if !errors.Is(err, ErrKernelBlockCreate) {
-		t.Errorf("Expected ErrKernelBlockCreate, got %v", err)
+	_, err := NewBlock([]byte{0x00, 0x01, 0x02})
+	var internalErr *InternalError
+	if !errors.As(err, &internalErr) {
+		t.Errorf("Expected InternalError, got %v", err)
 	}
 }
 
@@ -28,17 +22,14 @@ func TestBlockFromRaw(t *testing.T) {
 		t.Fatalf("Failed to decode genesis hex: %v", err)
 	}
 
-	block, err := NewBlockFromRaw(genesisBytes)
+	block, err := NewBlock(genesisBytes)
 	if err != nil {
 		t.Fatalf("NewBlockFromRaw() error = %v", err)
 	}
 	defer block.Destroy()
 
 	// Test getting block hash
-	hash, err := block.Hash()
-	if err != nil {
-		t.Fatalf("Block.Hash() error = %v", err)
-	}
+	hash := block.Hash()
 	defer hash.Destroy()
 
 	hashBytes := hash.Bytes()
@@ -48,7 +39,7 @@ func TestBlockFromRaw(t *testing.T) {
 
 	// Expected genesis block hash (reversed byte order for display)
 	expectedHash := "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
-	actualHashHex := hex.EncodeToString(ReverseBytes(hashBytes))
+	actualHashHex := hex.EncodeToString(reverseBytes(hashBytes))
 	if actualHashHex != expectedHash {
 		t.Logf("Actual hash: %s", actualHashHex)
 		t.Logf("Expected hash: %s", expectedHash)
@@ -77,17 +68,14 @@ func TestBlockCopy(t *testing.T) {
 		t.Fatalf("Failed to decode genesis hex: %v", err)
 	}
 
-	block, err := NewBlockFromRaw(genesisBytes)
+	block, err := NewBlock(genesisBytes)
 	if err != nil {
 		t.Fatalf("NewBlockFromRaw() error = %v", err)
 	}
 	defer block.Destroy()
 
 	// Test copying block
-	blockCopy, err := block.Copy()
-	if err != nil {
-		t.Fatalf("Block.Copy() error = %v", err)
-	}
+	blockCopy := block.Copy()
 	if blockCopy == nil {
 		t.Fatal("Copied block is nil")
 	}
@@ -105,17 +93,14 @@ func TestBlockCountTransactions(t *testing.T) {
 		t.Fatalf("Failed to decode genesis hex: %v", err)
 	}
 
-	block, err := NewBlockFromRaw(genesisBytes)
+	block, err := NewBlock(genesisBytes)
 	if err != nil {
 		t.Fatalf("NewBlockFromRaw() error = %v", err)
 	}
 	defer block.Destroy()
 
 	// Test counting transactions (genesis block has 1 transaction)
-	txCount, err := block.CountTransactions()
-	if err != nil {
-		t.Fatalf("Block.CountTransactions() error = %v", err)
-	}
+	txCount := block.CountTransactions()
 	if txCount != 1 {
 		t.Errorf("Expected 1 transaction, got %d", txCount)
 	}
@@ -128,7 +113,7 @@ func TestBlockGetTransactionAt(t *testing.T) {
 		t.Fatalf("Failed to decode genesis hex: %v", err)
 	}
 
-	block, err := NewBlockFromRaw(genesisBytes)
+	block, err := NewBlock(genesisBytes)
 	if err != nil {
 		t.Fatalf("NewBlockFromRaw() error = %v", err)
 	}
@@ -142,9 +127,15 @@ func TestBlockGetTransactionAt(t *testing.T) {
 	if tx == nil {
 		t.Fatal("Transaction is nil")
 	}
-	defer tx.Destroy()
-
 	if tx.ptr == nil {
 		t.Error("Transaction pointer is nil")
 	}
+}
+
+func reverseBytes(data []byte) []byte {
+	result := make([]byte, len(data))
+	for i, b := range data {
+		result[len(data)-1-i] = b
+	}
+	return result
 }

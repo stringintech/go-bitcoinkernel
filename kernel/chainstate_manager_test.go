@@ -22,14 +22,9 @@ func TestChainstateManager(t *testing.T) {
 }
 
 func (s *ChainstateManagerTestSuite) TestBlockSpentOutputs(t *testing.T) {
-	chain, err := s.Manager.GetActiveChain()
-	if err != nil {
-		t.Fatalf("GetActiveChain() error = %v", err)
-	}
-	defer chain.Destroy()
+	chain := s.Manager.GetActiveChain()
 
 	blockIndex := chain.GetByHeight(202)
-	defer blockIndex.Destroy()
 
 	blockSpentOutputs, err := s.Manager.ReadBlockSpentOutputs(blockIndex)
 	if err != nil {
@@ -49,7 +44,6 @@ func (s *ChainstateManagerTestSuite) TestBlockSpentOutputs(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetTransactionSpentOutputsAt(%d) error = %v", i, err)
 		}
-		defer txSpentOutputs.Destroy()
 
 		spentOutputSize := txSpentOutputs.Count()
 		if spentOutputSize != 1 {
@@ -60,12 +54,8 @@ func (s *ChainstateManagerTestSuite) TestBlockSpentOutputs(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetCoinAt(0) error = %v", err)
 		}
-		defer coin.Destroy()
 
-		_, err = coin.GetOutput()
-		if err != nil {
-			t.Fatalf("GetOutput() error = %v", err)
-		}
+		coin.GetOutput()
 
 		height := coin.ConfirmationHeight()
 		if height <= 0 {
@@ -75,18 +65,10 @@ func (s *ChainstateManagerTestSuite) TestBlockSpentOutputs(t *testing.T) {
 }
 
 func (s *ChainstateManagerTestSuite) TestReadBlock(t *testing.T) {
-	chain, err := s.Manager.GetActiveChain()
-	if err != nil {
-		t.Fatalf("GetActiveChain() error = %v", err)
-	}
-	defer chain.Destroy()
+	chain := s.Manager.GetActiveChain()
 
 	// Test reading genesis block
-	genesis, err := chain.GetGenesis()
-	if err != nil {
-		t.Fatalf("GetGenesis() error = %v", err)
-	}
-	defer genesis.Destroy()
+	genesis := chain.GetGenesis()
 
 	genesisBlock, err := s.Manager.ReadBlock(genesis)
 	if err != nil {
@@ -98,10 +80,7 @@ func (s *ChainstateManagerTestSuite) TestReadBlock(t *testing.T) {
 	defer genesisBlock.Destroy()
 
 	// Verify genesis block has expected properties
-	genesisHash, err := genesisBlock.Hash()
-	if err != nil {
-		t.Fatalf("Genesis block Hash() error = %v", err)
-	}
+	genesisHash := genesisBlock.Hash()
 	defer genesisHash.Destroy()
 
 	hashBytes := genesisHash.Bytes()
@@ -110,11 +89,7 @@ func (s *ChainstateManagerTestSuite) TestReadBlock(t *testing.T) {
 	}
 
 	// Test reading tip block
-	tip, err := chain.GetTip()
-	if err != nil {
-		t.Fatalf("GetTip() error = %v", err)
-	}
-	defer tip.Destroy()
+	tip := chain.GetTip()
 
 	tipBlock, err := s.Manager.ReadBlock(tip)
 	if err != nil {
@@ -126,10 +101,7 @@ func (s *ChainstateManagerTestSuite) TestReadBlock(t *testing.T) {
 	defer tipBlock.Destroy()
 
 	// Verify tip block properties
-	tipHash, err := tipBlock.Hash()
-	if err != nil {
-		t.Fatalf("Tip block Hash() error = %v", err)
-	}
+	tipHash := tipBlock.Hash()
 	defer tipHash.Destroy()
 
 	tipHashBytes := tipHash.Bytes()
@@ -139,34 +111,19 @@ func (s *ChainstateManagerTestSuite) TestReadBlock(t *testing.T) {
 }
 
 func (s *ChainstateManagerTestSuite) TestGetBlockTreeEntryByHash(t *testing.T) {
-	chain, err := s.Manager.GetActiveChain()
-	if err != nil {
-		t.Fatalf("GetActiveChain() error = %v", err)
-	}
-	defer chain.Destroy()
+	chain := s.Manager.GetActiveChain()
 
 	// Test getting genesis block by hash
-	genesis, err := chain.GetGenesis()
-	if err != nil {
-		t.Fatalf("GetGenesis() error = %v", err)
-	}
-	defer genesis.Destroy()
+	genesis := chain.GetGenesis()
 
-	genesisHash, err := genesis.Hash()
-	if err != nil {
-		t.Fatalf("Genesis Hash() error = %v", err)
-	}
+	genesisHash := genesis.Hash()
 	defer genesisHash.Destroy()
 
 	// Use GetBlockTreeEntryByHash to find genesis
-	foundGenesisIndex, err := s.Manager.GetBlockTreeEntryByHash(genesisHash)
-	if err != nil {
-		t.Fatalf("ChainstateManager.GetBlockTreeEntryByHash() for genesis error = %v", err)
-	}
+	foundGenesisIndex := s.Manager.GetBlockTreeEntryByHash(genesisHash)
 	if foundGenesisIndex == nil {
 		t.Fatal("Found genesis block tree entry is nil")
 	}
-	defer foundGenesisIndex.Destroy()
 
 	// Verify found block has same height as original
 	foundHeight := foundGenesisIndex.Height()
@@ -176,26 +133,15 @@ func (s *ChainstateManagerTestSuite) TestGetBlockTreeEntryByHash(t *testing.T) {
 	}
 
 	// Test getting tip block by hash
-	tipIndex, err := chain.GetTip()
-	if err != nil {
-		t.Fatalf("GetTip() error = %v", err)
-	}
-	defer tipIndex.Destroy()
+	tipIndex := chain.GetTip()
 
-	tipHash, err := tipIndex.Hash()
-	if err != nil {
-		t.Fatalf("Tip Hash() error = %v", err)
-	}
+	tipHash := tipIndex.Hash()
 	defer tipHash.Destroy()
 
-	foundTipIndex, err := s.Manager.GetBlockTreeEntryByHash(tipHash)
-	if err != nil {
-		t.Fatalf("ChainstateManager.GetBlockTreeEntryByHash() for tip error = %v", err)
-	}
+	foundTipIndex := s.Manager.GetBlockTreeEntryByHash(tipHash)
 	if foundTipIndex == nil {
 		t.Fatal("Found tip block tree entry is nil")
 	}
-	defer foundTipIndex.Destroy()
 
 	// Verify found tip has same height as original
 	foundTipHeight := foundTipIndex.Height()
@@ -270,7 +216,7 @@ func (s *ChainstateManagerTestSuite) Setup(t *testing.T) {
 	opts.SetWipeDBs(true, true)
 
 	// Create chainstate manager
-	manager, err := NewChainstateManager(ctx, opts)
+	manager, err := NewChainstateManager(opts)
 	if err != nil {
 		t.Fatalf("NewChainstateManager() error = %v", err)
 	}
@@ -317,17 +263,14 @@ func (s *ChainstateManagerTestSuite) Setup(t *testing.T) {
 			t.Fatalf("Failed to decode block %d hex: %v", i+1, err)
 		}
 
-		block, err := NewBlockFromRaw(blockBytes)
+		block, err := NewBlock(blockBytes)
 		if err != nil {
 			t.Fatalf("NewBlockFromRaw() failed for block %d: %v", i+1, err)
 		}
 		defer block.Destroy()
 
-		success, isNewBlock, err := manager.ProcessBlock(block)
-		if err != nil {
-			t.Fatalf("ProcessBlock() failed for block %d: %v", i+1, err)
-		}
-		if !success || !isNewBlock {
+		ok, duplicate := manager.ProcessBlock(block)
+		if !ok || duplicate {
 			t.Fatalf("ProcessBlock() failed for block %d", i+1)
 		}
 	}

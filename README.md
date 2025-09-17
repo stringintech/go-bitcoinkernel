@@ -87,24 +87,12 @@ replace github.com/stringintech/go-bitcoinkernel => /path/to/go-bitcoinkernel
 
 ### Memory Management
 
-The library handles memory management automatically through Go's finalizers, but it's highly recommended to explicitly
-call `Destroy()` methods when you're done with objects to free resources immediately.
+The library handles memory management automatically through Go's finalizers (see [common.go](./kernel/common.go)), but it's highly recommended to explicitly
+call `Destroy()` methods when you're done with owned objects to free resources immediately.
 
-### Error Handling and Resource Initialization
+### Error Handling
 
-The library uses structured error types for better error handling (see [errors.go](./kernel/errors.go)):
-
-- **`UninitializedError`**: Returned when attempting operations on uninitialized resources
-- **`KernelError`**: Returned when underlying C library operations fail
-
-**Important**: Method calls on uninitialized objects (where the internal C pointer is nil) will **panic** rather than return errors. This is by design to catch programming bugs early:
-
-```go
-m := kernel.ChainstateManager{}
-chain, _ := m.GetActiveChain() // panic: chainstateManager is not initialized
-```
-
-Always ensure objects are properly initialized (and not destroyed) before calling methods on them. Constructor functions like `NewChainstateManager()` return errors for validation, but method calls on receivers expect valid objects.
+The library uses structured error types for better error handling (see [errors.go](./kernel/errors.go)).
 
 ### Runtime Dependencies
 
