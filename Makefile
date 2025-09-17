@@ -18,7 +18,8 @@ build-kernel:
 		-DBUILD_BITCOIN_BIN=OFF \
 		-DBUILD_DAEMON=OFF \
 		-DBUILD_UTIL_CHAINSTATE=OFF \
-		-DBUILD_CLI=OFF && \
+		-DBUILD_CLI=OFF \
+		-DENABLE_IPC=OFF && \
 	cmake --build build --target bitcoinkernel -j $(shell nproc 2>/dev/null || echo 4)
 
 build:

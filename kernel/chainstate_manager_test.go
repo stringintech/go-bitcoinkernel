@@ -213,7 +213,10 @@ func (s *ChainstateManagerTestSuite) Setup(t *testing.T) {
 	opts.SetBlockTreeDBInMemory(true)
 	opts.SetChainstateDBInMemory(true)
 	// Wipe both databases to enable proper initialization
-	opts.SetWipeDBs(true, true)
+	err = opts.SetWipeDBs(true, true)
+	if err != nil {
+		t.Fatalf("SetWipeDBs() error = %v", err)
+	}
 
 	// Create chainstate manager
 	manager, err := NewChainstateManager(opts)
