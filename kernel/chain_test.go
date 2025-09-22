@@ -16,36 +16,17 @@ func TestChain(t *testing.T) {
 
 	// Test GetGenesis
 	genesis := chain.GetGenesis()
-
 	height := genesis.Height()
 	if height != 0 {
 		t.Errorf("Expected genesis height 0, got %d", height)
 	}
 
-	genesisHash := genesis.Hash()
-	defer genesisHash.Destroy()
-
-	hashBytes := genesisHash.Bytes()
-	if len(hashBytes) != 32 {
-		t.Errorf("Expected hash length 32, got %d", len(hashBytes))
-	}
-
 	// Test GetTip
 	tip := chain.GetTip()
-
 	tipHeight := tip.Height()
 	if tipHeight <= 0 {
 		t.Errorf("Expected tip height > 0, got %d", tipHeight)
 	}
-
-	tipHash := tip.Hash()
-	defer tipHash.Destroy()
-
-	tipHashBytes := tipHash.Bytes()
-	if len(tipHashBytes) != 32 {
-		t.Errorf("Expected hash length 32, got %d", len(tipHashBytes))
-	}
-
 	if tip.Height() != suite.ImportedBlocksCount {
 		t.Errorf("Expected tip height %d, got %d", suite.ImportedBlocksCount, tip.Height())
 	}

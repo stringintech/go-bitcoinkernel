@@ -69,7 +69,6 @@ func (s *ChainstateManagerTestSuite) TestReadBlock(t *testing.T) {
 
 	// Test reading genesis block
 	genesis := chain.GetGenesis()
-
 	genesisBlock, err := s.Manager.ReadBlock(genesis)
 	if err != nil {
 		t.Fatalf("ChainstateManager.ReadBlock() for genesis error = %v", err)
@@ -79,18 +78,8 @@ func (s *ChainstateManagerTestSuite) TestReadBlock(t *testing.T) {
 	}
 	defer genesisBlock.Destroy()
 
-	// Verify genesis block has expected properties
-	genesisHash := genesisBlock.Hash()
-	defer genesisHash.Destroy()
-
-	hashBytes := genesisHash.Bytes()
-	if len(hashBytes) != 32 {
-		t.Errorf("Expected hash length 32, got %d", len(hashBytes))
-	}
-
 	// Test reading tip block
 	tip := chain.GetTip()
-
 	tipBlock, err := s.Manager.ReadBlock(tip)
 	if err != nil {
 		t.Fatalf("ChainstateManager.ReadBlock() for tip error = %v", err)
@@ -99,15 +88,6 @@ func (s *ChainstateManagerTestSuite) TestReadBlock(t *testing.T) {
 		t.Fatal("Read tip block is nil")
 	}
 	defer tipBlock.Destroy()
-
-	// Verify tip block properties
-	tipHash := tipBlock.Hash()
-	defer tipHash.Destroy()
-
-	tipHashBytes := tipHash.Bytes()
-	if len(tipHashBytes) != 32 {
-		t.Errorf("Expected tip hash length 32, got %d", len(tipHashBytes))
-	}
 }
 
 func (s *ChainstateManagerTestSuite) TestGetBlockTreeEntryByHash(t *testing.T) {

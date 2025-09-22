@@ -37,7 +37,7 @@ func NewBlock(rawBlock []byte) (*Block, error) {
 }
 
 func (b *Block) Hash() *BlockHash {
-	return newBlockHash(C.btck_block_get_hash((*C.btck_Block)(b.ptr)))
+	return newBlockHash(C.btck_block_get_hash((*C.btck_Block)(b.ptr)), true)
 }
 
 // Bytes returns the consensus serialized block

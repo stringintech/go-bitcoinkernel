@@ -32,14 +32,10 @@ func TestBlockFromRaw(t *testing.T) {
 	hash := block.Hash()
 	defer hash.Destroy()
 
-	hashBytes := hash.Bytes()
-	if len(hashBytes) != 32 {
-		t.Errorf("Expected hash length 32, got %d", len(hashBytes))
-	}
-
 	// Expected genesis block hash (reversed byte order for display)
 	expectedHash := "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
-	actualHashHex := hex.EncodeToString(reverseBytes(hashBytes))
+	hashBytes := hash.Bytes()
+	actualHashHex := hex.EncodeToString(reverseBytes(hashBytes[:]))
 	if actualHashHex != expectedHash {
 		t.Logf("Actual hash: %s", actualHashHex)
 		t.Logf("Expected hash: %s", expectedHash)

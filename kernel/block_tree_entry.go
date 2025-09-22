@@ -15,7 +15,7 @@ func (bi *BlockTreeEntry) Height() int32 {
 
 func (bi *BlockTreeEntry) Hash() *BlockHash {
 	ptr := C.btck_block_tree_entry_get_block_hash(bi.ptr)
-	return newBlockHash(check(ptr))
+	return newBlockHash(check(ptr), true)
 }
 
 func (bi *BlockTreeEntry) Previous() *BlockTreeEntry {
