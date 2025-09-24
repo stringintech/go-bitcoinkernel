@@ -29,12 +29,11 @@ func (c *Chain) GetGenesis() *BlockTreeEntry {
 
 // GetByHeight returns the block tree entry for the given height in the chain, or nil if it does not exist
 func (c *Chain) GetByHeight(height int32) *BlockTreeEntry {
-	tip := c.GetTip()
-	if tip == nil || height > tip.Height() {
+	ptr := C.btck_chain_get_by_height(c.ptr, C.int(height))
+	if ptr == nil {
 		return nil
 	}
-	ptr := C.btck_chain_get_by_height(c.ptr, C.int(height))
-	return &BlockTreeEntry{check(ptr)}
+	return &BlockTreeEntry{ptr}
 }
 
 func (c *Chain) Contains(blockTreeEntry *BlockTreeEntry) bool {
