@@ -13,10 +13,7 @@ func TestScriptPubkeyFromRaw(t *testing.T) {
 		t.Fatalf("Failed to decode script hex: %v", err)
 	}
 
-	scriptPubkey, err := NewScriptPubkey(scriptBytes)
-	if err != nil {
-		t.Fatalf("NewScriptPubkeyFromRaw() error = %v", err)
-	}
+	scriptPubkey := NewScriptPubkey(scriptBytes)
 	defer scriptPubkey.Destroy()
 
 	// Test getting the serialized script pubkey
@@ -42,10 +39,7 @@ func TestScriptPubkeyCopy(t *testing.T) {
 		t.Fatalf("Failed to decode script hex: %v", err)
 	}
 
-	scriptPubkey, err := NewScriptPubkey(scriptBytes)
-	if err != nil {
-		t.Fatalf("NewScriptPubkeyFromRaw() error = %v", err)
-	}
+	scriptPubkey := NewScriptPubkey(scriptBytes)
 	defer scriptPubkey.Destroy()
 
 	// Test copying script pubkey
@@ -82,10 +76,7 @@ func TestScriptPubkeyBytes(t *testing.T) {
 		t.Fatalf("Failed to decode script hex: %v", err)
 	}
 
-	scriptPubkey, err := NewScriptPubkey(scriptBytes)
-	if err != nil {
-		t.Fatalf("NewScriptPubkeyFromRaw() error = %v", err)
-	}
+	scriptPubkey := NewScriptPubkey(scriptBytes)
 	defer scriptPubkey.Destroy()
 
 	// Test serializing script to bytes
@@ -202,10 +193,7 @@ func testVerifyScript(t *testing.T, scriptPubkeyHex string, amount int64, txToHe
 		t.Fatalf("Failed to decode script pubkey hex: %v", err)
 	}
 
-	scriptPubkey, err := NewScriptPubkey(scriptPubkeyBytes)
-	if err != nil {
-		t.Fatalf("Failed to create script pubkey: %v", err)
-	}
+	scriptPubkey := NewScriptPubkey(scriptPubkeyBytes)
 	defer scriptPubkey.Destroy()
 
 	txToBytes, err := hex.DecodeString(txToHex)

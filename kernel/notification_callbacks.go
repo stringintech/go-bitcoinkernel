@@ -20,6 +20,23 @@ type NotificationCallbacks struct {
 	OnFatalError   func(message string)
 }
 
+// SynchronizationState represents the current sync state passed to tip changed callbacks.
+type SynchronizationState C.btck_SynchronizationState
+
+const (
+	SyncStateInitReindex  SynchronizationState = C.btck_SynchronizationState_INIT_REINDEX
+	SyncStateInitDownload SynchronizationState = C.btck_SynchronizationState_INIT_DOWNLOAD
+	SyncStatePostInit     SynchronizationState = C.btck_SynchronizationState_POST_INIT
+)
+
+// Warning represents possible warning types issued by validation.
+type Warning C.btck_Warning
+
+const (
+	WarningUnknownNewRulesActivated Warning = C.btck_Warning_UNKNOWN_NEW_RULES_ACTIVATED
+	WarningLargeWorkInvalidChain    Warning = C.btck_Warning_LARGE_WORK_INVALID_CHAIN
+)
+
 //export go_notify_block_tip_bridge
 func go_notify_block_tip_bridge(user_data unsafe.Pointer, state C.btck_SynchronizationState, entry *C.btck_BlockTreeEntry, verification_progress C.double) {
 	handle := cgo.Handle(user_data)
@@ -98,18 +115,3 @@ func go_notify_fatal_error_bridge(user_data unsafe.Pointer, message *C.char, mes
 		callbacks.OnFatalError(goMessage)
 	}
 }
-
-const (
-	SyncStateInitReindex  = C.btck_SynchronizationState_INIT_REINDEX
-	SyncStateInitDownload = C.btck_SynchronizationState_INIT_DOWNLOAD
-	SyncStatePostInit     = C.btck_SynchronizationState_POST_INIT
-)
-
-type SynchronizationState C.btck_SynchronizationState
-
-const (
-	WarningUnknownNewRulesActivated = C.btck_Warning_UNKNOWN_NEW_RULES_ACTIVATED
-	WarningLargeWorkInvalidChain    = C.btck_Warning_LARGE_WORK_INVALID_CHAIN
-)
-
-type Warning C.btck_Warning

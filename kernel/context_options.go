@@ -30,6 +30,12 @@ func (contextOptionsCFuncs) destroy(ptr unsafe.Pointer) {
 	C.btck_context_options_destroy((*C.btck_ContextOptions)(ptr))
 }
 
+// ContextOptions holds options for creating a new kernel context.
+//
+// Once a kernel Context has been created from these options, they may be destroyed.
+// The options hold the notification callbacks as well as the selected chain type
+// until they are passed to the context. If no options are configured, the context
+// will be instantiated with no callbacks and for mainnet.
 type ContextOptions struct {
 	*uniqueHandle
 }
@@ -39,18 +45,27 @@ func newContextOptions(ptr *C.btck_ContextOptions) *ContextOptions {
 	return &ContextOptions{uniqueHandle: h}
 }
 
-func NewContextOptions() (*ContextOptions, error) {
+// NewContextOptions creates an empty context options object.
+func NewContextOptions() *ContextOptions {
 	ptr := C.btck_context_options_create()
-	return newContextOptions(check(ptr)), nil
+	return newContextOptions(check(ptr))
 }
 
-// SetChainParams sets the chain parameters for context options.
-// Caller can safely free the chainParams object after this call returns.
+// SetChainParams sets the chain params for the context options. The context created
+// with the options will be configured for these chain parameters.
+//
+// Parameters:
+//   - chainParams: Is set to the context options.
 func (opts *ContextOptions) SetChainParams(chainParams *ChainParameters) {
 	C.btck_context_options_set_chainparams((*C.btck_ContextOptions)(opts.ptr), (*C.btck_ChainParameters)(chainParams.ptr))
 }
 
-func (opts *ContextOptions) SetNotifications(callbacks *NotificationCallbacks) error {
+// SetNotifications sets the kernel notifications for the context options. The context
+// created with the options will be configured with these notifications.
+//
+// Parameters:
+//   - callbacks: Is set to the context options.
+func (opts *ContextOptions) SetNotifications(callbacks *NotificationCallbacks) {
 	notificationCallbacks := C.btck_NotificationInterfaceCallbacks{
 		user_data:         unsafe.Pointer(cgo.NewHandle(callbacks)),
 		user_data_destroy: C.btck_DestroyCallback(C.go_delete_handle),
@@ -63,15 +78,20 @@ func (opts *ContextOptions) SetNotifications(callbacks *NotificationCallbacks) e
 		fatal_error:       C.btck_NotifyFatalError(C.go_notify_fatal_error_bridge),
 	}
 	C.btck_context_options_set_notifications((*C.btck_ContextOptions)(opts.ptr), notificationCallbacks)
-	return nil
 }
 
-func (opts *ContextOptions) SetValidationInterface(callbacks *ValidationInterfaceCallbacks) error {
+// SetValidationInterface sets the validation interface callbacks for the context options. The
+// context created with the options will be configured for these validation
+// interface callbacks. The callbacks will then be triggered from validation
+// events issued by the chainstate manager created from the same context.
+//
+// Parameters:
+//   - callbacks: The callbacks used for passing validation information to the user.
+func (opts *ContextOptions) SetValidationInterface(callbacks *ValidationInterfaceCallbacks) {
 	validationCallbacks := C.btck_ValidationInterfaceCallbacks{
 		user_data:         unsafe.Pointer(cgo.NewHandle(callbacks)),
 		user_data_destroy: C.btck_DestroyCallback(C.go_delete_handle),
 		block_checked:     C.btck_ValidationInterfaceBlockChecked(C.go_validation_interface_block_checked_bridge),
 	}
 	C.btck_context_options_set_validation_interface((*C.btck_ContextOptions)(opts.ptr), validationCallbacks)
-	return nil
 }

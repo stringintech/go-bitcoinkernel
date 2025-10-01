@@ -26,6 +26,12 @@ func (loggingConnectionCFuncs) destroy(ptr unsafe.Pointer) {
 	C.btck_logging_connection_destroy((*C.btck_LoggingConnection)(ptr))
 }
 
+// LoggingConnection can be used to manually stop logging.
+//
+// Messages that were logged before a connection is created are buffered in a 1MB
+// buffer. Logging can alternatively be permanently disabled by calling DisableLogging.
+// Functions changing the logging settings are global and change the settings for all
+// existing LoggingConnection instances.
 type LoggingConnection struct {
 	*uniqueHandle
 }
@@ -38,6 +44,16 @@ func go_log_callback_bridge(user_data unsafe.Pointer, message *C.char, message_l
 	callback(goMessage)
 }
 
+// NewLoggingConnection creates a logging connection that routes kernel logs to a Go callback.
+//
+// Messages logged before the first connection is created are buffered in a 1MB buffer and
+// delivered immediately when this function is called.
+//
+// Parameters:
+//   - callback: Function that will receive log messages
+//   - options: Formatting options for log messages (timestamps, thread names, etc.)
+//
+// Returns an error if the logging connection cannot be created.
 func NewLoggingConnection(callback LogCallback, options LoggingOptions) (*LoggingConnection, error) {
 	cOptions := C.btck_LoggingOptions{
 		log_timestamps:               boolToInt(options.LogTimestamps),
@@ -59,33 +75,55 @@ func NewLoggingConnection(callback LogCallback, options LoggingOptions) (*Loggin
 }
 
 // DisableLogging permanently disables the global internal logger.
-// This function should only be called once and is not thread-safe
+//
+// No log messages will be buffered internally after this is called, and the buffer
+// is cleared. This function should only be called once and is not thread-safe or
+// re-entry safe.
 func DisableLogging() {
 	C.btck_logging_disable()
 }
 
-// AddLogLevelCategory sets the log level for a specific category or all categories
+// AddLogLevelCategory sets the log level for a specific category.
+//
+// This changes a global setting and affects all existing LoggingConnection instances.
+//
+// Parameters:
+//   - category: Log category to configure (or LogAll for all categories)
+//   - level: Minimum log level (Trace, Debug, or Info)
+//
+// Messages at the specified level and above will be logged for the category.
 func AddLogLevelCategory(category LogCategory, level LogLevel) {
 	C.btck_logging_set_level_category(category.c(), level.c())
 }
 
-// EnableLogCategory enables logging for a specific category or all categories
+// EnableLogCategory enables logging for a specific category.
+//
+// This changes a global setting and affects all existing LoggingConnection instances.
+//
+// Parameters:
+//   - category: Log category to enable (or LogAll to enable all categories)
 func EnableLogCategory(category LogCategory) {
 	C.btck_logging_enable_category(category.c())
 }
 
-// DisableLogCategory disables logging for a specific category or all categories
+// DisableLogCategory disables logging for a specific category.
+//
+// This changes a global setting and affects all existing LoggingConnection instances.
+//
+// Parameters:
+//   - category: Log category to disable (or LogAll to disable all categories)
 func DisableLogCategory(category LogCategory) {
 	C.btck_logging_disable_category(category.c())
 }
 
-const (
-	LogLevelTrace = C.btck_LogLevel_TRACE
-	LogLevelDebug = C.btck_LogLevel_DEBUG
-	LogLevelInfo  = C.btck_LogLevel_INFO
-)
-
+// LogLevel represents the level at which logs should be produced.
 type LogLevel C.btck_LogLevel
+
+const (
+	LogLevelTrace LogLevel = C.btck_LogLevel_TRACE
+	LogLevelDebug LogLevel = C.btck_LogLevel_DEBUG
+	LogLevelInfo  LogLevel = C.btck_LogLevel_INFO
+)
 
 func (l LogLevel) c() C.btck_LogLevel {
 	switch l {
@@ -96,21 +134,22 @@ func (l LogLevel) c() C.btck_LogLevel {
 	}
 }
 
-const (
-	LogAll          = C.btck_LogCategory_ALL
-	LogBench        = C.btck_LogCategory_BENCH
-	LogBlockStorage = C.btck_LogCategory_BLOCKSTORAGE
-	LogCoinDB       = C.btck_LogCategory_COINDB
-	LogLevelDB      = C.btck_LogCategory_LEVELDB
-	LogMempool      = C.btck_LogCategory_MEMPOOL
-	LogPrune        = C.btck_LogCategory_PRUNE
-	LogRand         = C.btck_LogCategory_RAND
-	LogReindex      = C.btck_LogCategory_REINDEX
-	LogValidation   = C.btck_LogCategory_VALIDATION
-	LogKernel       = C.btck_LogCategory_KERNEL
-)
-
+// LogCategory represents a collection of logging categories that may be encountered by kernel code.
 type LogCategory C.btck_LogCategory
+
+const (
+	LogAll          LogCategory = C.btck_LogCategory_ALL
+	LogBench        LogCategory = C.btck_LogCategory_BENCH
+	LogBlockStorage LogCategory = C.btck_LogCategory_BLOCKSTORAGE
+	LogCoinDB       LogCategory = C.btck_LogCategory_COINDB
+	LogLevelDB      LogCategory = C.btck_LogCategory_LEVELDB
+	LogMempool      LogCategory = C.btck_LogCategory_MEMPOOL
+	LogPrune        LogCategory = C.btck_LogCategory_PRUNE
+	LogRand         LogCategory = C.btck_LogCategory_RAND
+	LogReindex      LogCategory = C.btck_LogCategory_REINDEX
+	LogValidation   LogCategory = C.btck_LogCategory_VALIDATION
+	LogKernel       LogCategory = C.btck_LogCategory_KERNEL
+)
 
 func (c LogCategory) c() C.btck_LogCategory {
 	switch c {

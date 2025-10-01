@@ -15,6 +15,8 @@ func (chainstateManagerCFuncs) destroy(ptr unsafe.Pointer) {
 	C.btck_chainstate_manager_destroy((*C.btck_ChainstateManager)(ptr))
 }
 
+// ChainstateManager is the central object for doing validation tasks as well as
+// retrieving data from the chain.
 type ChainstateManager struct {
 	*uniqueHandle
 }
@@ -24,9 +26,15 @@ func newChainstateManager(ptr *C.btck_ChainstateManager) *ChainstateManager {
 	return &ChainstateManager{uniqueHandle: h}
 }
 
-// NewChainstateManager creates a new chainstate manager.
-// Kernel copies all necessary data from the options during construction,
-// so the caller can safely free the options object after this call returns successfully.
+// NewChainstateManager creates a new chainstate manager for validation and chain queries.
+//
+// This is the main object for validation tasks, retrieving data from the chain, and
+// interacting with chainstate and indexes.
+//
+// Parameters:
+//   - options: Configuration options created by NewChainstateManagerOptions
+//
+// Returns an error if the chainstate manager cannot be created.
 func NewChainstateManager(options *ChainstateManagerOptions) (*ChainstateManager, error) {
 	ptr := C.btck_chainstate_manager_create((*C.btck_ChainstateManagerOptions)(options.ptr))
 	if ptr == nil {
@@ -35,6 +43,12 @@ func NewChainstateManager(options *ChainstateManagerOptions) (*ChainstateManager
 	return newChainstateManager(ptr), nil
 }
 
+// ReadBlock reads the block from disk that the block tree entry points to.
+//
+// Parameters:
+//   - blockTreeEntry: Block index entry obtained from GetBlockTreeEntryByHash or chain queries
+//
+// Returns an error if the block cannot be read from disk.
 func (cm *ChainstateManager) ReadBlock(blockTreeEntry *BlockTreeEntry) (*Block, error) {
 	ptr := C.btck_block_read((*C.btck_ChainstateManager)(cm.ptr), blockTreeEntry.ptr)
 	if ptr == nil {
@@ -43,6 +57,12 @@ func (cm *ChainstateManager) ReadBlock(blockTreeEntry *BlockTreeEntry) (*Block, 
 	return newBlock(ptr, true), nil
 }
 
+// ReadBlockSpentOutputs reads the spent outputs for the block that the block tree entry points to from disk.
+//
+// Parameters:
+//   - blockTreeEntry: Block index entry for the block whose spent outputs to read
+//
+// Returns an error if the undo data cannot be read from disk.
 func (cm *ChainstateManager) ReadBlockSpentOutputs(blockTreeEntry *BlockTreeEntry) (*BlockSpentOutputs, error) {
 	ptr := C.btck_block_spent_outputs_read((*C.btck_ChainstateManager)(cm.ptr), blockTreeEntry.ptr)
 	if ptr == nil {
@@ -51,9 +71,17 @@ func (cm *ChainstateManager) ReadBlockSpentOutputs(blockTreeEntry *BlockTreeEntr
 	return newBlockSpentOutputs(ptr, true), nil
 }
 
-// ProcessBlock processes and validates the given block with the chainstate manager.
-// It returns ok=true if processing was successful (including for duplicate blocks)
-// and duplicate=true if this block was processed before.
+// ProcessBlock processes and validates the passed in block with the chainstate
+// manager. More detailed validation information in case of a failure can also
+// be retrieved through a registered validation interface. If the block fails
+// to validate the validation interface's BlockChecked callback's BlockValidationState
+// will contain details.
+//
+// Parameters:
+//   - block: Block to validate and potentially add to the chain
+//
+// Returns ok=true if processing the block was successful (will also return true for valid,
+// but duplicate blocks) and duplicate=false if this block was not processed before.
 func (cm *ChainstateManager) ProcessBlock(block *Block) (ok bool, duplicate bool) {
 	var newBlock C.int
 	result := C.btck_chainstate_manager_process_block((*C.btck_ChainstateManager)(cm.ptr), (*C.btck_Block)(block.ptr), &newBlock)
@@ -62,11 +90,26 @@ func (cm *ChainstateManager) ProcessBlock(block *Block) (ok bool, duplicate bool
 	return
 }
 
+// GetActiveChain returns the currently active best-known chain.
+//
+// The chain's lifetime depends on this chainstate manager. State transitions (e.g.,
+// processing blocks) will change the chain, so data retrieved from it is only consistent
+// until new data is processed.
+//
+// The returned Chain is a non-owned pointer valid for the lifetime of this
+// chainstate manager.
 func (cm *ChainstateManager) GetActiveChain() *Chain {
 	return &Chain{C.btck_chainstate_manager_get_active_chain((*C.btck_ChainstateManager)(cm.ptr))}
 }
 
-// GetBlockTreeEntryByHash returns the block tree entry for a given block hash, or null if the hash is not found
+// GetBlockTreeEntryByHash retrieves a block tree entry by its block hash.
+//
+// Parameters:
+//   - blockHash: Hash of the block to look up
+//
+// Returns nil if no block with this hash is found in the block index. The returned
+// BlockTreeEntry is a non-owned pointer valid for the lifetime of this chainstate
+// manager.
 func (cm *ChainstateManager) GetBlockTreeEntryByHash(blockHash *BlockHash) *BlockTreeEntry {
 	ptr := C.btck_chainstate_manager_get_block_tree_entry_by_hash((*C.btck_ChainstateManager)(cm.ptr), (*C.btck_BlockHash)(blockHash.ptr))
 	if ptr == nil {
@@ -75,8 +118,16 @@ func (cm *ChainstateManager) GetBlockTreeEntryByHash(blockHash *BlockHash) *Bloc
 	return &BlockTreeEntry{ptr: ptr}
 }
 
-// ImportBlocks triggers a reindex if the option was previously set and can also import
-// existing block files from the specified filesystem paths.
+// ImportBlocks triggers a reindex and/or imports block files from the filesystem.
+//
+// This starts a reindex if the wipe_dbs option was previously set via ChainstateManagerOptions.
+// It can also import existing block files from the specified filesystem paths.
+//
+// Parameters:
+//   - blockFilePaths: Array of full filesystem paths to block files to import (can be empty)
+//
+// Returns an error if the import fails. This is a long-running operation that can
+// be interrupted via Context.Interrupt().
 func (cm *ChainstateManager) ImportBlocks(blockFilePaths []string) error {
 	// Convert Go strings to C strings
 	cPaths := make([]*C.char, len(blockFilePaths))

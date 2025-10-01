@@ -28,7 +28,12 @@ func newTransaction(ptr *C.btck_Transaction, fromOwned bool) *Transaction {
 	return &Transaction{handle: h, transactionApi: transactionApi{(*C.btck_Transaction)(h.ptr)}}
 }
 
-// NewTransaction creates a new transaction from raw serialized data
+// NewTransaction creates a new transaction from raw serialized transaction data.
+//
+// Parameters:
+//   - rawTransaction: Serialized transaction data in Bitcoin's consensus format
+//
+// Returns an error if the transaction data is malformed or cannot be parsed.
 func NewTransaction(rawTransaction []byte) (*Transaction, error) {
 	ptr := C.btck_transaction_create(unsafe.Pointer(&rawTransaction[0]), C.size_t(len(rawTransaction)))
 	if ptr == nil {
@@ -53,18 +58,32 @@ type transactionApi struct {
 	ptr *C.btck_Transaction
 }
 
+// Copy creates a shallow copy of the transaction by incrementing its reference count.
+//
+// Transactions are reference-counted internally, so this operation is efficient and does
+// not duplicate the underlying data.
 func (t *transactionApi) Copy() *Transaction {
 	return newTransaction(t.ptr, false)
 }
 
+// CountInputs returns the number of inputs in the transaction.
 func (t *transactionApi) CountInputs() uint64 {
 	return uint64(C.btck_transaction_count_inputs(t.ptr))
 }
 
+// CountOutputs returns the number of outputs in the transaction.
 func (t *transactionApi) CountOutputs() uint64 {
 	return uint64(C.btck_transaction_count_outputs(t.ptr))
 }
 
+// GetOutput retrieves the output at the specified index.
+//
+// The returned output is a non-owned view that depends on the lifetime of this transaction.
+//
+// Parameters:
+//   - index: Index of the output to retrieve
+//
+// Returns an error if the index is out of bounds.
 func (t *transactionApi) GetOutput(index uint64) (*TransactionOutputView, error) {
 	if index >= t.CountOutputs() {
 		return nil, ErrKernelIndexOutOfBounds
@@ -73,7 +92,9 @@ func (t *transactionApi) GetOutput(index uint64) (*TransactionOutputView, error)
 	return newTransactionOutputView(check(ptr)), nil
 }
 
-// Bytes returns the consensus serialized transaction
+// Bytes returns the consensus serialized representation of the transaction.
+//
+// Returns an error if the serialization fails.
 func (t *transactionApi) Bytes() ([]byte, error) {
 	bytes, ok := writeToBytes(func(writer C.btck_WriteBytes, userData unsafe.Pointer) C.int {
 		return C.btck_transaction_to_bytes(t.ptr, writer, userData)

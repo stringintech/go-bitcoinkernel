@@ -14,10 +14,7 @@ func TestNewContext(t *testing.T) {
 		{
 			name: "Valid context options",
 			setupOption: func() *ContextOptions {
-				opts, err := NewContextOptions()
-				if err != nil {
-					t.Fatalf("Failed to create context options: %v", err)
-				}
+				opts := NewContextOptions()
 				params, err := NewChainParameters(ChainTypeMainnet)
 				if err != nil {
 					t.Fatalf("Failed to create chain parameters: %v", err)

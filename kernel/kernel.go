@@ -1,9 +1,20 @@
 // Package kernel provides Go bindings for the Bitcoin Core kernel library.
 //
-// Resource Management:
-// All types that implement the cManagedResource interface follow a dual cleanup pattern:
-//  1. Explicit cleanup via Destroy() methods (preferred)
-//  2. Finalizers as safety net for forgotten cleanup
+// # Memory Management
+//
+// Objects that provide a Destroy() method hold owned references to underlying C resources.
+// These resources should be freed immediately by calling Destroy() when no longer needed:
+//
+//	block, err := NewBlock(rawBlockBytes)
+//	if err != nil {
+//	    return err
+//	}
+//	defer block.Destroy()
+//
+// If Destroy() is not called explicitly, the garbage collector will eventually free
+// the resources automatically via finalizers. However, relying on finalizers may delay
+// resource cleanup and is not recommended for long-running programs or when working
+// with many objects.
 package kernel
 
 /*

@@ -12,10 +12,7 @@ func TestTransactionOutputCreation(t *testing.T) {
 		t.Fatalf("Failed to decode script hex: %v", err)
 	}
 
-	scriptPubkey, err := NewScriptPubkey(scriptBytes)
-	if err != nil {
-		t.Fatalf("Failed to create script pubkey: %v", err)
-	}
+	scriptPubkey := NewScriptPubkey(scriptBytes)
 	defer scriptPubkey.Destroy()
 
 	amount := int64(5000000000)
@@ -52,10 +49,7 @@ func TestTransactionOutputCopy(t *testing.T) {
 		t.Fatalf("Failed to decode script hex: %v", err)
 	}
 
-	scriptPubkey, err := NewScriptPubkey(scriptBytes)
-	if err != nil {
-		t.Fatalf("Failed to create script pubkey: %v", err)
-	}
+	scriptPubkey := NewScriptPubkey(scriptBytes)
 	defer scriptPubkey.Destroy()
 
 	amount := int64(5000000000)

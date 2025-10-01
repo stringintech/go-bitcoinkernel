@@ -15,6 +15,10 @@ func (chainstateManagerOptionsCFuncs) destroy(ptr unsafe.Pointer) {
 	C.btck_chainstate_manager_options_destroy((*C.btck_ChainstateManagerOptions)(ptr))
 }
 
+// ChainstateManagerOptions holds configuration options for creating a new chainstate manager.
+//
+// Options are initialized with sensible defaults and can be customized using the
+// setter methods before creating the chainstate manager.
 type ChainstateManagerOptions struct {
 	*uniqueHandle
 }
@@ -24,6 +28,17 @@ func newChainstateManagerOptions(ptr *C.btck_ChainstateManagerOptions) *Chainsta
 	return &ChainstateManagerOptions{uniqueHandle: h}
 }
 
+// NewChainstateManagerOptions creates options for configuring a chainstate manager.
+//
+// The options associate with the provided kernel context and specify the data and block
+// directories. If the directories do not exist, they will be created.
+//
+// Parameters:
+//   - context: Kernel context that the chainstate manager will associate with
+//   - dataDir: Path to the directory containing chainstate data
+//   - blocksDir: Path to the directory containing block data
+//
+// Returns an error if the options cannot be created.
 func NewChainstateManagerOptions(context *Context, dataDir, blocksDir string) (*ChainstateManagerOptions, error) {
 	cDataDir := C.CString(dataDir)
 	defer C.free(unsafe.Pointer(cDataDir))
@@ -39,11 +54,24 @@ func NewChainstateManagerOptions(context *Context, dataDir, blocksDir string) (*
 	return newChainstateManagerOptions(ptr), nil
 }
 
-// SetWorkerThreads sets the number of worker threads for validation
+// SetWorkerThreads configures the number of worker threads for parallel validation.
+//
+// Parameters:
+//   - threads: Number of worker threads (0 disables parallel verification, max is clamped to 15)
 func (opts *ChainstateManagerOptions) SetWorkerThreads(threads int) {
 	C.btck_chainstate_manager_options_set_worker_threads_num((*C.btck_ChainstateManagerOptions)(opts.ptr), C.int(threads))
 }
 
+// SetWipeDBs configures which databases to wipe on startup.
+//
+// When combined with ImportBlocks, this triggers a full reindex (if wipeBlockTree is true)
+// or chainstate-only reindex (if only wipeChainstate is true).
+//
+// Parameters:
+//   - wipeBlockTree: Whether to wipe the block tree database (requires wipeChainstate to also be true)
+//   - wipeChainstate: Whether to wipe the chainstate database
+//
+// Returns an error if wipeBlockTree is true but wipeChainstate is false.
 func (opts *ChainstateManagerOptions) SetWipeDBs(wipeBlockTree, wipeChainstate bool) error {
 	wipeBlockTreeInt := 0
 	if wipeBlockTree {
@@ -60,6 +88,10 @@ func (opts *ChainstateManagerOptions) SetWipeDBs(wipeBlockTree, wipeChainstate b
 	return nil
 }
 
+// SetBlockTreeDBInMemory configures whether the block tree database is stored in memory.
+//
+// Parameters:
+//   - inMemory: If true, the block tree database will be kept entirely in memory
 func (opts *ChainstateManagerOptions) SetBlockTreeDBInMemory(inMemory bool) {
 	inMemoryInt := 0
 	if inMemory {
@@ -68,6 +100,10 @@ func (opts *ChainstateManagerOptions) SetBlockTreeDBInMemory(inMemory bool) {
 	C.btck_chainstate_manager_options_set_block_tree_db_in_memory((*C.btck_ChainstateManagerOptions)(opts.ptr), C.int(inMemoryInt))
 }
 
+// SetChainstateDBInMemory configures whether the chainstate database is stored in memory.
+//
+// Parameters:
+//   - inMemory: If true, the chainstate database will be kept entirely in memory
 func (opts *ChainstateManagerOptions) SetChainstateDBInMemory(inMemory bool) {
 	inMemoryInt := 0
 	if inMemory {

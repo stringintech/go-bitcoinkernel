@@ -18,6 +18,7 @@ func (blockHashCFuncs) copy(ptr unsafe.Pointer) unsafe.Pointer {
 	return unsafe.Pointer(C.btck_block_hash_copy((*C.btck_BlockHash)(ptr)))
 }
 
+// BlockHash is a type-safe identifier for a block.
 type BlockHash struct {
 	*handle
 }
@@ -27,19 +28,23 @@ func newBlockHash(ptr *C.btck_BlockHash, fromOwned bool) *BlockHash {
 	return &BlockHash{handle: h}
 }
 
-// NewBlockHash creates a new BlockHash from raw 32-byte hash data
+// NewBlockHash creates a new BlockHash from a 32-byte hash value.
+//
+// Parameters:
+//   - hashBytes: 32-byte array containing the block hash
 func NewBlockHash(hashBytes [32]byte) *BlockHash {
 	ptr := C.btck_block_hash_create((*C.uchar)(unsafe.Pointer(&hashBytes[0])))
 	return newBlockHash(ptr, true)
 }
 
-// Bytes returns the raw hash bytes
+// Bytes returns the 32-byte representation of the block hash.
 func (bh *BlockHash) Bytes() [32]byte {
 	var output [32]C.uchar
 	C.btck_block_hash_to_bytes((*C.btck_BlockHash)(bh.ptr), &output[0])
 	return *(*[32]byte)(unsafe.Pointer(&output[0]))
 }
 
+// Copy creates a copy of the block hash.
 func (bh *BlockHash) Copy() *BlockHash {
 	return newBlockHash((*C.btck_BlockHash)(bh.ptr), false)
 }
