@@ -182,6 +182,7 @@ public:
     Iterator(const Collection* ptr) : m_collection{ptr}, m_idx{0} {}
     Iterator(const Collection* ptr, size_t idx) : m_collection{ptr}, m_idx{idx} {}
 
+    // This is just a view, so return a copy.
     auto operator*() const { return (*m_collection)[m_idx]; }
     auto operator->() const { return (*m_collection)[m_idx]; }
 
@@ -312,7 +313,7 @@ public:
     // Copy constructors
     Handle(const Handle& other)
         : m_ptr{check(CopyFunc(other.m_ptr))} {}
-    Handle operator=(const Handle& other)
+    Handle& operator=(const Handle& other)
     {
         if (this != &other) {
             Handle temp(other);
@@ -323,7 +324,7 @@ public:
 
     // Move constructors
     Handle(Handle&& other) noexcept : m_ptr(other.m_ptr) { other.m_ptr = nullptr; }
-    Handle operator=(Handle&& other) noexcept
+    Handle& operator=(Handle&& other) noexcept
     {
         DestroyFunc(m_ptr);
         m_ptr = std::exchange(other.m_ptr, nullptr);
@@ -448,6 +449,119 @@ public:
 };
 
 template <typename Derived>
+class TxidApi
+{
+private:
+    auto impl() const
+    {
+        return static_cast<const Derived*>(this)->get();
+    }
+
+    friend Derived;
+    TxidApi() = default;
+
+public:
+    bool operator==(const TxidApi& other) const
+    {
+        return btck_txid_equals(impl(), other.impl()) != 0;
+    }
+
+    bool operator!=(const TxidApi& other) const
+    {
+        return btck_txid_equals(impl(), other.impl()) == 0;
+    }
+
+    std::array<std::byte, 32> ToBytes() const
+    {
+        std::array<std::byte, 32> hash;
+        btck_txid_to_bytes(impl(), reinterpret_cast<unsigned char*>(hash.data()));
+        return hash;
+    }
+};
+
+class TxidView : public View<btck_Txid>, public TxidApi<TxidView>
+{
+public:
+    explicit TxidView(const btck_Txid* ptr) : View{ptr} {}
+};
+
+class Txid : public Handle<btck_Txid, btck_txid_copy, btck_txid_destroy>, public TxidApi<Txid>
+{
+public:
+    Txid(const TxidView& view)
+        : Handle(view) {}
+};
+
+template <typename Derived>
+class OutPointApi
+{
+private:
+    auto impl() const
+    {
+        return static_cast<const Derived*>(this)->get();
+    }
+
+    friend Derived;
+    OutPointApi() = default;
+
+public:
+    uint32_t index() const
+    {
+        return btck_transaction_out_point_get_index(impl());
+    }
+
+    TxidView Txid() const
+    {
+        return TxidView{btck_transaction_out_point_get_txid(impl())};
+    }
+};
+
+class OutPointView : public View<btck_TransactionOutPoint>, public OutPointApi<OutPointView>
+{
+public:
+    explicit OutPointView(const btck_TransactionOutPoint* ptr) : View{ptr} {}
+};
+
+class OutPoint : public Handle<btck_TransactionOutPoint, btck_transaction_out_point_copy, btck_transaction_out_point_destroy>, public OutPointApi<OutPoint>
+{
+public:
+    OutPoint(const OutPointView& view)
+        : Handle(view) {}
+};
+
+template <typename Derived>
+class TransactionInputApi
+{
+private:
+    auto impl() const
+    {
+        return static_cast<const Derived*>(this)->get();
+    }
+
+    friend Derived;
+    TransactionInputApi() = default;
+
+public:
+    OutPointView OutPoint() const
+    {
+        return OutPointView{btck_transaction_input_get_out_point(impl())};
+    }
+};
+
+class TransactionInputView : public View<btck_TransactionInput>, public TransactionInputApi<TransactionInputView>
+{
+public:
+    explicit TransactionInputView(const btck_TransactionInput* ptr) : View{ptr} {}
+};
+
+class TransactionInput : public Handle<btck_TransactionInput, btck_transaction_input_copy, btck_transaction_input_destroy>, public TransactionInputApi<TransactionInput>
+{
+public:
+    TransactionInput(const TransactionInputView& view)
+        : Handle(view) {}
+};
+
+template <typename Derived>
 class TransactionApi
 {
 private:
@@ -472,9 +586,24 @@ public:
         return TransactionOutputView{btck_transaction_get_output_at(impl(), index)};
     }
 
+    TransactionInputView GetInput(size_t index) const
+    {
+        return TransactionInputView{btck_transaction_get_input_at(impl(), index)};
+    }
+
+    TxidView Txid() const
+    {
+        return TxidView{btck_transaction_get_txid(impl())};
+    }
+
     auto Outputs() const
     {
         return Range<Derived, &TransactionApi<Derived>::CountOutputs, &TransactionApi<Derived>::GetOutput>{*static_cast<const Derived*>(this)};
+    }
+
+    auto Inputs() const
+    {
+        return Range<Derived, &TransactionApi<Derived>::CountInputs, &TransactionApi<Derived>::GetInput>{*static_cast<const Derived*>(this)};
     }
 
     std::vector<std::byte> ToBytes() const
@@ -537,7 +666,17 @@ public:
     explicit BlockHash(btck_BlockHash* hash)
         : Handle{hash} {}
 
-    std::array<std::byte, 32> Bytes() const
+    bool operator==(const BlockHash& other) const
+    {
+        return btck_block_hash_equals(get(), other.get()) != 0;
+    }
+
+    bool operator!=(const BlockHash& other) const
+    {
+        return btck_block_hash_equals(get(), other.get()) == 0;
+    }
+
+    std::array<std::byte, 32> ToBytes() const
     {
         std::array<std::byte, 32> hash;
         btck_block_hash_to_bytes(get(), reinterpret_cast<unsigned char*>(hash.data()));
@@ -549,11 +688,11 @@ class Block : public Handle<btck_Block, btck_block_copy, btck_block_destroy>
 {
 public:
     Block(const std::span<const std::byte> raw_block)
-        : Handle{check(btck_block_create(raw_block.data(), raw_block.size()))}
+        : Handle{btck_block_create(raw_block.data(), raw_block.size())}
     {
     }
 
-    Block(btck_Block* block) : Handle{check(block)} {}
+    Block(btck_Block* block) : Handle{block} {}
 
     size_t CountTransactions() const
     {
@@ -583,22 +722,22 @@ public:
     friend class ChainMan;
 };
 
-void logging_disable()
+inline void logging_disable()
 {
     btck_logging_disable();
 }
 
-void logging_set_level_category(LogCategory category, LogLevel level)
+inline void logging_set_level_category(LogCategory category, LogLevel level)
 {
     btck_logging_set_level_category(static_cast<btck_LogCategory>(category), static_cast<btck_LogLevel>(level));
 }
 
-void logging_enable_category(LogCategory category)
+inline void logging_enable_category(LogCategory category)
 {
     btck_logging_enable_category(static_cast<btck_LogCategory>(category));
 }
 
-void logging_disable_category(LogCategory category)
+inline void logging_disable_category(LogCategory category)
 {
     btck_logging_disable_category(static_cast<btck_LogCategory>(category));
 }
@@ -626,7 +765,7 @@ class BlockTreeEntry : public View<btck_BlockTreeEntry>
 {
 public:
     BlockTreeEntry(const btck_BlockTreeEntry* entry)
-        : View{check(entry)}
+        : View{entry}
     {
     }
 
@@ -703,9 +842,15 @@ public:
     virtual ~ValidationInterface() = default;
 
     virtual void BlockChecked(Block block, const BlockValidationState state) {}
+
+    virtual void PowValidBlock(BlockTreeEntry entry, Block block) {}
+
+    virtual void BlockConnected(Block block, BlockTreeEntry entry) {}
+
+    virtual void BlockDisconnected(Block block, BlockTreeEntry entry) {}
 };
 
-class ChainParams : Handle<btck_ChainParameters, btck_chain_parameters_copy, btck_chain_parameters_destroy>
+class ChainParams : public Handle<btck_ChainParameters, btck_chain_parameters_copy, btck_chain_parameters_destroy>
 {
 public:
     ChainParams(ChainType chain_type)
@@ -717,7 +862,7 @@ public:
 class ContextOptions : UniqueHandle<btck_ContextOptions, btck_context_options_destroy>
 {
 public:
-    ContextOptions() : UniqueHandle{check(btck_context_options_create())} {}
+    ContextOptions() : UniqueHandle{btck_context_options_create()} {}
 
     void SetChainParams(ChainParams& chain_params)
     {
@@ -757,6 +902,9 @@ public:
                 .user_data = heap_vi.release(),
                 .user_data_destroy = +[](void* user_data) { delete static_cast<user_type>(user_data); },
                 .block_checked = +[](void* user_data, btck_Block* block, const btck_BlockValidationState* state) { (*static_cast<user_type>(user_data))->BlockChecked(Block{block}, BlockValidationState{state}); },
+                .pow_valid_block = +[](void* user_data, const btck_BlockTreeEntry* entry, btck_Block* block) { (*static_cast<user_type>(user_data))->PowValidBlock(BlockTreeEntry{entry}, Block{block}); },
+                .block_connected = +[](void* user_data, btck_Block* block, const btck_BlockTreeEntry* entry) { (*static_cast<user_type>(user_data))->BlockConnected(Block{block}, BlockTreeEntry{entry}); },
+                .block_disconnected = +[](void* user_data, btck_Block* block, const btck_BlockTreeEntry* entry) { (*static_cast<user_type>(user_data))->BlockDisconnected(Block{block}, BlockTreeEntry{entry}); },
             });
     }
 
@@ -770,9 +918,10 @@ public:
         : Handle{btck_context_create(opts.get())} {}
 
     Context()
-        : Handle{check(btck_context_create(ContextOptions{}.get()))} {}
+        : Handle{btck_context_create(ContextOptions{}.get())} {}
 
-    bool interrupt() {
+    bool interrupt()
+    {
         return btck_context_interrupt(get()) == 0;
     }
 
@@ -783,7 +932,7 @@ class ChainstateManagerOptions : UniqueHandle<btck_ChainstateManagerOptions, btc
 {
 public:
     ChainstateManagerOptions(const Context& context, const std::string& data_dir, const std::string& blocks_dir)
-        : UniqueHandle{check(btck_chainstate_manager_options_create(context.get(), data_dir.c_str(), data_dir.length(), blocks_dir.c_str(), blocks_dir.length()))}
+        : UniqueHandle{btck_chainstate_manager_options_create(context.get(), data_dir.c_str(), data_dir.length(), blocks_dir.c_str(), blocks_dir.length())}
     {
     }
 
@@ -797,14 +946,14 @@ public:
         return btck_chainstate_manager_options_set_wipe_dbs(get(), wipe_block_tree, wipe_chainstate) == 0;
     }
 
-    void SetBlockTreeDbInMemory(bool block_tree_db_in_memory)
+    void UpdateBlockTreeDbInMemory(bool block_tree_db_in_memory)
     {
-        btck_chainstate_manager_options_set_block_tree_db_in_memory(get(), block_tree_db_in_memory);
+        btck_chainstate_manager_options_update_block_tree_db_in_memory(get(), block_tree_db_in_memory);
     }
 
-    void SetChainstateDbInMemory(bool chainstate_db_in_memory)
+    void UpdateChainstateDbInMemory(bool chainstate_db_in_memory)
     {
-        btck_chainstate_manager_options_set_chainstate_db_in_memory(get(), chainstate_db_in_memory);
+        btck_chainstate_manager_options_update_chainstate_db_in_memory(get(), chainstate_db_in_memory);
     }
 
     friend class ChainMan;
@@ -877,10 +1026,10 @@ public:
     explicit CoinView(const btck_Coin* ptr) : View{ptr} {}
 };
 
-class Coin : Handle<btck_Coin, btck_coin_copy, btck_coin_destroy>, public CoinApi<Coin>
+class Coin : public Handle<btck_Coin, btck_coin_copy, btck_coin_destroy>, public CoinApi<Coin>
 {
 public:
-    Coin(btck_Coin* coin) : Handle{check(coin)} {}
+    Coin(btck_Coin* coin) : Handle{coin} {}
 
     Coin(const CoinView& view) : Handle{view} {}
 };
@@ -920,20 +1069,20 @@ public:
     explicit TransactionSpentOutputsView(const btck_TransactionSpentOutputs* ptr) : View{ptr} {}
 };
 
-class TransactionSpentOutputs : Handle<btck_TransactionSpentOutputs, btck_transaction_spent_outputs_copy, btck_transaction_spent_outputs_destroy>,
+class TransactionSpentOutputs : public Handle<btck_TransactionSpentOutputs, btck_transaction_spent_outputs_copy, btck_transaction_spent_outputs_destroy>,
                                 public TransactionSpentOutputsApi<TransactionSpentOutputs>
 {
 public:
-    TransactionSpentOutputs(btck_TransactionSpentOutputs* transaction_spent_outputs) : Handle{check(transaction_spent_outputs)} {}
+    TransactionSpentOutputs(btck_TransactionSpentOutputs* transaction_spent_outputs) : Handle{transaction_spent_outputs} {}
 
     TransactionSpentOutputs(const TransactionSpentOutputsView& view) : Handle{view} {}
 };
 
-class BlockSpentOutputs : Handle<btck_BlockSpentOutputs, btck_block_spent_outputs_copy, btck_block_spent_outputs_destroy>
+class BlockSpentOutputs : public Handle<btck_BlockSpentOutputs, btck_block_spent_outputs_copy, btck_block_spent_outputs_destroy>
 {
 public:
     BlockSpentOutputs(btck_BlockSpentOutputs* block_spent_outputs)
-        : Handle{check(block_spent_outputs)}
+        : Handle{block_spent_outputs}
     {
     }
 
@@ -957,7 +1106,7 @@ class ChainMan : UniqueHandle<btck_ChainstateManager, btck_chainstate_manager_de
 {
 public:
     ChainMan(const Context& context, const ChainstateManagerOptions& chainman_opts)
-        : UniqueHandle{check(btck_chainstate_manager_create(chainman_opts.get()))}
+        : UniqueHandle{btck_chainstate_manager_create(chainman_opts.get())}
     {
     }
 
@@ -988,9 +1137,9 @@ public:
         return ChainView{btck_chainstate_manager_get_active_chain(get())};
     }
 
-    BlockTreeEntry GetBlockTreeEntry(const btck_BlockHash* block_hash) const
+    BlockTreeEntry GetBlockTreeEntry(const BlockHash& block_hash) const
     {
-        return btck_chainstate_manager_get_block_tree_entry_by_hash(get(), block_hash);
+        return btck_chainstate_manager_get_block_tree_entry_by_hash(get(), block_hash.get());
     }
 
     std::optional<Block> ReadBlock(const BlockTreeEntry& entry) const
