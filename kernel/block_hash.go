@@ -48,3 +48,13 @@ func (bh *BlockHash) Bytes() [32]byte {
 func (bh *BlockHash) Copy() *BlockHash {
 	return newBlockHash((*C.btck_BlockHash)(bh.ptr), false)
 }
+
+// Equals checks if two block hashes are equal.
+//
+// Parameters:
+//   - other: Block hash to compare against
+//
+// Returns true if the block hashes are equal.
+func (bh *BlockHash) Equals(other *BlockHash) bool {
+	return C.btck_block_hash_equals((*C.btck_BlockHash)(bh.ptr), (*C.btck_BlockHash)(other.ptr)) != 0
+}
