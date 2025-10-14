@@ -15,7 +15,7 @@ func TestInvalidTransactionData(t *testing.T) {
 	}
 }
 
-func TestTransactionFromRaw(t *testing.T) {
+func TestTransaction(t *testing.T) {
 	txHex := "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08044c86041b020602ffffffff0100f2052a010000004341041b0e8c2567c12536aa13357b79a073dc4444acb83c4ec7a0e2f99dd7457516c5817242da796924ca4e99947d087fedf9ce467cb9f7c6287078f801df276fdf84ac00000000"
 	txBytes, err := hex.DecodeString(txHex)
 	if err != nil {
@@ -24,7 +24,7 @@ func TestTransactionFromRaw(t *testing.T) {
 
 	tx, err := NewTransaction(txBytes)
 	if err != nil {
-		t.Fatalf("NewTransactionFromRaw() error = %v", err)
+		t.Fatalf("NewTransaction() error = %v", err)
 	}
 	if tx == nil {
 		t.Fatal("Transaction is nil")
@@ -34,22 +34,8 @@ func TestTransactionFromRaw(t *testing.T) {
 	if tx.handle.ptr == nil {
 		t.Error("Transaction pointer is nil")
 	}
-}
 
-func TestTransactionCopy(t *testing.T) {
-	txHex := "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08044c86041b020602ffffffff0100f2052a010000004341041b0e8c2567c12536aa13357b79a073dc4444acb83c4ec7a0e2f99dd7457516c5817242da796924ca4e99947d087fedf9ce467cb9f7c6287078f801df276fdf84ac00000000"
-	txBytes, err := hex.DecodeString(txHex)
-	if err != nil {
-		t.Fatalf("Failed to decode transaction hex: %v", err)
-	}
-
-	tx, err := NewTransaction(txBytes)
-	if err != nil {
-		t.Fatalf("NewTransactionFromRaw() error = %v", err)
-	}
-	defer tx.Destroy()
-
-	// Test copying transaction
+	// Test Copy()
 	txCopy := tx.Copy()
 	if txCopy == nil {
 		t.Fatal("Copied transaction is nil")
@@ -59,51 +45,23 @@ func TestTransactionCopy(t *testing.T) {
 	if txCopy.handle.ptr == nil {
 		t.Error("Copied transaction pointer is nil")
 	}
-}
 
-func TestTransactionCountInputsOutputs(t *testing.T) {
-	txHex := "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08044c86041b020602ffffffff0100f2052a010000004341041b0e8c2567c12536aa13357b79a073dc4444acb83c4ec7a0e2f99dd7457516c5817242da796924ca4e99947d087fedf9ce467cb9f7c6287078f801df276fdf84ac00000000"
-	txBytes, err := hex.DecodeString(txHex)
-	if err != nil {
-		t.Fatalf("Failed to decode transaction hex: %v", err)
-	}
-
-	tx, err := NewTransaction(txBytes)
-	if err != nil {
-		t.Fatalf("NewTransactionFromRaw() error = %v", err)
-	}
-	defer tx.Destroy()
-
-	// Test counting inputs (this is a coinbase transaction with 1 input)
+	// Test CountInputs() (this is a coinbase transaction with 1 input)
 	inputCount := tx.CountInputs()
 	if inputCount != 1 {
 		t.Errorf("Expected 1 input, got %d", inputCount)
 	}
 
-	// Test counting outputs (this transaction has 1 output)
+	// Test CountOutputs() (this transaction has 1 output)
 	outputCount := tx.CountOutputs()
 	if outputCount != 1 {
 		t.Errorf("Expected 1 output, got %d", outputCount)
 	}
-}
 
-func TestTransactionGetOutputAt(t *testing.T) {
-	txHex := "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08044c86041b020602ffffffff0100f2052a010000004341041b0e8c2567c12536aa13357b79a073dc4444acb83c4ec7a0e2f99dd7457516c5817242da796924ca4e99947d087fedf9ce467cb9f7c6287078f801df276fdf84ac00000000"
-	txBytes, err := hex.DecodeString(txHex)
-	if err != nil {
-		t.Fatalf("Failed to decode transaction hex: %v", err)
-	}
-
-	tx, err := NewTransaction(txBytes)
-	if err != nil {
-		t.Fatalf("NewTransactionFromRaw() error = %v", err)
-	}
-	defer tx.Destroy()
-
-	// Test getting output at index 0
+	// Test GetOutput()
 	output, err := tx.GetOutput(0)
 	if err != nil {
-		t.Fatalf("Transaction.GetOutputAt(0) error = %v", err)
+		t.Fatalf("GetOutput(0) error = %v", err)
 	}
 	if output == nil {
 		t.Fatal("Output is nil")
@@ -111,25 +69,14 @@ func TestTransactionGetOutputAt(t *testing.T) {
 	if output.ptr == nil {
 		t.Error("Output pointer is nil")
 	}
-}
 
-func TestTransactionToBytes(t *testing.T) {
-	txHex := "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08044c86041b020602ffffffff0100f2052a010000004341041b0e8c2567c12536aa13357b79a073dc4444acb83c4ec7a0e2f99dd7457516c5817242da796924ca4e99947d087fedf9ce467cb9f7c6287078f801df276fdf84ac00000000"
-	txBytes, err := hex.DecodeString(txHex)
-	if err != nil {
-		t.Fatalf("Failed to decode transaction hex: %v", err)
-	}
+	// Test GetTxid()
+	_ = tx.GetTxid()
 
-	tx, err := NewTransaction(txBytes)
-	if err != nil {
-		t.Fatalf("NewTransactionFromRaw() error = %v", err)
-	}
-	defer tx.Destroy()
-
-	// Test serializing transaction back to bytes
+	// Test Bytes()
 	serialized, err := tx.Bytes()
 	if err != nil {
-		t.Fatalf("Transaction.ToBytes() error = %v", err)
+		t.Fatalf("Bytes() error = %v", err)
 	}
 
 	if len(serialized) == 0 {

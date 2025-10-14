@@ -104,3 +104,9 @@ func (t *transactionApi) Bytes() ([]byte, error) {
 	}
 	return bytes, nil
 }
+
+// GetTxid returns the txid for this transaction.
+func (t *transactionApi) GetTxid() *TxidView {
+	ptr := C.btck_transaction_get_txid(t.ptr)
+	return newTxidView(check(ptr))
+}
