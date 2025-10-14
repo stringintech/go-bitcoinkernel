@@ -181,8 +181,8 @@ func (s *ChainstateManagerTestSuite) Setup(t *testing.T) {
 	t.Cleanup(func() { opts.Destroy() })
 
 	opts.SetWorkerThreads(1)
-	opts.SetBlockTreeDBInMemory(true)
-	opts.SetChainstateDBInMemory(true)
+	opts.UpdateBlockTreeDBInMemory(true)
+	opts.UpdateChainstateDBInMemory(true)
 	// Wipe both databases to enable proper initialization
 	err = opts.SetWipeDBs(true, true)
 	if err != nil {
