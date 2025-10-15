@@ -72,16 +72,20 @@ func (cm *ChainstateManager) ReadBlockSpentOutputs(blockTreeEntry *BlockTreeEntr
 }
 
 // ProcessBlock processes and validates the passed in block with the chainstate
-// manager. More detailed validation information in case of a failure can also
-// be retrieved through a registered validation interface. If the block fails
-// to validate the validation interface's BlockChecked callback's BlockValidationState
-// will contain details.
+// manager. Processing first does checks on the block, and if these passed,
+// saves it to disk. It then validates the block against the utxo set. If it is
+// valid, the chain is extended with it. The ok return value is not indicative of
+// the block's validity. Detailed information on the validity of the block can
+// be retrieved by registering the block_checked callback in the validation
+// interface.
 //
 // Parameters:
 //   - block: Block to validate and potentially add to the chain
 //
 // Returns ok=true if processing the block was successful (will also return true for valid,
-// but duplicate blocks) and duplicate=false if this block was not processed before.
+// but duplicate blocks) and duplicate=false if this block was not processed before. Note that
+// duplicate might also be false if processing was attempted before, but the block was found
+// invalid before its data was persisted.
 func (cm *ChainstateManager) ProcessBlock(block *Block) (ok bool, duplicate bool) {
 	var newBlock C.int
 	result := C.btck_chainstate_manager_process_block((*C.btck_ChainstateManager)(cm.ptr), (*C.btck_Block)(block.ptr), &newBlock)
@@ -92,12 +96,11 @@ func (cm *ChainstateManager) ProcessBlock(block *Block) (ok bool, duplicate bool
 
 // GetActiveChain returns the currently active best-known chain.
 //
-// The chain's lifetime depends on this chainstate manager. State transitions (e.g.,
-// processing blocks) will change the chain, so data retrieved from it is only consistent
-// until new data is processed.
-//
-// The returned Chain is a non-owned pointer valid for the lifetime of this
-// chainstate manager.
+// The returned Chain can be thought of as a view on a vector of block tree entries
+// that form the best chain. The chain's lifetime depends on this chainstate manager.
+// State transitions (e.g., processing blocks) will change the chain, so data retrieved
+// from it is only consistent until new data is processed. It is the caller's responsibility
+// to guard against these inconsistencies.
 func (cm *ChainstateManager) GetActiveChain() *Chain {
 	return &Chain{C.btck_chainstate_manager_get_active_chain((*C.btck_ChainstateManager)(cm.ptr))}
 }

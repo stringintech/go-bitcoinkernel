@@ -1,43 +1,40 @@
 package kernel
 
 import (
-	"encoding/hex"
 	"testing"
 )
 
 func TestBlockHash(t *testing.T) {
-	genesisHex := "0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff001d1dac2b7c0101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4d04ffff001d0104455468652054696d65732030332f4a616e2f32303039204368616e63656c6c6f72206f6e206272696e6b206f66207365636f6e64206261696c6f757420666f722062616e6b73ffffffff0100f2052a01000000434104678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac00000000"
-	genesisBytes, err := hex.DecodeString(genesisHex)
-	if err != nil {
-		t.Fatalf("Failed to decode genesis hex: %v", err)
-	}
+	hashBytes := [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32}
 
-	block, err := NewBlock(genesisBytes)
-	if err != nil {
-		t.Fatalf("NewBlock() error = %v", err)
-	}
-	defer block.Destroy()
-
-	hash := block.Hash()
+	hash := NewBlockHash(hashBytes)
 	defer hash.Destroy()
 
-	hashBytes := hash.Bytes()
-
-	newHash := NewBlockHash(hashBytes)
+	// Test Bytes()
+	newHash := NewBlockHash(hash.Bytes())
 	defer newHash.Destroy()
 
-	newHashBytes := newHash.Bytes()
-
-	if hashBytes != newHashBytes {
-		t.Errorf("Hash bytes differ: %x != %x", hashBytes, newHashBytes)
+	if hash.Bytes() != newHash.Bytes() {
+		t.Errorf("Hash bytes differ: %x != %x", hash.Bytes(), newHash.Bytes())
 	}
 
+	// Test Copy()
 	copiedHash := hash.Copy()
 	defer copiedHash.Destroy()
 
-	copiedHashBytes := copiedHash.Bytes()
+	if hash.Bytes() != copiedHash.Bytes() {
+		t.Errorf("Copied hash bytes differ: %x != %x", hash.Bytes(), copiedHash.Bytes())
+	}
 
-	if hashBytes != copiedHashBytes {
-		t.Errorf("Copied hash bytes differ: %x != %x", hashBytes, copiedHashBytes)
+	// Test Equals()
+	if !hash.Equals(copiedHash) {
+		t.Errorf("hash.Equals(copiedHash) = false, want true")
+	}
+
+	differentHash := NewBlockHash([32]byte{0xFF})
+	defer differentHash.Destroy()
+
+	if hash.Equals(differentHash) {
+		t.Errorf("hash.Equals(differentHash) = true, want false")
 	}
 }

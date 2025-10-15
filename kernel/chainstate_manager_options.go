@@ -88,26 +88,26 @@ func (opts *ChainstateManagerOptions) SetWipeDBs(wipeBlockTree, wipeChainstate b
 	return nil
 }
 
-// SetBlockTreeDBInMemory configures whether the block tree database is stored in memory.
+// UpdateBlockTreeDBInMemory configures whether the block tree database is stored in memory.
 //
 // Parameters:
 //   - inMemory: If true, the block tree database will be kept entirely in memory
-func (opts *ChainstateManagerOptions) SetBlockTreeDBInMemory(inMemory bool) {
+func (opts *ChainstateManagerOptions) UpdateBlockTreeDBInMemory(inMemory bool) {
 	inMemoryInt := 0
 	if inMemory {
 		inMemoryInt = 1
 	}
-	C.btck_chainstate_manager_options_set_block_tree_db_in_memory((*C.btck_ChainstateManagerOptions)(opts.ptr), C.int(inMemoryInt))
+	C.btck_chainstate_manager_options_update_block_tree_db_in_memory((*C.btck_ChainstateManagerOptions)(opts.ptr), C.int(inMemoryInt))
 }
 
-// SetChainstateDBInMemory configures whether the chainstate database is stored in memory.
+// UpdateChainstateDBInMemory configures whether the chainstate database is stored in memory.
 //
 // Parameters:
 //   - inMemory: If true, the chainstate database will be kept entirely in memory
-func (opts *ChainstateManagerOptions) SetChainstateDBInMemory(inMemory bool) {
+func (opts *ChainstateManagerOptions) UpdateChainstateDBInMemory(inMemory bool) {
 	inMemoryInt := 0
 	if inMemory {
 		inMemoryInt = 1
 	}
-	C.btck_chainstate_manager_options_set_chainstate_db_in_memory((*C.btck_ChainstateManagerOptions)(opts.ptr), C.int(inMemoryInt))
+	C.btck_chainstate_manager_options_update_chainstate_db_in_memory((*C.btck_ChainstateManagerOptions)(opts.ptr), C.int(inMemoryInt))
 }
