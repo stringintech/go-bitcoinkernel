@@ -92,6 +92,22 @@ func (t *transactionApi) GetOutput(index uint64) (*TransactionOutputView, error)
 	return newTransactionOutputView(check(ptr)), nil
 }
 
+// GetInput retrieves the input at the specified index.
+//
+// The returned input is a non-owned view that depends on the lifetime of this transaction.
+//
+// Parameters:
+//   - index: Index of the input to retrieve
+//
+// Returns an error if the index is out of bounds.
+func (t *transactionApi) GetInput(index uint64) (*TransactionInputView, error) {
+	if index >= t.CountInputs() {
+		return nil, ErrKernelIndexOutOfBounds
+	}
+	ptr := C.btck_transaction_get_input_at(t.ptr, C.size_t(index))
+	return newTransactionInputView(check(ptr)), nil
+}
+
 // Bytes returns the consensus serialized representation of the transaction.
 //
 // Returns an error if the serialization fails.

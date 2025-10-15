@@ -6,6 +6,9 @@ import (
 	"testing"
 )
 
+// coinbaseTxHex is a serialized coinbase transaction for testing
+const coinbaseTxHex = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08044c86041b020602ffffffff0100f2052a010000004341041b0e8c2567c12536aa13357b79a073dc4444acb83c4ec7a0e2f99dd7457516c5817242da796924ca4e99947d087fedf9ce467cb9f7c6287078f801df276fdf84ac00000000"
+
 func TestInvalidTransactionData(t *testing.T) {
 	// Test with invalid data
 	_, err := NewTransaction([]byte{0x00, 0x01, 0x02})
@@ -16,8 +19,7 @@ func TestInvalidTransactionData(t *testing.T) {
 }
 
 func TestTransaction(t *testing.T) {
-	txHex := "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08044c86041b020602ffffffff0100f2052a010000004341041b0e8c2567c12536aa13357b79a073dc4444acb83c4ec7a0e2f99dd7457516c5817242da796924ca4e99947d087fedf9ce467cb9f7c6287078f801df276fdf84ac00000000"
-	txBytes, err := hex.DecodeString(txHex)
+	txBytes, err := hex.DecodeString(coinbaseTxHex)
 	if err != nil {
 		t.Fatalf("Failed to decode transaction hex: %v", err)
 	}
@@ -58,6 +60,19 @@ func TestTransaction(t *testing.T) {
 		t.Errorf("Expected 1 output, got %d", outputCount)
 	}
 
+	// Test GetInput()
+	input, err := tx.GetInput(0)
+	if err != nil {
+		t.Fatalf("GetInput(0) error = %v", err)
+	}
+	if input == nil {
+		t.Error("Input is nil")
+	}
+	_, err = tx.GetInput(inputCount)
+	if !errors.Is(err, ErrKernelIndexOutOfBounds) {
+		t.Errorf("Expected ErrKernelIndexOutOfBounds for out of bounds input, got %v", err)
+	}
+
 	// Test GetOutput()
 	output, err := tx.GetOutput(0)
 	if err != nil {
@@ -66,8 +81,9 @@ func TestTransaction(t *testing.T) {
 	if output == nil {
 		t.Fatal("Output is nil")
 	}
-	if output.ptr == nil {
-		t.Error("Output pointer is nil")
+	_, err = tx.GetOutput(outputCount)
+	if !errors.Is(err, ErrKernelIndexOutOfBounds) {
+		t.Errorf("Expected ErrKernelIndexOutOfBounds for out of bounds output, got %v", err)
 	}
 
 	// Test GetTxid()
@@ -84,7 +100,7 @@ func TestTransaction(t *testing.T) {
 	}
 
 	// The serialized bytes should match the original
-	if hex.EncodeToString(serialized) != txHex {
-		t.Errorf("Serialized transaction doesn't match original.\nExpected: %s\nGot: %s", txHex, hex.EncodeToString(serialized))
+	if hex.EncodeToString(serialized) != coinbaseTxHex {
+		t.Errorf("Serialized transaction doesn't match original.\nExpected: %s\nGot: %s", coinbaseTxHex, hex.EncodeToString(serialized))
 	}
 }
