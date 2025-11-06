@@ -155,7 +155,7 @@ const (
 type ScriptVerifyStatus C.btck_ScriptVerifyStatus
 
 const (
-	ScriptVerifyOK                           ScriptVerifyStatus = C.btck_ScriptVerifyStatus_SCRIPT_VERIFY_OK                // Script verification succeeded
+	ScriptVerifyOK                           ScriptVerifyStatus = C.btck_ScriptVerifyStatus_OK                              // Script verification succeeded
 	ScriptVerifyErrorInvalidFlagsCombination ScriptVerifyStatus = C.btck_ScriptVerifyStatus_ERROR_INVALID_FLAGS_COMBINATION // The verification flags were combined in an invalid way
 	ScriptVerifyErrorSpentOutputsRequired    ScriptVerifyStatus = C.btck_ScriptVerifyStatus_ERROR_SPENT_OUTPUTS_REQUIRED    // The taproot flag was set, so valid spent outputs must be provided
 )
