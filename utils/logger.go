@@ -27,8 +27,11 @@ func NewLogger(handler slog.Handler, options kernel.LoggingOptions) (*Logger, er
 		parser: parser,
 	}
 
+	// Set global logging options
+	kernel.SetLoggingOptions(options)
+
 	// Create logging connection with our message handler
-	conn, err := kernel.NewLoggingConnection(viewer.handleMessage, options)
+	conn, err := kernel.NewLoggingConnection(viewer.handleMessage)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logging connection: %w", err)
 	}

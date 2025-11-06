@@ -44,7 +44,8 @@ func TestLoggingOptions(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			conn, err := NewLoggingConnection(func(_ string) {}, tc.options)
+			SetLoggingOptions(tc.options)
+			conn, err := NewLoggingConnection(func(_ string) {})
 			if err != nil {
 				t.Fatalf("NewLoggingConnection() error = %v", err)
 			}

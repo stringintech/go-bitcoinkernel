@@ -51,10 +51,27 @@ func go_log_callback_bridge(user_data unsafe.Pointer, message *C.char, message_l
 //
 // Parameters:
 //   - callback: Function that will receive log messages
-//   - options: Formatting options for log messages (timestamps, thread names, etc.)
 //
 // Returns an error if the logging connection cannot be created.
-func NewLoggingConnection(callback LogCallback, options LoggingOptions) (*LoggingConnection, error) {
+func NewLoggingConnection(callback LogCallback) (*LoggingConnection, error) {
+	callbackHandle := cgo.NewHandle(callback)
+	ptr := C.btck_logging_connection_create((C.btck_LogCallback)(C.go_log_callback_bridge),
+		unsafe.Pointer(callbackHandle), C.btck_DestroyCallback(C.go_delete_handle))
+	if ptr == nil {
+		callbackHandle.Delete()
+		return nil, &InternalError{"Failed to create logging connection"}
+	}
+	h := newUniqueHandle(unsafe.Pointer(ptr), loggingConnectionCFuncs{})
+	return &LoggingConnection{uniqueHandle: h}, nil
+}
+
+// SetLoggingOptions configures the formatting options for the global internal logger.
+//
+// This changes global settings and affects all existing LoggingConnection instances.
+//
+// Parameters:
+//   - options: Formatting options for log messages (timestamps, thread names, etc.)
+func SetLoggingOptions(options LoggingOptions) {
 	cOptions := C.btck_LoggingOptions{
 		log_timestamps:               boolToInt(options.LogTimestamps),
 		log_time_micros:              boolToInt(options.LogTimeMicros),
@@ -62,16 +79,7 @@ func NewLoggingConnection(callback LogCallback, options LoggingOptions) (*Loggin
 		log_sourcelocations:          boolToInt(options.LogSourceLocations),
 		always_print_category_levels: boolToInt(options.AlwaysPrintCategoryLevel),
 	}
-
-	callbackHandle := cgo.NewHandle(callback)
-	ptr := C.btck_logging_connection_create((C.btck_LogCallback)(C.go_log_callback_bridge),
-		unsafe.Pointer(callbackHandle), C.btck_DestroyCallback(C.go_delete_handle), cOptions)
-	if ptr == nil {
-		callbackHandle.Delete()
-		return nil, &InternalError{"Failed to create logging connection"}
-	}
-	h := newUniqueHandle(unsafe.Pointer(ptr), loggingConnectionCFuncs{})
-	return &LoggingConnection{uniqueHandle: h}, nil
+	C.btck_logging_set_options(cOptions)
 }
 
 // DisableLogging permanently disables the global internal logger.
