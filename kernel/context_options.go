@@ -95,7 +95,7 @@ func (opts *ContextOptions) SetValidationInterface(callbacks *ValidationInterfac
 		user_data:          unsafe.Pointer(cgo.NewHandle(callbacks)),
 		user_data_destroy:  C.btck_DestroyCallback(C.go_delete_handle),
 		block_checked:      C.btck_ValidationInterfaceBlockChecked(C.go_validation_interface_block_checked_bridge),
-		pow_valid_block:    C.btck_ValidationInterfacePowValidBlock(C.go_validation_interface_pow_valid_block_bridge),
+		pow_valid_block:    C.btck_ValidationInterfacePoWValidBlock(C.go_validation_interface_pow_valid_block_bridge),
 		block_connected:    C.btck_ValidationInterfaceBlockConnected(C.go_validation_interface_block_connected_bridge),
 		block_disconnected: C.btck_ValidationInterfaceBlockDisconnected(C.go_validation_interface_block_disconnected_bridge),
 	}
