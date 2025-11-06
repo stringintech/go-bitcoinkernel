@@ -51,7 +51,7 @@ func (t *transactionOutPointApi) Copy() *TransactionOutPoint {
 	return newTransactionOutPoint(t.ptr, false)
 }
 
-// GetIndex returns the output position from the out point.
+// GetIndex returns the output position from the transaction out point.
 func (t *transactionOutPointApi) GetIndex() uint32 {
 	return uint32(C.btck_transaction_out_point_get_index(t.ptr))
 }

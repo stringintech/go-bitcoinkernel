@@ -113,8 +113,8 @@ func (cm *ChainstateManager) GetActiveChain() *Chain {
 // Returns nil if no block with this hash is found in the block index. The returned
 // BlockTreeEntry is a non-owned pointer valid for the lifetime of this chainstate
 // manager.
-func (cm *ChainstateManager) GetBlockTreeEntryByHash(blockHash *BlockHash) *BlockTreeEntry {
-	ptr := C.btck_chainstate_manager_get_block_tree_entry_by_hash((*C.btck_ChainstateManager)(cm.ptr), (*C.btck_BlockHash)(blockHash.ptr))
+func (cm *ChainstateManager) GetBlockTreeEntryByHash(blockHash BlockHashLike) *BlockTreeEntry {
+	ptr := C.btck_chainstate_manager_get_block_tree_entry_by_hash((*C.btck_ChainstateManager)(cm.ptr), blockHash.blockHashPtr())
 	if ptr == nil {
 		return nil
 	}
@@ -123,7 +123,7 @@ func (cm *ChainstateManager) GetBlockTreeEntryByHash(blockHash *BlockHash) *Bloc
 
 // ImportBlocks triggers a reindex and/or imports block files from the filesystem.
 //
-// This starts a reindex if the wipe_dbs option was previously set via ChainstateManagerOptions.
+// This starts a reindex if the wipe options were previously set via ChainstateManagerOptions.
 // It can also import existing block files from the specified filesystem paths.
 //
 // Parameters:

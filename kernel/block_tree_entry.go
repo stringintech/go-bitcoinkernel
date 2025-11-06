@@ -23,9 +23,9 @@ func (bi *BlockTreeEntry) Height() int32 {
 }
 
 // Hash returns the block hash associated with this block tree entry.
-func (bi *BlockTreeEntry) Hash() *BlockHash {
+func (bi *BlockTreeEntry) Hash() *BlockHashView {
 	ptr := C.btck_block_tree_entry_get_block_hash(bi.ptr)
-	return newBlockHash(check(ptr), true)
+	return newBlockHashView(check(ptr))
 }
 
 // Previous returns the previous block tree entry in the chain.

@@ -9,6 +9,7 @@ build-kernel:
 	cmake -B build \
 		-DBUILD_SHARED_LIBS=ON \
 		-DBUILD_KERNEL_LIB=ON \
+		-DBUILD_KERNEL_TEST=OFF \
 		-DBUILD_TESTS=OFF \
 		-DBUILD_TX=OFF \
 		-DBUILD_WALLET_TOOL=OFF \
@@ -40,7 +41,7 @@ deps:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
 update-kernel:
-	git subtree pull --prefix=depend/bitcoin https://github.com/TheCharlatan/bitcoin.git kernelApi --squash
+	git subtree pull --prefix=depend/bitcoin https://github.com/bitcoin/bitcoin.git master --squash
 
 help:
 	@echo "Available targets:"

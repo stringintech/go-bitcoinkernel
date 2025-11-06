@@ -62,7 +62,7 @@ func (c *coinApi) GetOutput() *TransactionOutputView {
 	return newTransactionOutputView(check(ptr))
 }
 
-// ConfirmationHeight returns the block height at which this coin's prevout was created.
+// ConfirmationHeight returns the block height where the transaction that created this coin was included in.
 func (c *coinApi) ConfirmationHeight() uint32 {
 	return uint32(C.btck_coin_confirmation_height(c.ptr))
 }
