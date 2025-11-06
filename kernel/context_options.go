@@ -36,9 +36,9 @@ func (contextOptionsCFuncs) destroy(ptr unsafe.Pointer) {
 // ContextOptions holds options for creating a new kernel context.
 //
 // Once a kernel Context has been created from these options, they may be destroyed.
-// The options hold the notification callbacks as well as the selected chain type
-// until they are passed to the context. If no options are configured, the context
-// will be instantiated with no callbacks and for mainnet.
+// The options hold the notification callbacks, validation interface callbacks, as well
+// as the selected chain type until they are passed to the context. If no options are
+// configured, the context will be instantiated with no callbacks and for mainnet.
 type ContextOptions struct {
 	*uniqueHandle
 }

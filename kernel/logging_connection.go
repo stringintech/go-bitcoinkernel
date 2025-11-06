@@ -84,19 +84,25 @@ func SetLoggingOptions(options LoggingOptions) {
 
 // DisableLogging permanently disables the global internal logger.
 //
-// No log messages will be buffered internally after this is called, and the buffer
-// is cleared. This function should only be called once and is not thread-safe or
-// re-entry safe.
+// Log messages will be buffered until this function is called, or a logging connection
+// is created. This must not be called while a logging connection already exists.
+// This function should only be called once and is not thread-safe or re-entry safe.
 func DisableLogging() {
 	C.btck_logging_disable()
 }
 
 // AddLogLevelCategory sets the log level for a specific category.
 //
-// This changes a global setting and affects all existing LoggingConnection instances.
+// This does not enable the selected categories. Use EnableLogCategory to
+// start logging from a specific, or all categories. This changes a global
+// setting and will override settings for all existing LoggingConnection instances.
 //
 // Parameters:
-//   - category: Log category to configure (or LogAll for all categories)
+//   - category: If LogAll is chosen, sets both the global fallback log level
+//     used by all categories that don't have a specific level set, and also
+//     sets the log level for messages logged with the LogAll category itself.
+//     For any other category, sets a category-specific log level that overrides
+//     the global fallback for that category only.
 //   - level: Minimum log level (Trace, Debug, or Info)
 //
 // Messages at the specified level and above will be logged for the category.

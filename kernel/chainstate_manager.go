@@ -123,7 +123,7 @@ func (cm *ChainstateManager) GetBlockTreeEntryByHash(blockHash BlockHashLike) *B
 
 // ImportBlocks triggers a reindex and/or imports block files from the filesystem.
 //
-// This starts a reindex if the wipe_dbs option was previously set via ChainstateManagerOptions.
+// This starts a reindex if the wipe options were previously set via ChainstateManagerOptions.
 // It can also import existing block files from the specified filesystem paths.
 //
 // Parameters:
