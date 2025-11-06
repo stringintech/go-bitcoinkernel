@@ -97,7 +97,6 @@ func (s *ChainstateManagerTestSuite) TestGetBlockTreeEntryByHash(t *testing.T) {
 	genesis := chain.GetGenesis()
 
 	genesisHash := genesis.Hash()
-	defer genesisHash.Destroy()
 
 	// Use GetBlockTreeEntryByHash to find genesis
 	foundGenesisIndex := s.Manager.GetBlockTreeEntryByHash(genesisHash)
@@ -116,7 +115,6 @@ func (s *ChainstateManagerTestSuite) TestGetBlockTreeEntryByHash(t *testing.T) {
 	tipIndex := chain.GetTip()
 
 	tipHash := tipIndex.Hash()
-	defer tipHash.Destroy()
 
 	foundTipIndex := s.Manager.GetBlockTreeEntryByHash(tipHash)
 	if foundTipIndex == nil {
