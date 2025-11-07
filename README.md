@@ -35,6 +35,8 @@ cd go-bitcoinkernel
 
 ### Step 2: Build the Native Library
 
+On Nix: `nix develop` to get all the build and runtime dependencies.
+
 ```bash
 make build-kernel
 ```
