@@ -7,28 +7,44 @@ import (
 )
 
 func TestScriptPubkeyFromRaw(t *testing.T) {
-	scriptHex := "76a914389ffce9cd9ae88dcc0631e88a821ffdbe9bfe26158088ac"
-	scriptBytes, err := hex.DecodeString(scriptHex)
-	if err != nil {
-		t.Fatalf("Failed to decode script hex: %v", err)
+	tests := []struct {
+		name      string
+		scriptHex string
+	}{
+		{
+			name:      "standard_p2pkh",
+			scriptHex: "76a914389ffce9cd9ae88dcc0631e88a821ffdbe9bfe26158088ac",
+		},
+		{
+			name:      "empty_script",
+			scriptHex: "",
+		},
 	}
 
-	scriptPubkey := NewScriptPubkey(scriptBytes)
-	defer scriptPubkey.Destroy()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			scriptBytes, err := hex.DecodeString(tt.scriptHex)
+			if err != nil {
+				t.Fatalf("Failed to decode script hex: %v", err)
+			}
 
-	// Test getting the serialized script pubkey
-	data, err := scriptPubkey.Bytes()
-	if err != nil {
-		t.Fatalf("ScriptPubkey.Bytes() error = %v", err)
-	}
+			scriptPubkey := NewScriptPubkey(scriptBytes)
+			defer scriptPubkey.Destroy()
 
-	if len(data) != len(scriptBytes) {
-		t.Errorf("Expected data length %d, got %d", len(scriptBytes), len(data))
-	}
+			data, err := scriptPubkey.Bytes()
+			if err != nil {
+				t.Fatalf("ScriptPubkey.Bytes() error = %v", err)
+			}
 
-	hexStr := hex.EncodeToString(data)
-	if hexStr != scriptHex {
-		t.Errorf("Expected data hex: %s, got %s", scriptHex, hexStr)
+			if len(data) != len(scriptBytes) {
+				t.Errorf("Expected data length %d, got %d", len(scriptBytes), len(data))
+			}
+
+			hexStr := hex.EncodeToString(data)
+			if hexStr != tt.scriptHex {
+				t.Errorf("Expected data hex: %s, got %s", tt.scriptHex, hexStr)
+			}
+		})
 	}
 }
 
@@ -172,6 +188,16 @@ func TestInvalidScripts(t *testing.T) {
 			txToHex:         "010000000001011f97548fbbe7a0db7588a66e18d803d0089315aa7d4cc28360b6ec50ef36718a0100000000ffffffff02df1776000000000017a9146c002a686959067f4866b8fb493ad7970290ab728757d29f0000000000220020701a8d401c84fb13e6baf169d59684e17abd9fa216c8cc5b9fc63d622ff8c58d04004730440220565d170eed95ff95027a69b313758450ba84a01224e1f7f130dda46e94d13f8602207bdd20e307f062594022f12ed5017bbf4a055a06aea91c10110a0e3bb23117fc014730440220647d2dc5b15f60bc37dc42618a370b2a1490293f9e5c8464f53ec4fe1dfe067302203598773895b4b16d37485cbe21b337f4e4b650739880098c592553add7dd4355016952210375e00eb72e29da82b89367947f29ef34afb75e8654f6ea368e0acdfd92976b7c2103a1b26313f430c4b15bb1fdce663207659d8cac749a0e53d70eff01874496feff2103c96d495bfdd5ba4145e3e046fee45e84a8a48ad05bd8dbb395c011a32cf9f88053ae00000000",
 			inputIndex:      0,
 			description:     "a random segwit transaction from the blockchain using native segwit - WITH WRONG SEGWIT",
+		},
+		{
+			name:            "empty_scriptpubkey",
+			scriptPubkeyHex: "",
+			amount:          0,
+			// Minimal coinbase-style transaction with a single empty scriptSig and zero-value output;
+			// used to trigger verification paths.
+			txToHex:     "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff00ffffffff0100000000000000000000000000",
+			inputIndex:  0,
+			description: "empty scriptPubkey should fail verification",
 		},
 	}
 
