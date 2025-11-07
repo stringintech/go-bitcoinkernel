@@ -35,7 +35,11 @@ func newScriptPubkey(ptr *C.btck_ScriptPubkey, fromOwned bool) *ScriptPubkey {
 // Parameters:
 //   - rawScriptPubkey: Serialized script pubkey data
 func NewScriptPubkey(rawScriptPubkey []byte) *ScriptPubkey {
-	ptr := C.btck_script_pubkey_create(unsafe.Pointer(&rawScriptPubkey[0]), C.size_t(len(rawScriptPubkey)))
+	var buf unsafe.Pointer
+	if len(rawScriptPubkey) > 0 {
+		buf = unsafe.Pointer(&rawScriptPubkey[0])
+	}
+	ptr := C.btck_script_pubkey_create(buf, C.size_t(len(rawScriptPubkey)))
 	return newScriptPubkey(check(ptr), true)
 }
 
