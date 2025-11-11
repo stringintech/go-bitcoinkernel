@@ -3,7 +3,7 @@
 package kernel
 
 /*
-#cgo CFLAGS: -I../depend/bitcoin/src
-#cgo LDFLAGS: -L../depend/bitcoin/build/bin/RelWithDebInfo -lbitcoinkernel -lbcrypt -lshell32
+#cgo CFLAGS: -I../depend/bitcoin/install/include -DBITCOINKERNEL_STATIC
+#cgo LDFLAGS: -L../depend/bitcoin/install/lib -lbitcoinkernel -lstdc++ -lbcrypt -lshell32
 */
 import "C"

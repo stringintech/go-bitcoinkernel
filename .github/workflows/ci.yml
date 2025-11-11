@@ -59,30 +59,29 @@ jobs:
   windows:
     name: Build and Test on Windows
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up MSYS2 with MinGW
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          path-type: inherit
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-boost
+            make
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.23.3'
-
-      - name: Install Boost library
-        run: |
-          git clone https://github.com/microsoft/vcpkg.git
-          cd vcpkg
-          .\bootstrap-vcpkg.bat
-          .\vcpkg install boost-multi-index:x64-windows boost-headers:x64-windows
-
-      - name: Set environment variables
-        run: |
-          echo "BOOST_ROOT=$env:GITHUB_WORKSPACE\vcpkg\installed\x64-windows" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo "BOOST_INCLUDEDIR=$env:GITHUB_WORKSPACE\vcpkg\installed\x64-windows\include" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo "$env:GITHUB_WORKSPACE\depend\bitcoin\build\bin\RelWithDebInfo" | Out-File -FilePath $env:GITHUB_PATH -Append
-
-      - name: Install make
-        run: choco install make
 
       - name: Build Kernel
         run: make build-kernel
