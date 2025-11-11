@@ -7,6 +7,7 @@ all: build-kernel test
 build-kernel:
 	cd depend/bitcoin && \
 	cmake -B build \
+		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 		-DBUILD_SHARED_LIBS=ON \
 		-DBUILD_KERNEL_LIB=ON \
 		-DBUILD_KERNEL_TEST=OFF \
@@ -21,7 +22,7 @@ build-kernel:
 		-DBUILD_UTIL_CHAINSTATE=OFF \
 		-DBUILD_CLI=OFF \
 		-DENABLE_IPC=OFF && \
-	cmake --build build --target bitcoinkernel -j $(shell nproc 2>/dev/null || echo 4)
+	cmake --build build --config RelWithDebInfo --parallel$(if $(NUM_JOBS),=$(NUM_JOBS)) # Use NUM_JOBS variable if set (e.g., make build-kernel NUM_JOBS=8), otherwise auto-detect CPU cores
 
 build:
 	go build ./...
