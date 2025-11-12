@@ -53,7 +53,7 @@ func NewContext(options *ContextOptions) (*Context, error) {
 //
 // Returns an error if the interrupt signal cannot be delivered.
 func (ctx *Context) Interrupt() error {
-	result := C.btck_context_interrupt((*C.btck_Context)(ctx.handle.ptr))
+	result := C.btck_context_interrupt((*C.btck_Context)(ctx.ptr))
 	if result != 0 {
 		return &InternalError{"Context interrupt failed"}
 	}
@@ -65,5 +65,5 @@ func (ctx *Context) Interrupt() error {
 // The context is reference-counted internally, so this operation is efficient and does
 // not duplicate the underlying data.
 func (ctx *Context) Copy() *Context {
-	return newContext((*C.btck_Context)(ctx.handle.ptr), false)
+	return newContext((*C.btck_Context)(ctx.ptr), false)
 }
