@@ -143,7 +143,11 @@ func (s *ChainstateManagerTestSuite) Setup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	t.Cleanup(func() { os.RemoveAll(tempDir) })
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Errorf("Failed to remove temp dir: %v", err)
+		}
+	})
 
 	dataDir := filepath.Join(tempDir, "data")
 	blocksDir := filepath.Join(tempDir, "blocks")

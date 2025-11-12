@@ -1,0 +1,12 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: standard
+  settings:
+    govet:
+      disable:
+        - unsafeptr
