@@ -8,7 +8,7 @@ build-kernel:
 	cd depend/bitcoin && \
 	cmake -B build \
 		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
-		-DBUILD_SHARED_LIBS=ON \
+		-DBUILD_SHARED_LIBS=OFF \
 		-DBUILD_KERNEL_LIB=ON \
 		-DBUILD_KERNEL_TEST=OFF \
 		-DBUILD_TESTS=OFF \
@@ -21,8 +21,11 @@ build-kernel:
 		-DBUILD_DAEMON=OFF \
 		-DBUILD_UTIL_CHAINSTATE=OFF \
 		-DBUILD_CLI=OFF \
-		-DENABLE_IPC=OFF && \
-	cmake --build build --config RelWithDebInfo --parallel$(if $(NUM_JOBS),=$(NUM_JOBS)) # Use NUM_JOBS variable if set (e.g., make build-kernel NUM_JOBS=8), otherwise auto-detect CPU cores
+		-DENABLE_IPC=OFF \
+		-DCMAKE_INSTALL_LIBDIR=lib \
+		-DCMAKE_INSTALL_PREFIX=$$PWD/install && \
+	cmake --build build --config RelWithDebInfo --parallel$(if $(NUM_JOBS),=$(NUM_JOBS)) && \
+	cmake --install build --config RelWithDebInfo
 
 build:
 	go build ./...
@@ -32,6 +35,7 @@ test:
 
 clean:
 	rm -rf depend/bitcoin/build
+	rm -rf depend/bitcoin/install
 	go clean ./...
 	go clean -testcache
 

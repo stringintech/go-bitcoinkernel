@@ -1,7 +1,7 @@
 package kernel
 
 /*
-#include "kernel/bitcoinkernel.h"
+#include "bitcoinkernel.h"
 #include <stdlib.h>
 #include <string.h>
 

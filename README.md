@@ -39,10 +39,12 @@ cd go-bitcoinkernel
 make build-kernel
 ```
 
-This command will configure Bitcoin Core's CMake build system and build only the `libbitcoinkernel` shared library. Refer to Bitcoin Core's build documentation to for the minimum requirements to compile `libbitcoinkernel` from source:
+This command will configure Bitcoin Core's CMake build system and statically compile the `libbitcoinkernel` library. Building requires CMake, a C++ compiler, Boost library, and Make. For platform-specific setup instructions, consult Bitcoin Core's build documentation:
 ([Unix](./depend/bitcoin/doc/build-unix.md),
 [macOS](./depend/bitcoin/doc/build-osx.md),
 [Windows](./depend/bitcoin/doc/build-windows.md))
+
+**Addtional note for Windows:** MinGW toolchain is required. CGo uses GCC on Windows, so static linking requires the library to be compiled with GCC/MinGW rather than MSVC for ABI compatibility.
 
 ### Step 3: Run Tests
 
@@ -93,7 +95,3 @@ call `Destroy()` methods when you're done with owned objects to free resources i
 ### Error Handling
 
 The library uses structured error types for better error handling (see [errors.go](./kernel/errors.go)).
-
-### Runtime Dependencies
-
-Your Go application will have a runtime dependency on the shared `libbitcoinkernel` library produced by `make build-kernel` in `/path/to/go-bitcoinkernel/depend/bitcoin/build`. Do not delete or move these built library files as your application needs them to run.
