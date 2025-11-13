@@ -15,7 +15,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.23.3'
+        go-version: '1.23.12'
 
     - name: Install Boost library
       run: |
@@ -46,7 +46,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23.3'
+          go-version: '1.23.12'
 
       - name: Install Boost library
         run: |
@@ -86,7 +86,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23.3'
+          go-version: '1.23.12'
 
       - name: Build Kernel
         run: make build-kernel
