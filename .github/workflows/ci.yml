@@ -6,7 +6,7 @@ on:
 
 jobs:
   ubuntu:
-    name: Build, Test, and Lint on Ubuntu
+    name: Build and Test on Ubuntu
     runs-on: ubuntu-latest
 
     steps:
@@ -30,11 +30,6 @@ jobs:
 
     - name: Run tests
       run: make test
-
-    - name: Run linter
-      uses: golangci/golangci-lint-action@v9
-      with:
-        version: v2.6.1
 
   macos:
     name: Build and Test on macOS
@@ -96,3 +91,31 @@ jobs:
 
       - name: Run tests
         run: make test
+
+  nix:
+    name: Build, Test, and Lint with Nix (Ubuntu)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Setup Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Check flake
+        run: nix flake check --show-trace
+
+      - name: Build Kernel
+        run: nix develop --command make build-kernel
+
+      - name: Build
+        run: nix develop --command make build
+
+      - name: Run tests
+        run: nix develop --command make test
+
+      - name: Run linter
+        run: nix develop --command make lint
