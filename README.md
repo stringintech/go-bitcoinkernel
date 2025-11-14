@@ -44,7 +44,9 @@ This command will configure Bitcoin Core's CMake build system and statically com
 [macOS](./depend/bitcoin/doc/build-osx.md),
 [Windows](./depend/bitcoin/doc/build-windows.md))
 
-**Addtional note for Windows:** MinGW toolchain is required. CGo uses GCC on Windows, so static linking requires the library to be compiled with GCC/MinGW rather than MSVC for ABI compatibility.
+**Additional notes:**
+- **For Windows:** MinGW toolchain is required. CGo uses GCC on Windows, so static linking requires the library to be compiled with GCC/MinGW rather than MSVC for ABI compatibility.
+- **For Nix users:** Run `nix develop` to automatically get all the build and runtime dependencies, then run `make build-kernel` and continue with the remaining steps in the Nix dev shell.
 
 ### Step 3: Run Tests
 

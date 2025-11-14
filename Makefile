@@ -43,7 +43,7 @@ lint:
 	golangci-lint run ./...
 
 deps:
-	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.6.1
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.6
 
 update-kernel:
 	git subtree pull --prefix=depend/bitcoin https://github.com/bitcoin/bitcoin.git master --squash
