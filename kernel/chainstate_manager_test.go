@@ -152,25 +152,18 @@ func (s *ChainstateManagerTestSuite) Setup(t *testing.T) {
 	dataDir := filepath.Join(tempDir, "data")
 	blocksDir := filepath.Join(tempDir, "blocks")
 
-	contextOpts := NewContextOptions()
-
-	chainParams, err := NewChainParameters(ChainTypeRegtest)
-	if err != nil {
-		t.Fatalf("NewChainParameters() error = %v", err)
-	}
-	t.Cleanup(func() { chainParams.Destroy() })
-
-	contextOpts.SetChainParams(chainParams)
+	var contextOpts []ContextOption
+	contextOpts = append(contextOpts, WithChainType(ChainTypeRegtest))
 
 	if s.NotificationCallbacks != nil {
-		contextOpts.SetNotifications(s.NotificationCallbacks)
+		contextOpts = append(contextOpts, WithNotifications(s.NotificationCallbacks))
 	}
 
 	if s.ValidationCallbacks != nil {
-		contextOpts.SetValidationInterface(s.ValidationCallbacks)
+		contextOpts = append(contextOpts, WithValidationInterface(s.ValidationCallbacks))
 	}
 
-	ctx, err := NewContext(contextOpts)
+	ctx, err := NewContext(contextOpts...)
 	if err != nil {
 		t.Fatalf("NewContext() error = %v", err)
 	}

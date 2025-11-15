@@ -7,21 +7,14 @@ import (
 func TestNewContext(t *testing.T) {
 	tests := []struct {
 		name        string
-		setupOption func() *ContextOptions
+		setupOption func() []ContextOption
 		wantErr     bool
 		errType     error
 	}{
 		{
 			name: "Valid context options",
-			setupOption: func() *ContextOptions {
-				opts := NewContextOptions()
-				params, err := NewChainParameters(ChainTypeMainnet)
-				if err != nil {
-					t.Fatalf("Failed to create chain parameters: %v", err)
-				}
-				defer params.Destroy()
-				opts.SetChainParams(params)
-				return opts
+			setupOption: func() []ContextOption {
+				return []ContextOption{WithChainType(ChainTypeMainnet)}
 			},
 			wantErr: false,
 		},
@@ -31,7 +24,7 @@ func TestNewContext(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			opts := tt.setupOption()
 
-			ctx, err := NewContext(opts)
+			ctx, err := NewContext(opts...)
 
 			if tt.wantErr {
 				if err == nil {
