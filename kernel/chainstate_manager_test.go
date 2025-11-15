@@ -176,23 +176,12 @@ func (s *ChainstateManagerTestSuite) Setup(t *testing.T) {
 	}
 	t.Cleanup(func() { ctx.Destroy() })
 
-	opts, err := NewChainstateManagerOptions(ctx, dataDir, blocksDir)
-	if err != nil {
-		t.Fatalf("NewChainstateManagerOptions() error = %v", err)
-	}
-	t.Cleanup(func() { opts.Destroy() })
-
-	opts.SetWorkerThreads(1)
-	opts.UpdateBlockTreeDBInMemory(true)
-	opts.UpdateChainstateDBInMemory(true)
-	// Wipe both databases to enable proper initialization
-	err = opts.SetWipeDBs(true, true)
-	if err != nil {
-		t.Fatalf("SetWipeDBs() error = %v", err)
-	}
-
-	// Create chainstate manager
-	manager, err := NewChainstateManager(opts)
+	manager, err := NewChainstateManager(ctx, dataDir, blocksDir,
+		WithWorkerThreads(1),
+		WithBlockTreeDBInMemory,
+		WithChainstateDBInMemory,
+		WithWipeDBs(true, true),
+	)
 	if err != nil {
 		t.Fatalf("NewChainstateManager() error = %v", err)
 	}
