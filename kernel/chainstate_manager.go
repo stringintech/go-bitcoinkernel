@@ -31,12 +31,47 @@ func newChainstateManager(ptr *C.btck_ChainstateManager) *ChainstateManager {
 // This is the main object for validation tasks, retrieving data from the chain, and
 // interacting with chainstate and indexes.
 //
+// The chainstate manager associates with the provided kernel context and uses the specified
+// data and block directories. If the directories do not exist, they will be created.
+//
+// Usage:
+//
+//	chainman, err := NewChainstateManager(ctx, dataDir, blocksDir,
+//	    WithWorkerThreads(1),
+//	    WithBlockTreeDBInMemory,
+//	)
+//
 // Parameters:
-//   - options: Configuration options created by NewChainstateManagerOptions
+//   - context: Kernel context that the chainstate manager will associate with
+//   - dataDir: Path to the directory containing chainstate data
+//   - blocksDir: Path to the directory containing block data
+//   - options: Zero or more ChainstateManagerOption functional options
 //
 // Returns an error if the chainstate manager cannot be created.
-func NewChainstateManager(options *ChainstateManagerOptions) (*ChainstateManager, error) {
-	ptr := C.btck_chainstate_manager_create((*C.btck_ChainstateManagerOptions)(options.ptr))
+func NewChainstateManager(context *Context, dataDir, blocksDir string, options ...ChainstateManagerOption) (*ChainstateManager, error) {
+	cDataDir := C.CString(dataDir)
+	defer C.free(unsafe.Pointer(cDataDir))
+
+	cBlocksDir := C.CString(blocksDir)
+	defer C.free(unsafe.Pointer(cBlocksDir))
+
+	// Create the options
+	optsPtr := C.btck_chainstate_manager_options_create((*C.btck_Context)(context.ptr), cDataDir, C.size_t(len(dataDir)),
+		cBlocksDir, C.size_t(len(blocksDir)))
+	if optsPtr == nil {
+		return nil, &InternalError{"Failed to create chainstate manager options"}
+	}
+	defer C.btck_chainstate_manager_options_destroy(optsPtr)
+
+	// Apply all functional options
+	for _, opt := range options {
+		if err := opt(optsPtr); err != nil {
+			return nil, err
+		}
+	}
+
+	// Create the chainstate manager
+	ptr := C.btck_chainstate_manager_create(optsPtr)
 	if ptr == nil {
 		return nil, &InternalError{"Failed to create chainstate manager"}
 	}

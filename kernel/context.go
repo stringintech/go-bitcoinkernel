@@ -36,13 +36,38 @@ func newContext(ptr *C.btck_Context, fromOwned bool) *Context {
 
 // NewContext creates a new kernel context.
 //
-// Parameters:
-//   - options: Context configuration created by NewContextOptions (can be nil for defaults)
+// The context holds chain-specific parameters and callbacks for handling error and
+// validation events. If no options are provided, the context assumes mainnet chain
+// parameters and no callbacks.
 //
-// Returns an error if the context cannot be created. If options is nil or not configured,
-// the context assumes mainnet chain parameters and no callbacks.
-func NewContext(options *ContextOptions) (*Context, error) {
-	ptr := C.btck_context_create((*C.btck_ContextOptions)(options.ptr))
+// Usage:
+//
+//	ctx, err := NewContext(
+//	    WithChainType(ChainTypeRegtest),
+//	    WithNotifications(notificationCallbacks),
+//	)
+//
+// Parameters:
+//   - options: Zero or more ContextOption functional options
+//
+// Returns an error if the context cannot be created.
+func NewContext(options ...ContextOption) (*Context, error) {
+	// Create the options
+	optsPtr := C.btck_context_options_create()
+	if optsPtr == nil {
+		return nil, &InternalError{"Failed to create context options"}
+	}
+	defer C.btck_context_options_destroy(optsPtr)
+
+	// Apply all functional options
+	for _, opt := range options {
+		if err := opt(optsPtr); err != nil {
+			return nil, err
+		}
+	}
+
+	// Create the context
+	ptr := C.btck_context_create(optsPtr)
 	if ptr == nil {
 		return nil, &InternalError{"Failed to create context"}
 	}
