@@ -38,7 +38,7 @@ func newChainstateManager(ptr *C.btck_ChainstateManager) *ChainstateManager {
 //
 //	chainman, err := NewChainstateManager(ctx, dataDir, blocksDir,
 //	    WithWorkerThreads(1),
-//	    WithBlockTreeDBInMemory,
+//	    WithBlockTreeDBInMemory(),
 //	)
 //
 // Parameters:

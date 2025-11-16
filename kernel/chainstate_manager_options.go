@@ -47,16 +47,20 @@ func WithWipeDBs(wipeBlockTree, wipeChainstate bool) ChainstateManagerOption {
 	}
 }
 
-// WithBlockTreeDBInMemory is a ChainstateManagerOption that configures
+// WithBlockTreeDBInMemory returns a ChainstateManagerOption that configures
 // the block tree database to be stored in memory.
-var WithBlockTreeDBInMemory ChainstateManagerOption = func(opts *C.btck_ChainstateManagerOptions) error {
-	C.btck_chainstate_manager_options_update_block_tree_db_in_memory(opts, C.int(1))
-	return nil
+func WithBlockTreeDBInMemory() ChainstateManagerOption {
+	return func(opts *C.btck_ChainstateManagerOptions) error {
+		C.btck_chainstate_manager_options_update_block_tree_db_in_memory(opts, C.int(1))
+		return nil
+	}
 }
 
-// WithChainstateDBInMemory is a ChainstateManagerOption that configures
+// WithChainstateDBInMemory returns a ChainstateManagerOption that configures
 // the chainstate database to be stored in memory.
-var WithChainstateDBInMemory ChainstateManagerOption = func(opts *C.btck_ChainstateManagerOptions) error {
-	C.btck_chainstate_manager_options_update_chainstate_db_in_memory(opts, C.int(1))
-	return nil
+func WithChainstateDBInMemory() ChainstateManagerOption {
+	return func(opts *C.btck_ChainstateManagerOptions) error {
+		C.btck_chainstate_manager_options_update_chainstate_db_in_memory(opts, C.int(1))
+		return nil
+	}
 }
