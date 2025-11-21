@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -23,7 +24,6 @@ func TestChainstateManager(t *testing.T) {
 
 func (s *ChainstateManagerTestSuite) TestBlockSpentOutputs(t *testing.T) {
 	chain := s.Manager.GetActiveChain()
-
 	blockIndex := chain.GetByHeight(202)
 
 	blockSpentOutputs, err := s.Manager.ReadBlockSpentOutputs(blockIndex)
@@ -32,36 +32,69 @@ func (s *ChainstateManagerTestSuite) TestBlockSpentOutputs(t *testing.T) {
 	}
 	defer blockSpentOutputs.Destroy()
 
-	// Test transaction spent outputs count
-	txCount := blockSpentOutputs.Count()
-	if txCount != 20 {
-		t.Errorf("Expected 20 transactions, got %d", txCount)
-	}
+	t.Run("Count", func(t *testing.T) {
+		txCount := blockSpentOutputs.Count()
+		if txCount != 20 {
+			t.Errorf("Expected 20 transactions, got %d", txCount)
+		}
+	})
 
-	// Verify each transaction spent outputs
-	for i := uint64(0); i < txCount; i++ {
-		txSpentOutputs, err := blockSpentOutputs.GetTransactionSpentOutputsAt(i)
-		if err != nil {
-			t.Fatalf("GetTransactionSpentOutputsAt(%d) error = %v", i, err)
+	t.Run("GetTransactionSpentOutputsAt", func(t *testing.T) {
+		for i := uint64(0); i < blockSpentOutputs.Count(); i++ {
+			txSpentOutputs, err := blockSpentOutputs.GetTransactionSpentOutputsAt(i)
+			if err != nil {
+				t.Fatalf("GetTransactionSpentOutputsAt(%d) error = %v", i, err)
+			}
+
+			spentOutputSize := txSpentOutputs.Count()
+			if spentOutputSize != 1 {
+				t.Errorf("Expected transaction spent output size 1, got %d", spentOutputSize)
+			}
+
+			coin, err := txSpentOutputs.GetCoinAt(0)
+			if err != nil {
+				t.Fatalf("GetCoinAt(0) error = %v", err)
+			}
+
+			coin.GetOutput()
+
+			height := coin.ConfirmationHeight()
+			if height <= 0 {
+				t.Fatalf("ConfirmationHeight() height %d, want > 0", height)
+			}
+		}
+	})
+
+	t.Run("TransactionsSpentOutputs", func(t *testing.T) {
+		count := len(slices.Collect(blockSpentOutputs.TransactionsSpentOutputs()))
+		if count != 20 {
+			t.Errorf("Expected to iterate over 20 transaction spent outputs, got %d", count)
+		}
+	})
+
+	t.Run("TransactionsSpentOutputsRange", func(t *testing.T) {
+		count := len(slices.Collect(blockSpentOutputs.TransactionsSpentOutputsRange(0, 1000)))
+		if count != 20 {
+			t.Errorf("Expected to iterate over 20 transaction spent outputs, got %d", count)
 		}
 
-		spentOutputSize := txSpentOutputs.Count()
-		if spentOutputSize != 1 {
-			t.Errorf("Expected transaction spent output size 1, got %d", spentOutputSize)
+		count = len(slices.Collect(blockSpentOutputs.TransactionsSpentOutputsRange(10, 15)))
+		if count != 5 {
+			t.Errorf("Expected to iterate over 5 transaction spent outputs, got %d", count)
+		}
+	})
+
+	t.Run("TransactionsSpentOutputsFrom", func(t *testing.T) {
+		count := len(slices.Collect(blockSpentOutputs.TransactionsSpentOutputsFrom(0)))
+		if count != 20 {
+			t.Errorf("Expected to iterate over 20 transaction spent outputs, got %d", count)
 		}
 
-		coin, err := txSpentOutputs.GetCoinAt(0)
-		if err != nil {
-			t.Fatalf("GetCoinAt(0) error = %v", err)
+		count = len(slices.Collect(blockSpentOutputs.TransactionsSpentOutputsFrom(15)))
+		if count != 5 {
+			t.Errorf("Expected to iterate over 5 transaction spent outputs, got %d", count)
 		}
-
-		coin.GetOutput()
-
-		height := coin.ConfirmationHeight()
-		if height <= 0 {
-			t.Fatalf("ConfirmationHeight() height %d, want > 0", height)
-		}
-	}
+	})
 }
 
 func (s *ChainstateManagerTestSuite) TestReadBlock(t *testing.T) {
