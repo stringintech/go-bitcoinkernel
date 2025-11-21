@@ -171,7 +171,7 @@ func (s *ChainstateManagerTestSuite) Setup(t *testing.T) {
 
 	manager, err := NewChainstateManager(ctx, dataDir, blocksDir,
 		WithWorkerThreads(1),
-		WithBlockTreeDBInMemory(),
+		WithBlockTreeDBInMemory(true),
 		WithChainstateDBInMemory(),
 		WithWipeDBs(true, true),
 	)
