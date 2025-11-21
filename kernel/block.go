@@ -5,6 +5,7 @@ package kernel
 */
 import "C"
 import (
+	"iter"
 	"unsafe"
 )
 
@@ -86,4 +87,75 @@ func (b *Block) GetTransactionAt(index uint64) (*TransactionView, error) {
 	}
 	ptr := C.btck_block_get_transaction_at((*C.btck_Block)(b.ptr), C.size_t(index))
 	return newTransactionView(check(ptr)), nil
+}
+
+// Transactions returns an iterator over all transactions in the block.
+//
+// The returned transactions are non-owned views that depend on the lifetime of this Block.
+//
+// Example usage:
+//
+//	for tx := range block.Transactions() {
+//	    // Process transaction
+//	}
+func (b *Block) Transactions() iter.Seq[*TransactionView] {
+	return func(yield func(*TransactionView) bool) {
+		b.iterTransactions(0, b.CountTransactions(), yield)
+	}
+}
+
+// TransactionsRange returns an iterator over a range of transactions in the block.
+//
+// Parameters:
+//   - from: Starting index (inclusive)
+//   - to: Ending index (exclusive)
+//
+// The returned transactions are non-owned views that depend on the lifetime of this Block.
+// Safe for out-of-bounds arguments: 'to' is clamped to the count,
+// and an invalid range (from >= to) yields an empty iterator.
+//
+// Example usage:
+//
+//	for tx := range block.TransactionsRange(0, 5) {
+//	    // Process transactions 0-4
+//	}
+func (b *Block) TransactionsRange(from, to uint64) iter.Seq[*TransactionView] {
+	return func(yield func(*TransactionView) bool) {
+		if count := b.CountTransactions(); to > count {
+			to = count
+		}
+		b.iterTransactions(from, to, yield)
+	}
+}
+
+// TransactionsFrom returns an iterator over transactions starting from the given index.
+//
+// Parameters:
+//   - from: Starting index (inclusive)
+//
+// The returned transactions are non-owned views that depend on the lifetime of this Block.
+// If from is beyond the transaction count, returns an empty iterator.
+//
+// Example usage:
+//
+//	for tx := range block.TransactionsFrom(5) {
+//	    // Process transactions from index 5 to the end
+//	}
+func (b *Block) TransactionsFrom(from uint64) iter.Seq[*TransactionView] {
+	return func(yield func(*TransactionView) bool) {
+		b.iterTransactions(from, b.CountTransactions(), yield)
+	}
+}
+
+// iterTransactions is a helper that iterates over transactions in [from, to).
+func (b *Block) iterTransactions(from, to uint64, yield func(*TransactionView) bool) {
+	for i := from; i < to; i++ {
+		tx, err := b.GetTransactionAt(i)
+		if err != nil {
+			panic(err)
+		}
+		if !yield(tx) {
+			return
+		}
+	}
 }
