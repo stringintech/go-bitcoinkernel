@@ -67,27 +67,6 @@ func (t *transactionApi) Copy() *Transaction {
 	return newTransaction(t.ptr, false)
 }
 
-// CountOutputs returns the number of outputs in the transaction.
-func (t *transactionApi) CountOutputs() uint64 {
-	return uint64(C.btck_transaction_count_outputs(t.ptr))
-}
-
-// GetOutput retrieves the output at the specified index.
-//
-// The returned output is a non-owned view that depends on the lifetime of this transaction.
-//
-// Parameters:
-//   - index: Index of the output to retrieve
-//
-// Returns an error if the index is out of bounds.
-func (t *transactionApi) GetOutput(index uint64) (*TransactionOutputView, error) {
-	if index >= t.CountOutputs() {
-		return nil, ErrKernelIndexOutOfBounds
-	}
-	ptr := C.btck_transaction_get_output_at(t.ptr, C.size_t(index))
-	return newTransactionOutputView(check(ptr)), nil
-}
-
 // Bytes returns the consensus serialized representation of the transaction.
 //
 // Returns an error if the serialization fails.
@@ -194,6 +173,98 @@ func (t *transactionApi) iterInputs(from, to uint64, yield func(*TransactionInpu
 			panic(err)
 		}
 		if !yield(input) {
+			return
+		}
+	}
+}
+
+// CountOutputs returns the number of outputs in the transaction.
+func (t *transactionApi) CountOutputs() uint64 {
+	return uint64(C.btck_transaction_count_outputs(t.ptr))
+}
+
+// GetOutput retrieves the output at the specified index.
+//
+// The returned output is a non-owned view that depends on the lifetime of this transaction.
+//
+// Parameters:
+//   - index: Index of the output to retrieve
+//
+// Returns an error if the index is out of bounds.
+func (t *transactionApi) GetOutput(index uint64) (*TransactionOutputView, error) {
+	if index >= t.CountOutputs() {
+		return nil, ErrKernelIndexOutOfBounds
+	}
+	ptr := C.btck_transaction_get_output_at(t.ptr, C.size_t(index))
+	return newTransactionOutputView(check(ptr)), nil
+}
+
+// Outputs returns an iterator over all outputs in the transaction.
+//
+// The returned outputs are non-owned views that depend on the lifetime of this transaction.
+//
+// Example usage:
+//
+//	for output := range tx.Outputs() {
+//	    // Process output
+//	}
+func (t *transactionApi) Outputs() iter.Seq[*TransactionOutputView] {
+	return func(yield func(*TransactionOutputView) bool) {
+		t.iterOutputs(0, t.CountOutputs(), yield)
+	}
+}
+
+// OutputsRange returns an iterator over a range of outputs in the transaction.
+//
+// Parameters:
+//   - from: Starting index (inclusive)
+//   - to: Ending index (exclusive)
+//
+// The returned outputs are non-owned views that depend on the lifetime of this transaction.
+// Safe for out-of-bounds arguments: 'to' is clamped to the count,
+// and an invalid range (from >= to) yields an empty iterator.
+//
+// Example usage:
+//
+//	for output := range tx.OutputsRange(0, 5) {
+//	    // Process outputs 0-4
+//	}
+func (t *transactionApi) OutputsRange(from, to uint64) iter.Seq[*TransactionOutputView] {
+	return func(yield func(*TransactionOutputView) bool) {
+		if count := t.CountOutputs(); to > count {
+			to = count
+		}
+		t.iterOutputs(from, to, yield)
+	}
+}
+
+// OutputsFrom returns an iterator over outputs starting from the given index.
+//
+// Parameters:
+//   - from: Starting index (inclusive)
+//
+// The returned outputs are non-owned views that depend on the lifetime of this transaction.
+// If from is beyond the output count, returns an empty iterator.
+//
+// Example usage:
+//
+//	for output := range tx.OutputsFrom(5) {
+//	    // Process outputs from index 5 to the end
+//	}
+func (t *transactionApi) OutputsFrom(from uint64) iter.Seq[*TransactionOutputView] {
+	return func(yield func(*TransactionOutputView) bool) {
+		t.iterOutputs(from, t.CountOutputs(), yield)
+	}
+}
+
+// iterOutputs is a helper that iterates over outputs in [from, to).
+func (t *transactionApi) iterOutputs(from, to uint64, yield func(*TransactionOutputView) bool) {
+	for i := from; i < to; i++ {
+		output, err := t.GetOutput(i)
+		if err != nil {
+			panic(err)
+		}
+		if !yield(output) {
 			return
 		}
 	}

@@ -53,29 +53,6 @@ func TestTransaction(t *testing.T) {
 		}
 	})
 
-	t.Run("CountOutputs", func(t *testing.T) {
-		// This transaction has 1 output
-		outputCount := tx.CountOutputs()
-		if outputCount != 1 {
-			t.Errorf("Expected 1 output, got %d", outputCount)
-		}
-	})
-
-	t.Run("GetOutput", func(t *testing.T) {
-		output, err := tx.GetOutput(0)
-		if err != nil {
-			t.Fatalf("GetOutput(0) error = %v", err)
-		}
-		if output == nil {
-			t.Fatal("Output is nil")
-		}
-
-		_, err = tx.GetOutput(tx.CountOutputs())
-		if !errors.Is(err, ErrKernelIndexOutOfBounds) {
-			t.Errorf("Expected ErrKernelIndexOutOfBounds for out of bounds output, got %v", err)
-		}
-	})
-
 	t.Run("GetTxid", func(t *testing.T) {
 		txid := tx.GetTxid()
 		if txid == nil {
@@ -150,6 +127,60 @@ func TestTransaction(t *testing.T) {
 		count = len(slices.Collect(tx.InputsFrom(1)))
 		if count != 0 {
 			t.Errorf("Expected to iterate over 0 inputs, got %d", count)
+		}
+	})
+
+	t.Run("CountOutputs", func(t *testing.T) {
+		// This transaction has 1 output
+		outputCount := tx.CountOutputs()
+		if outputCount != 1 {
+			t.Errorf("Expected 1 output, got %d", outputCount)
+		}
+	})
+
+	t.Run("GetOutput", func(t *testing.T) {
+		output, err := tx.GetOutput(0)
+		if err != nil {
+			t.Fatalf("GetOutput(0) error = %v", err)
+		}
+		if output == nil {
+			t.Fatal("Output is nil")
+		}
+
+		_, err = tx.GetOutput(tx.CountOutputs())
+		if !errors.Is(err, ErrKernelIndexOutOfBounds) {
+			t.Errorf("Expected ErrKernelIndexOutOfBounds for out of bounds output, got %v", err)
+		}
+	})
+
+	t.Run("Outputs", func(t *testing.T) {
+		count := len(slices.Collect(tx.Outputs()))
+		if count != 1 {
+			t.Errorf("Expected to iterate over 1 output, got %d", count)
+		}
+	})
+
+	t.Run("OutputsRange", func(t *testing.T) {
+		count := len(slices.Collect(tx.OutputsRange(0, 1000)))
+		if count != 1 {
+			t.Errorf("Expected to iterate over 1 output, got %d", count)
+		}
+
+		count = len(slices.Collect(tx.OutputsRange(1, 2)))
+		if count != 0 {
+			t.Errorf("Expected to iterate over 0 outputs, got %d", count)
+		}
+	})
+
+	t.Run("OutputsFrom", func(t *testing.T) {
+		count := len(slices.Collect(tx.OutputsFrom(0)))
+		if count != 1 {
+			t.Errorf("Expected to iterate over 1 output, got %d", count)
+		}
+
+		count = len(slices.Collect(tx.OutputsFrom(1)))
+		if count != 0 {
+			t.Errorf("Expected to iterate over 0 outputs, got %d", count)
 		}
 	})
 }
