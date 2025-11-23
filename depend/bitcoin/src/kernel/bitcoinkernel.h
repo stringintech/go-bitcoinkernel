@@ -35,6 +35,17 @@
 #else
     #define BITCOINKERNEL_WARN_UNUSED_RESULT
 #endif
+
+/**
+ * BITCOINKERNEL_ARG_NONNULL is a compiler attribute used to indicate that
+ * certain pointer arguments to a function are not expected to be null.
+ *
+ * Callers must not pass a null pointer for arguments marked with this attribute,
+ * as doing so may result in undefined behavior. This attribute should only be
+ * used for arguments where a null pointer is unambiguously a programmer error,
+ * such as for opaque handles, and not for pointers to raw input data that might
+ * validly be null (e.g., from an empty std::span or std::string).
+ */
 #if !defined(BITCOINKERNEL_BUILD) && defined(__GNUC__)
     #define BITCOINKERNEL_ARG_NONNULL(...) __attribute__((__nonnull__(__VA_ARGS__)))
 #else
@@ -469,12 +480,12 @@ typedef uint8_t btck_ChainType;
 /**
  * @brief Create a new transaction from the serialized data.
  *
- * @param[in] raw_transaction     Non-null.
+ * @param[in] raw_transaction     Serialized transaction.
  * @param[in] raw_transaction_len Length of the serialized transaction.
  * @return                        The transaction, or null on error.
  */
 BITCOINKERNEL_API btck_Transaction* BITCOINKERNEL_WARN_UNUSED_RESULT btck_transaction_create(
-    const void* raw_transaction, size_t raw_transaction_len) BITCOINKERNEL_ARG_NONNULL(1);
+    const void* raw_transaction, size_t raw_transaction_len);
 
 /**
  * @brief Copy a transaction. Transactions are reference counted, so this just
@@ -567,12 +578,12 @@ BITCOINKERNEL_API void btck_transaction_destroy(btck_Transaction* transaction);
 
 /**
  * @brief Create a script pubkey from serialized data.
- * @param[in] script_pubkey     Non-null.
+ * @param[in] script_pubkey     Serialized script pubkey.
  * @param[in] script_pubkey_len Length of the script pubkey data.
  * @return                      The script pubkey.
  */
 BITCOINKERNEL_API btck_ScriptPubkey* BITCOINKERNEL_WARN_UNUSED_RESULT btck_script_pubkey_create(
-    const void* script_pubkey, size_t script_pubkey_len) BITCOINKERNEL_ARG_NONNULL(1);
+    const void* script_pubkey, size_t script_pubkey_len);
 
 /**
  * @brief Copy a script pubkey.
@@ -933,11 +944,12 @@ BITCOINKERNEL_API const btck_BlockHash* BITCOINKERNEL_WARN_UNUSED_RESULT btck_bl
  * @brief Create options for the chainstate manager.
  *
  * @param[in] context          Non-null, the created options and through it the chainstate manager will
-                               associate with this kernel context for the duration of their lifetimes.
- * @param[in] data_directory   Non-null, path string of the directory containing the chainstate data.
- *                             If the directory does not exist yet, it will be created.
- * @param[in] blocks_directory Non-null, path string of the directory containing the block data. If
- *                             the directory does not exist yet, it will be created.
+ *                             associate with this kernel context for the duration of their lifetimes.
+ * @param[in] data_directory   Non-null, non-empty path string of the directory containing the
+ *                             chainstate data. If the directory does not exist yet, it will be
+ *                             created.
+ * @param[in] blocks_directory Non-null, non-empty path string of the directory containing the block
+ *                             data. If the directory does not exist yet, it will be created.
  * @return                     The allocated chainstate manager options, or null on error.
  */
 BITCOINKERNEL_API btck_ChainstateManagerOptions* BITCOINKERNEL_WARN_UNUSED_RESULT btck_chainstate_manager_options_create(
@@ -945,7 +957,7 @@ BITCOINKERNEL_API btck_ChainstateManagerOptions* BITCOINKERNEL_WARN_UNUSED_RESUL
     const char* data_directory,
     size_t data_directory_len,
     const char* blocks_directory,
-    size_t blocks_directory_len) BITCOINKERNEL_ARG_NONNULL(1, 2);
+    size_t blocks_directory_len) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
  * @brief Set the number of available worker threads used during validation.
@@ -1111,12 +1123,12 @@ BITCOINKERNEL_API btck_Block* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_read(
 /**
  * @brief Parse a serialized raw block into a new block object.
  *
- * @param[in] raw_block     Non-null, serialized block.
+ * @param[in] raw_block     Serialized block.
  * @param[in] raw_block_len Length of the serialized block.
  * @return                  The allocated block, or null on error.
  */
 BITCOINKERNEL_API btck_Block* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_create(
-    const void* raw_block, size_t raw_block_len) BITCOINKERNEL_ARG_NONNULL(1);
+    const void* raw_block, size_t raw_block_len);
 
 /**
  * @brief Copy a block. Blocks are reference counted, so this just increments
@@ -1204,31 +1216,12 @@ BITCOINKERNEL_API btck_BlockValidationResult btck_block_validation_state_get_blo
 ///@{
 
 /**
- * @brief Get the block tree entry of the current chain tip. Once returned,
- * there is no guarantee that it remains in the active chain.
- *
- * @param[in] chain Non-null.
- * @return          The block tree entry of the current tip, or null if the chain is empty.
- */
-BITCOINKERNEL_API const btck_BlockTreeEntry* BITCOINKERNEL_WARN_UNUSED_RESULT btck_chain_get_tip(
-    const btck_Chain* chain) BITCOINKERNEL_ARG_NONNULL(1);
-
-/**
  * @brief Return the height of the tip of the chain.
  *
  * @param[in] chain Non-null.
  * @return          The current height.
  */
 BITCOINKERNEL_API int32_t BITCOINKERNEL_WARN_UNUSED_RESULT btck_chain_get_height(
-    const btck_Chain* chain) BITCOINKERNEL_ARG_NONNULL(1);
-
-/**
- * @brief Get the block tree entry of the genesis block.
- *
- * @param[in] chain Non-null.
- * @return          The block tree entry of the genesis block, or null if the chain is empty.
- */
-BITCOINKERNEL_API const btck_BlockTreeEntry* BITCOINKERNEL_WARN_UNUSED_RESULT btck_chain_get_genesis(
     const btck_Chain* chain) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
