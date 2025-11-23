@@ -5,6 +5,7 @@ package kernel
 */
 import "C"
 import (
+	"iter"
 	"unsafe"
 )
 
@@ -72,4 +73,75 @@ func (t *transactionSpentOutputsApi) GetCoinAt(index uint64) (*CoinView, error) 
 	}
 	ptr := C.btck_transaction_spent_outputs_get_coin_at(t.ptr, C.size_t(index))
 	return newCoinView(check(ptr)), nil
+}
+
+// Coins returns an iterator over all coins in the transaction spent outputs.
+//
+// The returned coins are non-owned views that depend on the lifetime of this transaction spent outputs.
+//
+// Example usage:
+//
+//	for coin := range tso.Coins() {
+//	    // Process coin
+//	}
+func (t *transactionSpentOutputsApi) Coins() iter.Seq[*CoinView] {
+	return func(yield func(*CoinView) bool) {
+		t.iterCoins(0, t.Count(), yield)
+	}
+}
+
+// CoinsRange returns an iterator over a range of coins in the transaction spent outputs.
+//
+// Parameters:
+//   - from: Starting index (inclusive)
+//   - to: Ending index (exclusive)
+//
+// The returned coins are non-owned views that depend on the lifetime of this transaction spent outputs.
+// Safe for out-of-bounds arguments: 'to' is clamped to the count,
+// and an invalid range (from >= to) yields an empty iterator.
+//
+// Example usage:
+//
+//	for coin := range tso.CoinsRange(0, 5) {
+//	    // Process coins 0-4
+//	}
+func (t *transactionSpentOutputsApi) CoinsRange(from, to uint64) iter.Seq[*CoinView] {
+	return func(yield func(*CoinView) bool) {
+		if count := t.Count(); to > count {
+			to = count
+		}
+		t.iterCoins(from, to, yield)
+	}
+}
+
+// CoinsFrom returns an iterator over coins starting from the given index.
+//
+// Parameters:
+//   - from: Starting index (inclusive)
+//
+// The returned coins are non-owned views that depend on the lifetime of this transaction spent outputs.
+// If from is beyond the coin count, returns an empty iterator.
+//
+// Example usage:
+//
+//	for coin := range tso.CoinsFrom(5) {
+//	    // Process coins from index 5 to the end
+//	}
+func (t *transactionSpentOutputsApi) CoinsFrom(from uint64) iter.Seq[*CoinView] {
+	return func(yield func(*CoinView) bool) {
+		t.iterCoins(from, t.Count(), yield)
+	}
+}
+
+// iterCoins is a helper that iterates over coins in [from, to).
+func (t *transactionSpentOutputsApi) iterCoins(from, to uint64, yield func(*CoinView) bool) {
+	for i := from; i < to; i++ {
+		coin, err := t.GetCoinAt(i)
+		if err != nil {
+			panic(err)
+		}
+		if !yield(coin) {
+			return
+		}
+	}
 }

@@ -4,6 +4,7 @@ package kernel
 #include "bitcoinkernel.h"
 */
 import "C"
+import "iter"
 
 // Chain represents the currently known best-chain associated with a chainstate.
 //
@@ -65,4 +66,73 @@ func (c *Chain) Contains(blockTreeEntry *BlockTreeEntry) bool {
 // This is the height of the most recent block in the chain.
 func (c *Chain) GetHeight() int32 {
 	return int32(C.btck_chain_get_height(c.ptr))
+}
+
+// Entries returns an iterator over all block tree entries in the chain.
+//
+// The iterator starts from height 0 (genesis) and goes up to and including the chain tip.
+//
+// Example usage:
+//
+//	for entry := range chain.Entries() {
+//	    // Process block tree entry
+//	}
+func (c *Chain) Entries() iter.Seq[*BlockTreeEntry] {
+	return func(yield func(*BlockTreeEntry) bool) {
+		c.iterEntries(0, c.GetHeight()+1, yield)
+	}
+}
+
+// EntriesRange returns an iterator over a range of block tree entries in the chain.
+//
+// Parameters:
+//   - from: Starting height (inclusive)
+//   - to: Ending height (exclusive)
+//
+// Safe for out-of-bounds arguments: 'to' is clamped to chain tip height + 1,
+// and an invalid range (from >= to) yields an empty iterator.
+//
+// Example usage:
+//
+//	for entry := range chain.EntriesRange(0, 6) {
+//	    // Process block tree entries at heights 0-5
+//	}
+func (c *Chain) EntriesRange(from, to int32) iter.Seq[*BlockTreeEntry] {
+	return func(yield func(*BlockTreeEntry) bool) {
+		if tipHeight := c.GetHeight(); to > tipHeight+1 {
+			to = tipHeight + 1
+		}
+		c.iterEntries(from, to, yield)
+	}
+}
+
+// EntriesFrom returns an iterator over block tree entries starting from the given height.
+//
+// Parameters:
+//   - from: Starting height (inclusive)
+//
+// If from is beyond the chain height, returns an empty iterator.
+//
+// Example usage:
+//
+//	for entry := range chain.EntriesFrom(5) {
+//	    // Process block tree entries from height 5 to the tip
+//	}
+func (c *Chain) EntriesFrom(from int32) iter.Seq[*BlockTreeEntry] {
+	return func(yield func(*BlockTreeEntry) bool) {
+		c.iterEntries(from, c.GetHeight()+1, yield)
+	}
+}
+
+// iterEntries is a helper that iterates over block tree entries in [from, to).
+func (c *Chain) iterEntries(from, to int32, yield func(*BlockTreeEntry) bool) {
+	for h := from; h < to; h++ {
+		entry := c.GetByHeight(h)
+		if entry == nil { // Height may become out of bounds due to a reorg
+			return
+		}
+		if !yield(entry) {
+			return
+		}
+	}
 }

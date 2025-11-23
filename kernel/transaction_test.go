@@ -3,6 +3,7 @@ package kernel
 import (
 	"encoding/hex"
 	"errors"
+	"slices"
 	"testing"
 )
 
@@ -37,70 +38,149 @@ func TestTransaction(t *testing.T) {
 		t.Error("Transaction pointer is nil")
 	}
 
-	// Test Copy()
-	txCopy := tx.Copy()
-	if txCopy == nil {
-		t.Fatal("Copied transaction is nil")
-	}
-	defer txCopy.Destroy()
+	t.Run("Copy", func(t *testing.T) {
+		txCopy := tx.Copy()
+		if txCopy == nil {
+			t.Fatal("Copied transaction is nil")
+		}
+		defer txCopy.Destroy()
 
-	if txCopy.handle.ptr == nil {
-		t.Error("Copied transaction pointer is nil")
-	}
+		if txCopy.handle.ptr == nil {
+			t.Error("Copied transaction pointer is nil")
+		}
+		if txCopy.handle.ptr == tx.handle.ptr {
+			t.Error("Copied transaction pointer should be different from original")
+		}
+	})
 
-	// Test CountInputs() (this is a coinbase transaction with 1 input)
-	inputCount := tx.CountInputs()
-	if inputCount != 1 {
-		t.Errorf("Expected 1 input, got %d", inputCount)
-	}
+	t.Run("GetTxid", func(t *testing.T) {
+		txid := tx.GetTxid()
+		if txid == nil {
+			t.Error("Txid is nil")
+		}
+	})
 
-	// Test CountOutputs() (this transaction has 1 output)
-	outputCount := tx.CountOutputs()
-	if outputCount != 1 {
-		t.Errorf("Expected 1 output, got %d", outputCount)
-	}
+	t.Run("Bytes", func(t *testing.T) {
+		serialized, err := tx.Bytes()
+		if err != nil {
+			t.Fatalf("Bytes() error = %v", err)
+		}
 
-	// Test GetInput()
-	input, err := tx.GetInput(0)
-	if err != nil {
-		t.Fatalf("GetInput(0) error = %v", err)
-	}
-	if input == nil {
-		t.Error("Input is nil")
-	}
-	_, err = tx.GetInput(inputCount)
-	if !errors.Is(err, ErrKernelIndexOutOfBounds) {
-		t.Errorf("Expected ErrKernelIndexOutOfBounds for out of bounds input, got %v", err)
-	}
+		if len(serialized) == 0 {
+			t.Error("Serialized transaction is empty")
+		}
 
-	// Test GetOutput()
-	output, err := tx.GetOutput(0)
-	if err != nil {
-		t.Fatalf("GetOutput(0) error = %v", err)
-	}
-	if output == nil {
-		t.Fatal("Output is nil")
-	}
-	_, err = tx.GetOutput(outputCount)
-	if !errors.Is(err, ErrKernelIndexOutOfBounds) {
-		t.Errorf("Expected ErrKernelIndexOutOfBounds for out of bounds output, got %v", err)
-	}
+		// The serialized bytes should match the original
+		if hex.EncodeToString(serialized) != coinbaseTxHex {
+			t.Errorf("Serialized transaction doesn't match original.\nExpected: %s\nGot: %s", coinbaseTxHex, hex.EncodeToString(serialized))
+		}
+	})
 
-	// Test GetTxid()
-	_ = tx.GetTxid()
+	t.Run("CountInputs", func(t *testing.T) {
+		// This is a coinbase transaction with 1 input
+		inputCount := tx.CountInputs()
+		if inputCount != 1 {
+			t.Errorf("Expected 1 input, got %d", inputCount)
+		}
+	})
 
-	// Test Bytes()
-	serialized, err := tx.Bytes()
-	if err != nil {
-		t.Fatalf("Bytes() error = %v", err)
-	}
+	t.Run("GetInput", func(t *testing.T) {
+		input, err := tx.GetInput(0)
+		if err != nil {
+			t.Fatalf("GetInput(0) error = %v", err)
+		}
+		if input == nil {
+			t.Error("Input is nil")
+		}
 
-	if len(serialized) == 0 {
-		t.Error("Serialized transaction is empty")
-	}
+		_, err = tx.GetInput(tx.CountInputs())
+		if !errors.Is(err, ErrKernelIndexOutOfBounds) {
+			t.Errorf("Expected ErrKernelIndexOutOfBounds for out of bounds input, got %v", err)
+		}
+	})
 
-	// The serialized bytes should match the original
-	if hex.EncodeToString(serialized) != coinbaseTxHex {
-		t.Errorf("Serialized transaction doesn't match original.\nExpected: %s\nGot: %s", coinbaseTxHex, hex.EncodeToString(serialized))
-	}
+	t.Run("Inputs", func(t *testing.T) {
+		count := len(slices.Collect(tx.Inputs()))
+		if count != 1 {
+			t.Errorf("Expected to iterate over 1 input, got %d", count)
+		}
+	})
+
+	t.Run("InputsRange", func(t *testing.T) {
+		count := len(slices.Collect(tx.InputsRange(0, 1000)))
+		if count != 1 {
+			t.Errorf("Expected to iterate over 1 input, got %d", count)
+		}
+
+		count = len(slices.Collect(tx.InputsRange(1, 2)))
+		if count != 0 {
+			t.Errorf("Expected to iterate over 0 inputs, got %d", count)
+		}
+	})
+
+	t.Run("InputsFrom", func(t *testing.T) {
+		count := len(slices.Collect(tx.InputsFrom(0)))
+		if count != 1 {
+			t.Errorf("Expected to iterate over 1 input, got %d", count)
+		}
+
+		count = len(slices.Collect(tx.InputsFrom(1)))
+		if count != 0 {
+			t.Errorf("Expected to iterate over 0 inputs, got %d", count)
+		}
+	})
+
+	t.Run("CountOutputs", func(t *testing.T) {
+		// This transaction has 1 output
+		outputCount := tx.CountOutputs()
+		if outputCount != 1 {
+			t.Errorf("Expected 1 output, got %d", outputCount)
+		}
+	})
+
+	t.Run("GetOutput", func(t *testing.T) {
+		output, err := tx.GetOutput(0)
+		if err != nil {
+			t.Fatalf("GetOutput(0) error = %v", err)
+		}
+		if output == nil {
+			t.Fatal("Output is nil")
+		}
+
+		_, err = tx.GetOutput(tx.CountOutputs())
+		if !errors.Is(err, ErrKernelIndexOutOfBounds) {
+			t.Errorf("Expected ErrKernelIndexOutOfBounds for out of bounds output, got %v", err)
+		}
+	})
+
+	t.Run("Outputs", func(t *testing.T) {
+		count := len(slices.Collect(tx.Outputs()))
+		if count != 1 {
+			t.Errorf("Expected to iterate over 1 output, got %d", count)
+		}
+	})
+
+	t.Run("OutputsRange", func(t *testing.T) {
+		count := len(slices.Collect(tx.OutputsRange(0, 1000)))
+		if count != 1 {
+			t.Errorf("Expected to iterate over 1 output, got %d", count)
+		}
+
+		count = len(slices.Collect(tx.OutputsRange(1, 2)))
+		if count != 0 {
+			t.Errorf("Expected to iterate over 0 outputs, got %d", count)
+		}
+	})
+
+	t.Run("OutputsFrom", func(t *testing.T) {
+		count := len(slices.Collect(tx.OutputsFrom(0)))
+		if count != 1 {
+			t.Errorf("Expected to iterate over 1 output, got %d", count)
+		}
+
+		count = len(slices.Collect(tx.OutputsFrom(1)))
+		if count != 0 {
+			t.Errorf("Expected to iterate over 0 outputs, got %d", count)
+		}
+	})
 }

@@ -5,6 +5,7 @@ package kernel
 */
 import "C"
 import (
+	"iter"
 	"unsafe"
 )
 
@@ -63,4 +64,75 @@ func (bso *BlockSpentOutputs) GetTransactionSpentOutputsAt(index uint64) (*Trans
 // and does not duplicate the underlying data.
 func (bso *BlockSpentOutputs) Copy() *BlockSpentOutputs {
 	return newBlockSpentOutputs((*C.btck_BlockSpentOutputs)(bso.ptr), false)
+}
+
+// TransactionsSpentOutputs returns an iterator over all transaction spent outputs in the block.
+//
+// The returned transaction spent outputs are non-owned views that depend on the lifetime of this BlockSpentOutputs.
+//
+// Example usage:
+//
+//	for txSpentOutputs := range blockSpentOutputs.TransactionsSpentOutputs() {
+//	    // Process transaction spent outputs
+//	}
+func (bso *BlockSpentOutputs) TransactionsSpentOutputs() iter.Seq[*TransactionSpentOutputsView] {
+	return func(yield func(*TransactionSpentOutputsView) bool) {
+		bso.iterTransactionsSpentOutputs(0, bso.Count(), yield)
+	}
+}
+
+// TransactionsSpentOutputsRange returns an iterator over a range of transaction spent outputs in the block.
+//
+// Parameters:
+//   - from: Starting index (inclusive)
+//   - to: Ending index (exclusive)
+//
+// The returned transaction spent outputs are non-owned views that depend on the lifetime of this BlockSpentOutputs.
+// Safe for out-of-bounds arguments: 'to' is clamped to the count,
+// and an invalid range (from >= to) yields an empty iterator.
+//
+// Example usage:
+//
+//	for txSpentOutputs := range blockSpentOutputs.TransactionsSpentOutputsRange(0, 5) {
+//	    // Process transaction spent outputs 0-4
+//	}
+func (bso *BlockSpentOutputs) TransactionsSpentOutputsRange(from, to uint64) iter.Seq[*TransactionSpentOutputsView] {
+	return func(yield func(*TransactionSpentOutputsView) bool) {
+		if count := bso.Count(); to > count {
+			to = count
+		}
+		bso.iterTransactionsSpentOutputs(from, to, yield)
+	}
+}
+
+// TransactionsSpentOutputsFrom returns an iterator over transaction spent outputs starting from the given index.
+//
+// Parameters:
+//   - from: Starting index (inclusive)
+//
+// The returned transaction spent outputs are non-owned views that depend on the lifetime of this BlockSpentOutputs.
+// If from is beyond the count, returns an empty iterator.
+//
+// Example usage:
+//
+//	for txSpentOutputs := range blockSpentOutputs.TransactionsSpentOutputsFrom(5) {
+//	    // Process transaction spent outputs from index 5 to the end
+//	}
+func (bso *BlockSpentOutputs) TransactionsSpentOutputsFrom(from uint64) iter.Seq[*TransactionSpentOutputsView] {
+	return func(yield func(*TransactionSpentOutputsView) bool) {
+		bso.iterTransactionsSpentOutputs(from, bso.Count(), yield)
+	}
+}
+
+// iterTransactionsSpentOutputs is a helper that iterates over transaction spent outputs in [from, to).
+func (bso *BlockSpentOutputs) iterTransactionsSpentOutputs(from, to uint64, yield func(*TransactionSpentOutputsView) bool) {
+	for i := from; i < to; i++ {
+		txSpentOutputs, err := bso.GetTransactionSpentOutputsAt(i)
+		if err != nil {
+			panic(err)
+		}
+		if !yield(txSpentOutputs) {
+			return
+		}
+	}
 }
