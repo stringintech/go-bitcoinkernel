@@ -28,7 +28,7 @@ func TestBlockTreeEntryGetPrevious(t *testing.T) {
 	}
 
 	// Test genesis block has no previous
-	genesisEntry := chain.GetGenesis()
+	genesisEntry := chain.GetByHeight(0)
 
 	// Genesis should have no previous block (should return nil)
 	genesisPrevious := genesisEntry.Previous()
