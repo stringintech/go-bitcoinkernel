@@ -7,38 +7,18 @@ import (
 
 func TestChain(t *testing.T) {
 	suite := ChainstateManagerTestSuite{
-		MaxBlockHeightToImport: 3,   // Import genesis and first few blocks
-		NotificationCallbacks:  nil, // no notification callbacks
-		ValidationCallbacks:    nil, // no validation callbacks
+		MaxBlockHeightToImport: 3,
+		NotificationCallbacks:  nil,
+		ValidationCallbacks:    nil,
 	}
 	suite.Setup(t)
 
 	chain := suite.Manager.GetActiveChain()
 
-	t.Run("GetGenesis", func(t *testing.T) {
-		genesis := chain.GetGenesis()
-		height := genesis.Height()
-		if height != 0 {
-			t.Errorf("Expected genesis height 0, got %d", height)
-		}
-	})
-
-	t.Run("GetTip", func(t *testing.T) {
-		tip := chain.GetTip()
-		tipHeight := tip.Height()
-		if tipHeight <= 0 {
-			t.Errorf("Expected tip height > 0, got %d", tipHeight)
-		}
-		if tip.Height() != suite.ImportedBlocksCount {
-			t.Errorf("Expected tip height %d, got %d", suite.ImportedBlocksCount, tip.Height())
-		}
-	})
-
 	t.Run("GetHeight", func(t *testing.T) {
 		chainHeight := chain.GetHeight()
-		tipHeight := chain.GetTip().Height()
-		if chainHeight != tipHeight {
-			t.Errorf("Expected chain height %d to match tip height %d", chainHeight, tipHeight)
+		if chainHeight != suite.MaxBlockHeightToImport {
+			t.Errorf("Expected chain height %d to match tip height %d", chainHeight, suite.MaxBlockHeightToImport)
 		}
 	})
 
@@ -50,7 +30,7 @@ func TestChain(t *testing.T) {
 	})
 
 	t.Run("Contains", func(t *testing.T) {
-		genesis := chain.GetGenesis()
+		genesis := chain.GetByHeight(0)
 		if !chain.Contains(genesis) {
 			t.Error("Chain should contain genesis block")
 		}

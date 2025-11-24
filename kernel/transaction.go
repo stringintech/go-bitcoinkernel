@@ -36,7 +36,7 @@ func newTransaction(ptr *C.btck_Transaction, fromOwned bool) *Transaction {
 //
 // Returns an error if the transaction data is malformed or cannot be parsed.
 func NewTransaction(rawTransaction []byte) (*Transaction, error) {
-	ptr := C.btck_transaction_create(unsafe.Pointer(&rawTransaction[0]), C.size_t(len(rawTransaction)))
+	ptr := C.btck_transaction_create(unsafe.Pointer(unsafe.SliceData(rawTransaction)), C.size_t(len(rawTransaction)))
 	if ptr == nil {
 		return nil, &InternalError{"Failed to create transaction from bytes"}
 	}

@@ -11,11 +11,22 @@ import (
 const coinbaseTxHex = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08044c86041b020602ffffffff0100f2052a010000004341041b0e8c2567c12536aa13357b79a073dc4444acb83c4ec7a0e2f99dd7457516c5817242da796924ca4e99947d087fedf9ce467cb9f7c6287078f801df276fdf84ac00000000"
 
 func TestInvalidTransactionData(t *testing.T) {
-	// Test with invalid data
-	_, err := NewTransaction([]byte{0x00, 0x01, 0x02})
-	var internalErr *InternalError
-	if !errors.As(err, &internalErr) {
-		t.Errorf("Expected InternalError, got %v", err)
+	tests := []struct {
+		name string
+		data []byte
+	}{
+		{"invalid bytes", []byte{0x00, 0x01, 0x02}},
+		{"nil slice", nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewTransaction(tt.data)
+			var internalErr *InternalError
+			if !errors.As(err, &internalErr) {
+				t.Errorf("Expected InternalError, got %v", err)
+			}
+		})
 	}
 }
 

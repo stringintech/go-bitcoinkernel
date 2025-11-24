@@ -158,7 +158,7 @@ func (s *ChainstateManagerTestSuite) TestReadBlock(t *testing.T) {
 	chain := s.Manager.GetActiveChain()
 
 	// Test reading genesis block
-	genesis := chain.GetGenesis()
+	genesis := chain.GetByHeight(0)
 	genesisBlock, err := s.Manager.ReadBlock(genesis)
 	if err != nil {
 		t.Fatalf("ChainstateManager.ReadBlock() for genesis error = %v", err)
@@ -169,7 +169,7 @@ func (s *ChainstateManagerTestSuite) TestReadBlock(t *testing.T) {
 	defer genesisBlock.Destroy()
 
 	// Test reading tip block
-	tip := chain.GetTip()
+	tip := chain.GetByHeight(chain.GetHeight())
 	tipBlock, err := s.Manager.ReadBlock(tip)
 	if err != nil {
 		t.Fatalf("ChainstateManager.ReadBlock() for tip error = %v", err)
@@ -184,7 +184,7 @@ func (s *ChainstateManagerTestSuite) TestGetBlockTreeEntryByHash(t *testing.T) {
 	chain := s.Manager.GetActiveChain()
 
 	// Test getting genesis block by hash
-	genesis := chain.GetGenesis()
+	genesis := chain.GetByHeight(0)
 
 	genesisHash := genesis.Hash()
 
@@ -202,7 +202,7 @@ func (s *ChainstateManagerTestSuite) TestGetBlockTreeEntryByHash(t *testing.T) {
 	}
 
 	// Test getting tip block by hash
-	tipIndex := chain.GetTip()
+	tipIndex := chain.GetByHeight(chain.GetHeight())
 
 	tipHash := tipIndex.Hash()
 

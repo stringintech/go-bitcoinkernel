@@ -16,29 +16,6 @@ type Chain struct {
 	ptr *C.btck_Chain
 }
 
-// GetTip returns the block tree entry of the current chain tip.
-//
-// Returns nil if the chain is empty. Once returned, there is no guarantee that it
-// remains in the active chain if new blocks are processed.
-func (c *Chain) GetTip() *BlockTreeEntry {
-	ptr := C.btck_chain_get_tip(c.ptr)
-	if ptr == nil {
-		return nil
-	}
-	return &BlockTreeEntry{ptr: ptr}
-}
-
-// GetGenesis returns the block tree entry of the genesis block.
-//
-// Returns nil if the chain is empty.
-func (c *Chain) GetGenesis() *BlockTreeEntry {
-	ptr := C.btck_chain_get_genesis(c.ptr)
-	if ptr == nil {
-		return nil
-	}
-	return &BlockTreeEntry{ptr: ptr}
-}
-
 // GetByHeight retrieves a block tree entry by its height in the currently active chain.
 //
 // Returns nil if the height is out of bounds. Once retrieved, there is no guarantee
@@ -46,6 +23,11 @@ func (c *Chain) GetGenesis() *BlockTreeEntry {
 //
 // Parameters:
 //   - height: Block height to retrieve
+//
+// Example usage:
+//
+//	genesis := chain.GetByHeight(0)
+//	tip := chain.GetByHeight(chain.GetHeight())
 func (c *Chain) GetByHeight(height int32) *BlockTreeEntry {
 	ptr := C.btck_chain_get_by_height(c.ptr, C.int(height))
 	if ptr == nil {
@@ -62,8 +44,6 @@ func (c *Chain) Contains(blockTreeEntry *BlockTreeEntry) bool {
 }
 
 // GetHeight returns the height of the chain's tip.
-//
-// This is the height of the most recent block in the chain.
 func (c *Chain) GetHeight() int32 {
 	return int32(C.btck_chain_get_height(c.ptr))
 }

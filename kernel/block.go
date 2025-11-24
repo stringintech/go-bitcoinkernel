@@ -35,7 +35,7 @@ func newBlock(ptr *C.btck_Block, fromOwned bool) *Block {
 //
 // Returns an error if the block data is malformed or cannot be parsed.
 func NewBlock(rawBlock []byte) (*Block, error) {
-	ptr := C.btck_block_create(unsafe.Pointer(&rawBlock[0]), C.size_t(len(rawBlock)))
+	ptr := C.btck_block_create(unsafe.Pointer(unsafe.SliceData(rawBlock)), C.size_t(len(rawBlock)))
 	if ptr == nil {
 		return nil, &InternalError{"Failed to create block from bytes"}
 	}

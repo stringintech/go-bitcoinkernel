@@ -8,10 +8,22 @@ import (
 )
 
 func TestInvalidBlockData(t *testing.T) {
-	_, err := NewBlock([]byte{0x00, 0x01, 0x02})
-	var internalErr *InternalError
-	if !errors.As(err, &internalErr) {
-		t.Errorf("Expected InternalError, got %v", err)
+	tests := []struct {
+		name string
+		data []byte
+	}{
+		{"invalid bytes", []byte{0x00, 0x01, 0x02}},
+		{"nil slice", nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewBlock(tt.data)
+			var internalErr *InternalError
+			if !errors.As(err, &internalErr) {
+				t.Errorf("Expected InternalError, got %v", err)
+			}
+		})
 	}
 }
 
