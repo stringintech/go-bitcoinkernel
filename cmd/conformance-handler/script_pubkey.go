@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 
 	"github.com/stringintech/go-bitcoinkernel/kernel"
 )
@@ -84,10 +83,7 @@ func handleScriptPubkeyVerify(req Request) Response {
 		panic("scriptPubkey.Verify returned non-ScriptVerifyError (request ID: " + req.ID + "): " + err.Error())
 	}
 
-	return Response{
-		ID:     req.ID,
-		Result: json.RawMessage(fmt.Sprintf("%t", valid)),
-	}
+	return NewSuccessResponse(req.ID, valid)
 }
 
 // parseScriptFlags parses flags from array or numeric format

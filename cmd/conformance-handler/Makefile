@@ -1,7 +1,7 @@
 # Conformance Handler Makefile
 
 # Test suite configuration
-TEST_VERSION := 0.0.2
+TEST_VERSION := 0.0.3-alpha.3
 TEST_REPO := stringintech/kernel-bindings-tests
 TEST_DIR := .conformance-tests
 
@@ -71,7 +71,7 @@ test: build
 		$(MAKE) download-tests; \
 	fi
 	@echo "Running conformance tests..."
-	$(TEST_RUNNER) --handler ./$(HANDLER_BIN)
+	$(TEST_RUNNER) --handler ./$(HANDLER_BIN) -vv
 
 clean:
 	@echo "Cleaning up..."

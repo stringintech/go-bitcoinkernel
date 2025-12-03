@@ -8,6 +8,10 @@ import (
 )
 
 func main() {
+	// Initialize registry for object references
+	registry := NewRegistry()
+	defer registry.Cleanup()
+
 	// Read requests from stdin line by line
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
@@ -20,7 +24,7 @@ func main() {
 			continue
 		}
 
-		resp := handleRequest(req)
+		resp := handleRequest(registry, req)
 		sendResponse(resp)
 	}
 

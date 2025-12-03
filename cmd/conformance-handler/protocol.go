@@ -9,6 +9,7 @@ type Request struct {
 	ID     string          `json:"id"`
 	Method string          `json:"method"`
 	Params json.RawMessage `json:"params"`
+	Ref    string          `json:"ref,omitempty"`
 }
 
 type Response struct {
@@ -24,6 +25,10 @@ type Error struct {
 type ErrorCode struct {
 	Type   string `json:"type"`
 	Member string `json:"member"`
+}
+
+type RefObject struct {
+	Ref string `json:"ref"`
 }
 
 // NewErrorResponse creates an error response with the given code type and member.
@@ -56,4 +61,35 @@ func NewHandlerErrorResponse(id, codeMember, detail string) Response {
 // Use when request parameters are malformed or missing. Detail provides context about the issue.
 func NewInvalidParamsResponse(id, detail string) Response {
 	return NewHandlerErrorResponse(id, "INVALID_PARAMS", detail)
+}
+
+// NewEmptyErrorResponse creates an error response with an empty error object {}.
+// Use when an operation fails but no specific error code applies (e.g., C API returned null).
+func NewEmptyErrorResponse(id string) Response {
+	return Response{ID: id}
+}
+
+// NewSuccessResponse creates a success response with a result value.
+// Use when an operation succeeds and returns data.
+func NewSuccessResponse(id string, result interface{}) Response {
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to marshal result for request %s: %v", id, err))
+	}
+	return Response{
+		ID:     id,
+		Result: resultJSON,
+	}
+}
+
+// NewSuccessResponseWithRef creates a success response returning a reference object.
+// Use for methods that create objects and store them in the registry.
+func NewSuccessResponseWithRef(id, ref string) Response {
+	return NewSuccessResponse(id, RefObject{Ref: ref})
+}
+
+// NewEmptySuccessResponse creates a success response with no result.
+// Use for void/nullptr operations that succeed but return no data.
+func NewEmptySuccessResponse(id string) Response {
+	return Response{ID: id}
 }
