@@ -125,13 +125,11 @@ func (s *scriptPubkeyApi) Verify(amount int64, txTo *Transaction, spentOutputs [
 		&cStatus,
 	)
 
-	status := ScriptVerifyStatus(cStatus)
-
 	// Check for errors that prevented verification
-	if status == ScriptVerifyErrorInvalidFlagsCombination {
+	if cStatus == C.btck_ScriptVerifyStatus_ERROR_INVALID_FLAGS_COMBINATION {
 		return false, ErrVerifyScriptVerifyInvalidFlagsCombination
 	}
-	if status == ScriptVerifyErrorSpentOutputsRequired {
+	if cStatus == C.btck_ScriptVerifyStatus_ERROR_SPENT_OUTPUTS_REQUIRED {
 		return false, ErrVerifyScriptVerifySpentOutputsRequired
 	}
 
@@ -154,13 +152,4 @@ const (
 	ScriptFlagsVerifyWitness             ScriptFlags = C.btck_ScriptVerificationFlags_WITNESS             // Enable WITNESS (BIP141)
 	ScriptFlagsVerifyTaproot             ScriptFlags = C.btck_ScriptVerificationFlags_TAPROOT             // Enable TAPROOT (BIPs 341 & 342)
 	ScriptFlagsVerifyAll                 ScriptFlags = C.btck_ScriptVerificationFlags_ALL                 // All verification flags combined
-)
-
-// ScriptVerifyStatus represents a collection of status codes that may be issued by the script verify function.
-type ScriptVerifyStatus C.btck_ScriptVerifyStatus
-
-const (
-	ScriptVerifyOK                           ScriptVerifyStatus = C.btck_ScriptVerifyStatus_OK                              // Script verification succeeded
-	ScriptVerifyErrorInvalidFlagsCombination ScriptVerifyStatus = C.btck_ScriptVerifyStatus_ERROR_INVALID_FLAGS_COMBINATION // The verification flags were combined in an invalid way
-	ScriptVerifyErrorSpentOutputsRequired    ScriptVerifyStatus = C.btck_ScriptVerifyStatus_ERROR_SPENT_OUTPUTS_REQUIRED    // The taproot flag was set, so valid spent outputs must be provided
 )
