@@ -148,9 +148,11 @@ func TestValidScripts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := testVerifyScript(t, tt.scriptPubkeyHex, tt.amount, tt.txToHex, tt.inputIndex)
+			valid, err := testVerifyScript(t, tt.scriptPubkeyHex, tt.amount, tt.txToHex, tt.inputIndex)
 			if err != nil {
 				t.Errorf("testVerifyScript() error = %v", err)
+			} else if !valid {
+				t.Errorf("testVerifyScript() expected valid script, got invalid")
 			}
 		})
 	}
@@ -203,17 +205,82 @@ func TestInvalidScripts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var scriptVerifyError *ScriptVerifyError
-			err := testVerifyScript(t, tt.scriptPubkeyHex, tt.amount, tt.txToHex, tt.inputIndex)
-			if err == nil || !errors.As(err, &scriptVerifyError) {
-				t.Errorf("testVerifyScript() was expected to fail with ScriptVerifyError, got: %v", err)
+			valid, err := testVerifyScript(t, tt.scriptPubkeyHex, tt.amount, tt.txToHex, tt.inputIndex)
+			if err != nil {
+				t.Errorf("testVerifyScript() unexpected error = %v", err)
+			} else if valid {
+				t.Errorf("testVerifyScript() expected invalid script, got valid")
+			}
+		})
+	}
+}
+
+func TestScriptVerifyErrors(t *testing.T) {
+	// Use a valid transaction for testing error conditions
+	validScriptHex := "76a9144bfbaf6afb76cc5771bc6404810d1cc041a6933988ac"
+	validTxHex := "02000000013f7cebd65c27431a90bba7f796914fe8cc2ddfc3f2cbd6f7e5f2fc854534da95000000006b483045022100de1ac3bcdfb0332207c4a91f3832bd2c2915840165f876ab47c5f8996b971c3602201c6c053d750fadde599e6f5c4e1963df0f01fc0d97815e8157e3d59fe09ca30d012103699b464d1d8bc9e47d4fb1cdaa89a1c5783d68363c4dbc4b524ed3d857148617feffffff02836d3c01000000001976a914fc25d6d5c94003bf5b0c7b640a248e2c637fcfb088ac7ada8202000000001976a914fbed3d9b11183209a57999d54d59f67c019e756c88ac6acb0700"
+
+	scriptBytes, err := hex.DecodeString(validScriptHex)
+	if err != nil {
+		t.Fatalf("Failed to decode script hex: %v", err)
+	}
+
+	scriptPubkey := NewScriptPubkey(scriptBytes)
+	defer scriptPubkey.Destroy()
+
+	txBytes, err := hex.DecodeString(validTxHex)
+	if err != nil {
+		t.Fatalf("Failed to decode transaction hex: %v", err)
+	}
+
+	tx, err := NewTransaction(txBytes)
+	if err != nil {
+		t.Fatalf("Failed to create transaction: %v", err)
+	}
+	defer tx.Destroy()
+
+	tests := []struct {
+		name          string
+		inputIndex    uint
+		flags         ScriptFlags
+		spentOutputs  []*TransactionOutput
+		expectedError error
+		description   string
+	}{
+		{
+			name:          "invalid_input_index",
+			inputIndex:    999,
+			flags:         ScriptFlagsVerifyAll,
+			spentOutputs:  nil,
+			expectedError: ErrVerifyScriptVerifyTxInputIndex,
+			description:   "input index out of bounds should return error",
+		},
+		{
+			name:          "invalid_flags",
+			inputIndex:    0,
+			flags:         ScriptFlags(0xFFFFFFFF), // Invalid flags
+			spentOutputs:  nil,
+			expectedError: ErrVerifyScriptVerifyInvalidFlags,
+			description:   "invalid flags should return error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			valid, err := scriptPubkey.Verify(0, tx, tt.spentOutputs, tt.inputIndex, tt.flags)
+			if err == nil {
+				t.Errorf("Expected error %v, got nil (valid=%v)", tt.expectedError, valid)
+				return
+			}
+			if !errors.Is(err, tt.expectedError) {
+				t.Errorf("Expected error %v, got %v", tt.expectedError, err)
 			}
 		})
 	}
 }
 
 // testVerifyScript is a helper function that creates the necessary objects and calls VerifyScript
-func testVerifyScript(t *testing.T, scriptPubkeyHex string, amount int64, txToHex string, inputIndex uint) error {
+func testVerifyScript(t *testing.T, scriptPubkeyHex string, amount int64, txToHex string, inputIndex uint) (bool, error) {
 	scriptPubkeyBytes, err := hex.DecodeString(scriptPubkeyHex)
 	if err != nil {
 		t.Fatalf("Failed to decode script pubkey hex: %v", err)

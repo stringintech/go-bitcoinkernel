@@ -10,7 +10,6 @@ var (
 	ErrVerifyScriptVerifyInvalidFlagsCombination = &ScriptVerifyError{"Invalid combination of script verification flags"}
 	ErrVerifyScriptVerifySpentOutputsMismatch    = &ScriptVerifyError{"Spent outputs count mismatch"}
 	ErrVerifyScriptVerifySpentOutputsRequired    = &ScriptVerifyError{"Spent outputs required for verification"}
-	ErrVerifyScriptVerifyInvalid                 = &ScriptVerifyError{"Script verification failed"}
 )
 
 // check panics if ptr is nil, otherwise returns ptr unchanged; used when C calls are not expected to return null
@@ -57,6 +56,7 @@ func (e *SerializationError) Error() string {
 
 func (e *SerializationError) isKernelError() {}
 
+// ScriptVerifyError represents errors that prevent script verification from executing.
 type ScriptVerifyError struct {
 	Msg string
 }

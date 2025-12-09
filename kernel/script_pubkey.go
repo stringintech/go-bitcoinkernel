@@ -85,20 +85,23 @@ func (s *scriptPubkeyApi) Bytes() ([]byte, error) {
 //   - inputIndex: Index of the input in txTo spending the script pubkey.
 //   - flags: ScriptFlags controlling validation constraints.
 //
-// Returns an error if verification fails.
-func (s *scriptPubkeyApi) Verify(amount int64, txTo *Transaction, spentOutputs []*TransactionOutput, inputIndex uint, flags ScriptFlags) error {
+// Returns:
+//   - bool: true if the script is valid, false if invalid (only meaningful when error is nil)
+//   - error: non-nil if verification could not be performed due to malformed input;
+//     nil if verification completed successfully (check bool for validity result)
+func (s *scriptPubkeyApi) Verify(amount int64, txTo *Transaction, spentOutputs []*TransactionOutput, inputIndex uint, flags ScriptFlags) (bool, error) {
 	inputCount := txTo.CountInputs()
 	if inputIndex >= uint(inputCount) {
-		return ErrVerifyScriptVerifyTxInputIndex
+		return false, ErrVerifyScriptVerifyTxInputIndex
 	}
 
 	if len(spentOutputs) > 0 && uint64(len(spentOutputs)) != inputCount {
-		return ErrVerifyScriptVerifySpentOutputsMismatch
+		return false, ErrVerifyScriptVerifySpentOutputsMismatch
 	}
 
 	allFlags := ScriptFlagsVerifyAll
 	if (flags & ^ScriptFlags(allFlags)) != 0 {
-		return ErrVerifyScriptVerifyInvalidFlags
+		return false, ErrVerifyScriptVerifyInvalidFlags
 	}
 
 	var cSpentOutputsPtr **C.btck_TransactionOutput
@@ -122,18 +125,20 @@ func (s *scriptPubkeyApi) Verify(amount int64, txTo *Transaction, spentOutputs [
 		&cStatus,
 	)
 
-	if result != 1 {
-		status := ScriptVerifyStatus(cStatus)
-		switch status {
-		case ScriptVerifyErrorInvalidFlagsCombination:
-			return ErrVerifyScriptVerifyInvalidFlagsCombination
-		case ScriptVerifyErrorSpentOutputsRequired:
-			return ErrVerifyScriptVerifySpentOutputsRequired
-		default:
-			return ErrVerifyScriptVerifyInvalid
-		}
+	status := ScriptVerifyStatus(cStatus)
+
+	// Check for errors that prevented verification
+	if status == ScriptVerifyErrorInvalidFlagsCombination {
+		return false, ErrVerifyScriptVerifyInvalidFlagsCombination
 	}
-	return nil
+	if status == ScriptVerifyErrorSpentOutputsRequired {
+		return false, ErrVerifyScriptVerifySpentOutputsRequired
+	}
+
+	// Verification completed: result indicates validity
+	// result == 1: script is valid
+	// result != 1: script is invalid
+	return result == 1, nil
 }
 
 // ScriptFlags represents script verification flags that may be composed with each other.
