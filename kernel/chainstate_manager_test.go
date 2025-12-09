@@ -317,9 +317,12 @@ func (s *ChainstateManagerTestSuite) Setup(t *testing.T) {
 		}
 		defer block.Destroy()
 
-		ok, duplicate := manager.ProcessBlock(block)
-		if !ok || duplicate {
+		ok, newBlock := manager.ProcessBlock(block)
+		if !ok {
 			t.Fatalf("ProcessBlock() failed for block %d", i+1)
+		}
+		if !newBlock {
+			t.Fatalf("ProcessBlock() returned newBlock=false for block %d (block data was already on disk)", i+1)
 		}
 	}
 

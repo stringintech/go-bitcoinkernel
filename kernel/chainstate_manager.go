@@ -118,14 +118,14 @@ func (cm *ChainstateManager) ReadBlockSpentOutputs(blockTreeEntry *BlockTreeEntr
 //   - block: Block to validate and potentially add to the chain
 //
 // Returns ok=true if processing the block was successful (will also return true for valid,
-// but duplicate blocks) and duplicate=false if this block was not processed before. Note that
-// duplicate might also be false if processing was attempted before, but the block was found
+// but duplicate blocks) and newBlock=true if this block was not processed before. Note that
+// newBlock might also be true if processing was attempted before, but the block was found
 // invalid before its data was persisted.
-func (cm *ChainstateManager) ProcessBlock(block *Block) (ok bool, duplicate bool) {
-	var newBlock C.int
-	result := C.btck_chainstate_manager_process_block((*C.btck_ChainstateManager)(cm.ptr), (*C.btck_Block)(block.ptr), &newBlock)
+func (cm *ChainstateManager) ProcessBlock(block *Block) (ok bool, newBlock bool) {
+	var newBlockInt C.int
+	result := C.btck_chainstate_manager_process_block((*C.btck_ChainstateManager)(cm.ptr), (*C.btck_Block)(block.ptr), &newBlockInt)
 	ok = result == 0
-	duplicate = newBlock == 0
+	newBlock = newBlockInt == 1
 	return
 }
 
