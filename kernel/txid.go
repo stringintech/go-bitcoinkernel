@@ -5,6 +5,7 @@ package kernel
 */
 import "C"
 import (
+	"encoding/hex"
 	"unsafe"
 )
 
@@ -59,4 +60,10 @@ func (t *txidApi) Bytes() [32]byte {
 	var output [32]C.uchar
 	C.btck_txid_to_bytes(t.ptr, &output[0])
 	return *(*[32]byte)(unsafe.Pointer(&output[0]))
+}
+
+// String returns the txid as a hex string in display order (reversed).
+func (t *txidApi) String() string {
+	hashBytes := t.Bytes()
+	return hex.EncodeToString(ReverseBytes(hashBytes[:]))
 }
