@@ -48,7 +48,7 @@ func TestBlock(t *testing.T) {
 		// Expected genesis block hash (reversed byte order for display)
 		expectedHash := "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
 		hashBytes := hash.Bytes()
-		actualHashHex := hex.EncodeToString(reverseBytes(hashBytes[:]))
+		actualHashHex := hex.EncodeToString(ReverseBytes(hashBytes[:]))
 		if actualHashHex != expectedHash {
 			t.Errorf("Expected hash %s, got %s", expectedHash, actualHashHex)
 		}
@@ -133,12 +133,4 @@ func TestBlock(t *testing.T) {
 			t.Errorf("Expected to iterate over 0 transactions, got %d", count)
 		}
 	})
-}
-
-func reverseBytes(data []byte) []byte {
-	result := make([]byte, len(data))
-	for i, b := range data {
-		result[len(data)-1-i] = b
-	}
-	return result
 }

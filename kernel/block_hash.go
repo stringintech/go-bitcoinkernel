@@ -5,6 +5,7 @@ package kernel
 */
 import "C"
 import (
+	"encoding/hex"
 	"unsafe"
 )
 
@@ -84,4 +85,10 @@ func (bh *blockHashApi) Copy() *BlockHash {
 // Returns true if the block hashes are equal.
 func (bh *blockHashApi) Equals(other BlockHashLike) bool {
 	return C.btck_block_hash_equals(bh.ptr, other.blockHashPtr()) != 0
+}
+
+// String returns the block hash as a hex string in display order (reversed).
+func (bh *blockHashApi) String() string {
+	hashBytes := bh.Bytes()
+	return hex.EncodeToString(ReverseBytes(hashBytes[:]))
 }

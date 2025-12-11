@@ -1,6 +1,7 @@
 package kernel
 
 import (
+	"encoding/hex"
 	"testing"
 )
 
@@ -36,5 +37,11 @@ func TestBlockHash(t *testing.T) {
 
 	if hash.Equals(differentHash) {
 		t.Errorf("hash.Equals(differentHash) = true, want false")
+	}
+
+	// Test String()
+	expected := hex.EncodeToString(ReverseBytes(hashBytes[:]))
+	if hash.String() != expected {
+		t.Errorf("hash.String() = %s, want %s", hash.String(), expected)
 	}
 }
