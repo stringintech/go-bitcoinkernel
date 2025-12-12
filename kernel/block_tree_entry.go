@@ -40,3 +40,12 @@ func (bi *BlockTreeEntry) Previous() *BlockTreeEntry {
 	prevIndex := &BlockTreeEntry{ptr: ptr}
 	return prevIndex
 }
+
+// Equals compares two block tree entries for equality.
+// Returns true if both entries point to the same block in the tree.
+func (bi *BlockTreeEntry) Equals(other *BlockTreeEntry) bool {
+	if other == nil {
+		return false
+	}
+	return C.btck_block_tree_entry_equals(bi.ptr, other.ptr) != 0
+}

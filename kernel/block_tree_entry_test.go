@@ -36,3 +36,35 @@ func TestBlockTreeEntryGetPrevious(t *testing.T) {
 		t.Error("Genesis block should not have a previous block")
 	}
 }
+
+func TestBlockTreeEntryEquals(t *testing.T) {
+	suite := ChainstateManagerTestSuite{
+		MaxBlockHeightToImport: 2,
+	}
+	suite.Setup(t)
+
+	chain := suite.Manager.GetActiveChain()
+
+	// Same entry should equal itself
+	entry1 := chain.GetByHeight(1)
+	if !entry1.Equals(entry1) {
+		t.Error("Entry should equal itself")
+	}
+
+	// Different retrievals of same height should be equal
+	entry1Again := chain.GetByHeight(1)
+	if !entry1.Equals(entry1Again) {
+		t.Error("Same height entries should be equal")
+	}
+
+	// Different heights should not be equal
+	entry0 := chain.GetByHeight(0)
+	if entry1.Equals(entry0) {
+		t.Error("Different height entries should not be equal")
+	}
+
+	// Nil comparison should return false
+	if entry1.Equals(nil) {
+		t.Error("Entry should not equal nil")
+	}
+}
