@@ -119,3 +119,46 @@ jobs:
 
       - name: Run linter
         run: nix develop --command make lint
+
+  conformance:
+    name: Conformance Tests
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: darwin_arm64
+          - os: macos-15-intel
+            platform: darwin_amd64
+          - os: ubuntu-latest
+            platform: linux_amd64
+          - os: ubuntu-24.04-arm
+            platform: linux_arm64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.12'
+
+      - name: Install dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libboost-all-dev
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install boost
+
+      - name: Build Kernel
+        run: make build-kernel
+
+      - name: Run conformance tests
+        working-directory: cmd/conformance-handler
+        run: make test
