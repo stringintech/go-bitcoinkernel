@@ -51,6 +51,7 @@
 #include <utility>
 #include <vector>
 
+using kernel::ChainstateRole;
 using util::ImmediateTaskRunner;
 
 // Define G_TRANSLATION_FUN symbol in libbitcoinkernel library so users of the
@@ -359,7 +360,7 @@ protected:
         }
     }
 
-    void BlockConnected(ChainstateRole role, const std::shared_ptr<const CBlock>& block, const CBlockIndex* pindex) override
+    void BlockConnected(const ChainstateRole& role, const std::shared_ptr<const CBlock>& block, const CBlockIndex* pindex) override
     {
         if (m_cbs.block_connected) {
             m_cbs.block_connected(m_cbs.user_data,
@@ -494,6 +495,7 @@ struct btck_BlockHash : Handle<btck_BlockHash, uint256> {};
 struct btck_TransactionInput : Handle<btck_TransactionInput, CTxIn> {};
 struct btck_TransactionOutPoint: Handle<btck_TransactionOutPoint, COutPoint> {};
 struct btck_Txid: Handle<btck_Txid, Txid> {};
+struct btck_PrecomputedTransactionData : Handle<btck_PrecomputedTransactionData, PrecomputedTransactionData> {};
 
 btck_Transaction* btck_transaction_create(const void* raw_transaction, size_t raw_transaction_len)
 {
@@ -607,10 +609,46 @@ void btck_transaction_output_destroy(btck_TransactionOutput* output)
     delete output;
 }
 
+btck_PrecomputedTransactionData* btck_precomputed_transaction_data_create(
+    const btck_Transaction* tx_to,
+    const btck_TransactionOutput** spent_outputs_, size_t spent_outputs_len)
+{
+    try {
+        const CTransaction& tx{*btck_Transaction::get(tx_to)};
+        auto txdata{btck_PrecomputedTransactionData::create()};
+        if (spent_outputs_ != nullptr && spent_outputs_len > 0) {
+            assert(spent_outputs_len == tx.vin.size());
+            std::vector<CTxOut> spent_outputs;
+            spent_outputs.reserve(spent_outputs_len);
+            for (size_t i = 0; i < spent_outputs_len; i++) {
+                const CTxOut& tx_out{btck_TransactionOutput::get(spent_outputs_[i])};
+                spent_outputs.push_back(tx_out);
+            }
+            btck_PrecomputedTransactionData::get(txdata).Init(tx, std::move(spent_outputs));
+        } else {
+            btck_PrecomputedTransactionData::get(txdata).Init(tx, {});
+        }
+
+        return txdata;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+btck_PrecomputedTransactionData* btck_precomputed_transaction_data_copy(const btck_PrecomputedTransactionData* precomputed_txdata)
+{
+    return btck_PrecomputedTransactionData::copy(precomputed_txdata);
+}
+
+void btck_precomputed_transaction_data_destroy(btck_PrecomputedTransactionData* precomputed_txdata)
+{
+    delete precomputed_txdata;
+}
+
 int btck_script_pubkey_verify(const btck_ScriptPubkey* script_pubkey,
                               const int64_t amount,
                               const btck_Transaction* tx_to,
-                              const btck_TransactionOutput** spent_outputs_, size_t spent_outputs_len,
+                              const btck_PrecomputedTransactionData* precomputed_txdata,
                               const unsigned int input_index,
                               const btck_ScriptVerificationFlags flags,
                               btck_ScriptVerifyStatus* status)
@@ -623,30 +661,17 @@ int btck_script_pubkey_verify(const btck_ScriptPubkey* script_pubkey,
         return 0;
     }
 
-    if (flags & btck_ScriptVerificationFlags_TAPROOT && spent_outputs_ == nullptr) {
+    const CTransaction& tx{*btck_Transaction::get(tx_to)};
+    assert(input_index < tx.vin.size());
+
+    const PrecomputedTransactionData& txdata{precomputed_txdata ? btck_PrecomputedTransactionData::get(precomputed_txdata) : PrecomputedTransactionData(tx)};
+
+    if (flags & btck_ScriptVerificationFlags_TAPROOT && txdata.m_spent_outputs.empty()) {
         if (status) *status = btck_ScriptVerifyStatus_ERROR_SPENT_OUTPUTS_REQUIRED;
         return 0;
     }
 
     if (status) *status = btck_ScriptVerifyStatus_OK;
-
-    const CTransaction& tx{*btck_Transaction::get(tx_to)};
-    std::vector<CTxOut> spent_outputs;
-    if (spent_outputs_ != nullptr) {
-        assert(spent_outputs_len == tx.vin.size());
-        spent_outputs.reserve(spent_outputs_len);
-        for (size_t i = 0; i < spent_outputs_len; i++) {
-            const CTxOut& tx_out{btck_TransactionOutput::get(spent_outputs_[i])};
-            spent_outputs.push_back(tx_out);
-        }
-    }
-
-    assert(input_index < tx.vin.size());
-    PrecomputedTransactionData txdata{tx};
-
-    if (spent_outputs_ != nullptr && flags & btck_ScriptVerificationFlags_TAPROOT) {
-        txdata.Init(tx, std::move(spent_outputs));
-    }
 
     bool result = VerifyScript(tx.vin[input_index].scriptSig,
                                btck_ScriptPubkey::get(script_pubkey),
@@ -981,13 +1006,9 @@ btck_ChainstateManager* btck_chainstate_manager_create(
             LogError("Failed to verify loaded chain state from your datadir: %s", chainstate_err.original);
             return nullptr;
         }
-
-        for (Chainstate* chainstate : WITH_LOCK(chainman->GetMutex(), return chainman->GetAll())) {
-            BlockValidationState state;
-            if (!chainstate->ActivateBestChain(state, nullptr)) {
-                LogError("Failed to connect best block: %s", state.ToString());
-                return nullptr;
-            }
+        if (auto result = chainman->ActivateBestChains(); !result) {
+            LogError("%s", util::ErrorString(result).original);
+            return nullptr;
         }
     } catch (const std::exception& e) {
         LogError("Failed to load chainstate: %s", e.what());
@@ -1012,7 +1033,7 @@ void btck_chainstate_manager_destroy(btck_ChainstateManager* chainman)
 {
     {
         LOCK(btck_ChainstateManager::get(chainman).m_chainman->GetMutex());
-        for (Chainstate* chainstate : btck_ChainstateManager::get(chainman).m_chainman->GetAll()) {
+        for (const auto& chainstate : btck_ChainstateManager::get(chainman).m_chainman->m_chainstates) {
             if (chainstate->CanFlushToDisk()) {
                 chainstate->ForceFlushStateToDisk();
                 chainstate->ResetCoinsViews();
