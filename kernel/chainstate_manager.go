@@ -172,17 +172,9 @@ func (cm *ChainstateManager) ImportBlocks(blockFilePaths []string) error {
 	cLens := make([]C.size_t, len(blockFilePaths))
 	for i, path := range blockFilePaths {
 		cPaths[i] = C.CString(path)
+		defer C.free(unsafe.Pointer(cPaths[i]))
 		cLens[i] = C.size_t(len(path))
 	}
-
-	// Clean up C strings
-	defer func() {
-		for i := range cPaths {
-			if cPaths[i] != nil {
-				C.free(unsafe.Pointer(cPaths[i]))
-			}
-		}
-	}()
 
 	var cPathsPtr **C.char
 	var cLensPtr *C.size_t

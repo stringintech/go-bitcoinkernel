@@ -8,7 +8,6 @@ var (
 	ErrVerifyScriptVerifyTxInputIndex            = &ScriptVerifyError{"Transaction input index out of range"}
 	ErrVerifyScriptVerifyInvalidFlags            = &ScriptVerifyError{"Invalid script verification flags"}
 	ErrVerifyScriptVerifyInvalidFlagsCombination = &ScriptVerifyError{"Invalid combination of script verification flags"}
-	ErrVerifyScriptVerifySpentOutputsMismatch    = &ScriptVerifyError{"Spent outputs count mismatch"}
 	ErrVerifyScriptVerifySpentOutputsRequired    = &ScriptVerifyError{"Spent outputs required for verification"}
 )
 
