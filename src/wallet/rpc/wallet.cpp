@@ -89,11 +89,11 @@ static RPCHelpMan getwalletinfo()
     obj.pushKV("walletname", pwallet->GetName());
     obj.pushKV("walletversion", latest_legacy_wallet_minversion);
     obj.pushKV("format", pwallet->GetDatabase().Format());
-    obj.pushKV("txcount",       (int)pwallet->mapWallet.size());
-    obj.pushKV("keypoolsize", (int64_t)kpExternalSize);
+    obj.pushKV("txcount", pwallet->mapWallet.size());
+    obj.pushKV("keypoolsize", kpExternalSize);
     obj.pushKV("keypoolsize_hd_internal", pwallet->GetKeyPoolSize() - kpExternalSize);
 
-    if (pwallet->IsCrypted()) {
+    if (pwallet->HasEncryptionKeys()) {
         obj.pushKV("unlocked_until", pwallet->nRelockTime);
     }
     obj.pushKV("paytxfee", ValueFromAmount(pwallet->m_pay_tx_fee.GetFeePerK()));
@@ -422,10 +422,7 @@ static RPCHelpMan createwallet()
     bilingual_str error;
     std::optional<bool> load_on_start = request.params[6].isNull() ? std::nullopt : std::optional<bool>(request.params[6].get_bool());
     const std::shared_ptr<CWallet> wallet = CreateWallet(context, request.params[0].get_str(), load_on_start, options, status, error, warnings);
-    if (!wallet) {
-        RPCErrorCode code = status == DatabaseStatus::FAILED_ENCRYPT ? RPC_WALLET_ENCRYPTION_FAILED : RPC_WALLET_ERROR;
-        throw JSONRPCError(code, error.original);
-    }
+    HandleWalletError(wallet, status, error);
 
     UniValue obj(UniValue::VOBJ);
     obj.pushKV("name", wallet->GetName());

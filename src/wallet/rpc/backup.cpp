@@ -17,6 +17,7 @@
 #include <sync.h>
 #include <uint256.h>
 #include <util/bip32.h>
+#include <util/check.h>
 #include <util/fs.h>
 #include <util/time.h>
 #include <util/translation.h>
@@ -239,6 +240,10 @@ static UniValue ProcessDescriptorImport(CWallet& wallet, const UniValue& data, c
                 throw JSONRPCError(RPC_WALLET_ERROR, "Cannot expand descriptor. Probably because of hardened derivations without private keys provided");
             }
             parsed_desc->ExpandPrivate(0, keys, expand_keys);
+
+            for (const auto& w : parsed_desc->Warnings()) {
+               warnings.push_back(w);
+            }
 
             // Check if all private keys are provided
             bool have_all_privkeys = !expand_keys.keys.empty();
@@ -493,6 +498,9 @@ RPCHelpMan listdescriptors()
     if (!wallet) return UniValue::VNULL;
 
     const bool priv = !request.params[0].isNull() && request.params[0].get_bool();
+    if (wallet->IsWalletFlagSet(WALLET_FLAG_DISABLE_PRIVATE_KEYS) && priv) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Can't get private descriptor string for watch-only wallets");
+    }
     if (priv) {
         EnsureWalletIsUnlocked(*wallet);
     }
@@ -519,9 +527,7 @@ RPCHelpMan listdescriptors()
         LOCK(desc_spk_man->cs_desc_man);
         const auto& wallet_descriptor = desc_spk_man->GetWalletDescriptor();
         std::string descriptor;
-        if (!desc_spk_man->GetDescriptorString(descriptor, priv)) {
-            throw JSONRPCError(RPC_WALLET_ERROR, "Can't get descriptor string.");
-        }
+        CHECK_NONFATAL(desc_spk_man->GetDescriptorString(descriptor, priv));
         const bool is_range = wallet_descriptor.descriptor->IsRange();
         wallet_descriptors.push_back({
             descriptor,
