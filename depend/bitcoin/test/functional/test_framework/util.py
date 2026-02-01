@@ -165,13 +165,13 @@ def try_rpc(code, message, fun, *args, **kwds):
     try:
         fun(*args, **kwds)
     except JSONRPCException as e:
-        # JSONRPCException was thrown as expected. Check the code and message values are correct.
-        if (code is not None) and (code != e.error["code"]):
-            raise AssertionError("Unexpected JSONRPC error code %i" % e.error["code"])
+        # JSONRPCException was thrown as expected. Check the message and code values are correct.
         if (message is not None) and (message not in e.error['message']):
             raise AssertionError(
                 "Expected substring not found in error message:\nsubstring: '{}'\nerror message: '{}'.".format(
                     message, e.error['message']))
+        if (code is not None) and (code != e.error["code"]):
+            raise AssertionError("Unexpected JSONRPC error code %i" % e.error["code"])
         return True
     except Exception as e:
         raise AssertionError("Unexpected exception raised: " + type(e).__name__)
@@ -261,6 +261,10 @@ class Binaries:
         # Add -nonamed because "bitcoin rpc" enables -named by default, but bitcoin-cli doesn't
         return self._argv("rpc", self.paths.bitcoincli) + ["-nonamed"]
 
+    def bench_argv(self):
+        "Return argv array that should be used to invoke bench_bitcoin"
+        return self._argv("bench", self.paths.bitcoin_bench)
+
     def tx_argv(self):
         "Return argv array that should be used to invoke bitcoin-tx"
         return self._argv("tx", self.paths.bitcointx)
@@ -301,6 +305,7 @@ def get_binary_paths(config):
     binaries = {
         "bitcoin": "BITCOIN_BIN",
         "bitcoind": "BITCOIND",
+        "bench_bitcoin": "BITCOIN_BENCH",
         "bitcoin-cli": "BITCOINCLI",
         "bitcoin-util": "BITCOINUTIL",
         "bitcoin-tx": "BITCOINTX",

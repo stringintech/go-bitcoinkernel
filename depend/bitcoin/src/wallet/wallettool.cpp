@@ -98,7 +98,7 @@ static void WalletShowInfo(CWallet* wallet_instance)
     tfm::format(std::cout, "Name: %s\n", wallet_instance->GetName());
     tfm::format(std::cout, "Format: %s\n", wallet_instance->GetDatabase().Format());
     tfm::format(std::cout, "Descriptors: %s\n", wallet_instance->IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS) ? "yes" : "no");
-    tfm::format(std::cout, "Encrypted: %s\n", wallet_instance->IsCrypted() ? "yes" : "no");
+    tfm::format(std::cout, "Encrypted: %s\n", wallet_instance->HasEncryptionKeys() ? "yes" : "no");
     tfm::format(std::cout, "HD (hd seed available): %s\n", wallet_instance->IsHDEnabled() ? "yes" : "no");
     tfm::format(std::cout, "Keypool Size: %u\n", wallet_instance->GetKeyPoolSize());
     tfm::format(std::cout, "Transactions: %zu\n", wallet_instance->mapWallet.size());
@@ -111,7 +111,7 @@ bool ExecuteWalletToolFunc(const ArgsManager& args, const std::string& command)
         tfm::format(std::cerr, "The -dumpfile option can only be used with the \"dump\" and \"createfromdump\" commands.\n");
         return false;
     }
-    if (command == "create" && !args.IsArgSet("-wallet")) {
+    if ((command == "create" || command == "createfromdump") && !args.IsArgSet("-wallet")) {
         tfm::format(std::cerr, "Wallet name must be provided when creating a new wallet.\n");
         return false;
     }
@@ -119,6 +119,10 @@ bool ExecuteWalletToolFunc(const ArgsManager& args, const std::string& command)
     const fs::path path = fsbridge::AbsPathJoin(GetWalletDir(), fs::PathFromString(name));
 
     if (command == "create") {
+        if (name.empty()) {
+            tfm::format(std::cerr, "Wallet name cannot be empty\n");
+            return false;
+        }
         DatabaseOptions options;
         ReadDatabaseArgs(args, options);
         options.require_create = true;
