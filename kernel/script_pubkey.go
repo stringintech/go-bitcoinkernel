@@ -75,13 +75,13 @@ func (s *scriptPubkeyApi) Bytes() ([]byte, error) {
 
 // Verify verifies if the input at inputIndex of txTo spends the script pubkey
 // under the constraints specified by flags. If the witness flag is set in flags,
-// the amount parameter is used. If the taproot flag is set, spentOutputs is used
-// to validate taproot transactions.
+// the amount parameter is used. If the taproot flag is set, precomputedTxData must
+// contain the spent outputs.
 //
 // Parameters:
 //   - amount: Amount of the script pubkey's associated output. May be zero if the witness flag is not set.
 //   - txTo: Transaction spending the script pubkey.
-//   - spentOutputs: Outputs spent by the transaction. May be nil if the taproot flag is not set.
+//   - precomputedTxData: Precomputed transaction data. May be nil if the taproot flag is not set.
 //   - inputIndex: Index of the input in txTo spending the script pubkey.
 //   - flags: ScriptFlags controlling validation constraints.
 //
@@ -89,14 +89,10 @@ func (s *scriptPubkeyApi) Bytes() ([]byte, error) {
 //   - bool: true if the script is valid, false if invalid (only meaningful when error is nil)
 //   - error: non-nil if verification could not be performed due to malformed input;
 //     nil if verification completed successfully (check bool for validity result)
-func (s *scriptPubkeyApi) Verify(amount int64, txTo *Transaction, spentOutputs []*TransactionOutput, inputIndex uint, flags ScriptFlags) (bool, error) {
+func (s *scriptPubkeyApi) Verify(amount int64, txTo *Transaction, precomputedTxData *PrecomputedTransactionData, inputIndex uint, flags ScriptFlags) (bool, error) {
 	inputCount := txTo.CountInputs()
 	if inputIndex >= uint(inputCount) {
 		return false, ErrVerifyScriptVerifyTxInputIndex
-	}
-
-	if len(spentOutputs) > 0 && uint64(len(spentOutputs)) != inputCount {
-		return false, ErrVerifyScriptVerifySpentOutputsMismatch
 	}
 
 	allFlags := ScriptFlagsVerifyAll
@@ -104,13 +100,9 @@ func (s *scriptPubkeyApi) Verify(amount int64, txTo *Transaction, spentOutputs [
 		return false, ErrVerifyScriptVerifyInvalidFlags
 	}
 
-	var cSpentOutputsPtr **C.btck_TransactionOutput
-	if len(spentOutputs) > 0 {
-		cSpentOutputs := make([]*C.btck_TransactionOutput, len(spentOutputs))
-		for i, output := range spentOutputs {
-			cSpentOutputs[i] = (*C.btck_TransactionOutput)(output.handle.ptr)
-		}
-		cSpentOutputsPtr = (**C.btck_TransactionOutput)(unsafe.Pointer(&cSpentOutputs[0]))
+	var cPrecomputedTxData *C.btck_PrecomputedTransactionData
+	if precomputedTxData != nil {
+		cPrecomputedTxData = (*C.btck_PrecomputedTransactionData)(precomputedTxData.ptr)
 	}
 
 	var cStatus C.btck_ScriptVerifyStatus
@@ -118,8 +110,7 @@ func (s *scriptPubkeyApi) Verify(amount int64, txTo *Transaction, spentOutputs [
 		s.ptr,
 		C.int64_t(amount),
 		(*C.btck_Transaction)(txTo.handle.ptr),
-		cSpentOutputsPtr,
-		C.size_t(len(spentOutputs)),
+		cPrecomputedTxData,
 		C.uint(inputIndex),
 		C.btck_ScriptVerificationFlags(flags),
 		&cStatus,
