@@ -129,6 +129,42 @@ func (cm *ChainstateManager) ProcessBlock(block *Block) (ok bool, newBlock bool)
 	return
 }
 
+// ProcessBlockHeader validates a block header and adds it to the block tree.
+//
+// This verifies the header's proof of work and its connection to existing headers.
+// It can be used to implement "headers first sync", where headers are synchronized
+// before blocks.
+//
+// Parameters:
+//   - header: Block header to validate
+//
+// Returns a BlockValidationError if the header fails validation. The error contains
+// detailed validation state information accessible via BlockValidationError.GetState().
+//
+// Example:
+//
+//	err := chainman.ProcessBlockHeader(header)
+//	if err != nil {
+//	    var validationErr *BlockValidationError
+//	    if errors.As(err, &validationErr) {
+//	        state := validationErr.GetState()
+//	        fmt.Printf("Validation failed: mode=%v, result=%v\n",
+//	            state.ValidationMode(), state.ValidationResult())
+//	    }
+//	}
+func (cm *ChainstateManager) ProcessBlockHeader(header *BlockHeader) error {
+	state := NewBlockValidationState()
+	result := C.btck_chainstate_manager_process_block_header(
+		(*C.btck_ChainstateManager)(cm.ptr),
+		(*C.btck_BlockHeader)(header.ptr),
+		(*C.btck_BlockValidationState)(state.handle.ptr),
+	)
+	if result != 0 {
+		return &BlockValidationError{State: state}
+	}
+	return nil
+}
+
 // GetActiveChain returns the currently active best-known chain.
 //
 // The returned Chain can be thought of as a view on a vector of block tree entries

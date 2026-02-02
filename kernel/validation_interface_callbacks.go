@@ -13,10 +13,10 @@ import (
 //
 // Note that these callbacks block any further validation execution when they are called.
 type ValidationInterfaceCallbacks struct {
-	OnBlockChecked      func(block *Block, state *BlockValidationState) // Called when a new block has been fully validated. Contains the result of its validation.
-	OnPoWValidBlock     func(block *Block, entry *BlockTreeEntry)       // Called when a new block extends the header chain and has a valid transaction and segwit merkle root.
-	OnBlockConnected    func(block *Block, entry *BlockTreeEntry)       // Called when a block is valid and has now been connected to the best chain.
-	OnBlockDisconnected func(block *Block, entry *BlockTreeEntry)       // Called during a re-org when a block has been removed from the best chain.
+	OnBlockChecked      func(block *Block, state *BlockValidationStateView) // Called when a new block has been fully validated. Contains the result of its validation.
+	OnPoWValidBlock     func(block *Block, entry *BlockTreeEntry)           // Called when a new block extends the header chain and has a valid transaction and segwit merkle root.
+	OnBlockConnected    func(block *Block, entry *BlockTreeEntry)           // Called when a block is valid and has now been connected to the best chain.
+	OnBlockDisconnected func(block *Block, entry *BlockTreeEntry)           // Called during a re-org when a block has been removed from the best chain.
 }
 
 //export go_validation_interface_block_checked_bridge
@@ -24,7 +24,7 @@ func go_validation_interface_block_checked_bridge(user_data unsafe.Pointer, bloc
 	handle := cgo.Handle(user_data)
 	callbacks := handle.Value().(*ValidationInterfaceCallbacks)
 	if callbacks.OnBlockChecked != nil {
-		callbacks.OnBlockChecked(newBlock(block, true), &BlockValidationState{ptr: state})
+		callbacks.OnBlockChecked(newBlock(block, true), newBlockValidationStateView(state))
 	}
 }
 

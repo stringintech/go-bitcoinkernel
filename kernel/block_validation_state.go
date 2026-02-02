@@ -4,14 +4,60 @@ package kernel
 #include "bitcoinkernel.h"
 */
 import "C"
+import "unsafe"
 
-// BlockValidationState holds the state of a block during validation.
+type blockValidationStateCFuncs struct{}
+
+func (blockValidationStateCFuncs) destroy(ptr unsafe.Pointer) {
+	C.btck_block_validation_state_destroy((*C.btck_BlockValidationState)(ptr))
+}
+
+func (blockValidationStateCFuncs) copy(ptr unsafe.Pointer) unsafe.Pointer {
+	return unsafe.Pointer(C.btck_block_validation_state_copy((*C.btck_BlockValidationState)(ptr)))
+}
+
+// BlockValidationState holds the state of a Block or BlockHeader during validation.
 //
 // Contains information about whether validation was successful, and if not,
-// which step during block validation failed. This is typically provided through
-// validation interface callbacks.
+// which step during block validation failed.
 type BlockValidationState struct {
+	*handle
+	blockValidationStateApi
+}
+
+func newBlockValidationState(ptr *C.btck_BlockValidationState, fromOwned bool) *BlockValidationState {
+	h := newHandle(unsafe.Pointer(ptr), blockValidationStateCFuncs{}, fromOwned)
+	return &BlockValidationState{handle: h, blockValidationStateApi: blockValidationStateApi{(*C.btck_BlockValidationState)(h.ptr)}}
+}
+
+// NewBlockValidationState creates a new owned BlockValidationState.
+func NewBlockValidationState() *BlockValidationState {
+	ptr := C.btck_block_validation_state_create()
+	return newBlockValidationState(ptr, true)
+}
+
+// BlockValidationStateView is an unowned view of a BlockValidationState.
+//
+// It provides read-only access to validation state without managing the underlying memory.
+type BlockValidationStateView struct {
+	blockValidationStateApi
 	ptr *C.btck_BlockValidationState
+}
+
+func newBlockValidationStateView(ptr *C.btck_BlockValidationState) *BlockValidationStateView {
+	return &BlockValidationStateView{
+		blockValidationStateApi: blockValidationStateApi{ptr},
+		ptr:                     ptr,
+	}
+}
+
+type blockValidationStateApi struct {
+	ptr *C.btck_BlockValidationState
+}
+
+// Copy creates a copy of the block validation state.
+func (s *blockValidationStateApi) Copy() *BlockValidationState {
+	return newBlockValidationState(s.ptr, false)
 }
 
 // ValidationMode returns whether the block is valid, invalid, or encountered an error.
@@ -20,8 +66,8 @@ type BlockValidationState struct {
 //   - ValidationStateValid: Block passed validation
 //   - ValidationStateInvalid: Block failed validation
 //   - ValidationStateError: Internal error during validation
-func (bvs *BlockValidationState) ValidationMode() ValidationMode {
-	mode := C.btck_block_validation_state_get_validation_mode(bvs.ptr)
+func (s *blockValidationStateApi) ValidationMode() ValidationMode {
+	mode := C.btck_block_validation_state_get_validation_mode(s.ptr)
 	return ValidationMode(mode)
 }
 
@@ -29,8 +75,8 @@ func (bvs *BlockValidationState) ValidationMode() ValidationMode {
 //
 // This provides detailed information about the specific validation failure, such as
 // consensus violations, invalid headers, or missing previous blocks.
-func (bvs *BlockValidationState) ValidationResult() BlockValidationResult {
-	result := C.btck_block_validation_state_get_block_validation_result(bvs.ptr)
+func (s *blockValidationStateApi) ValidationResult() BlockValidationResult {
+	result := C.btck_block_validation_state_get_block_validation_result(s.ptr)
 	return BlockValidationResult(result)
 }
 

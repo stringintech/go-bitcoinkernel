@@ -49,3 +49,8 @@ func (bi *BlockTreeEntry) Equals(other *BlockTreeEntry) bool {
 	}
 	return C.btck_block_tree_entry_equals(bi.ptr, other.ptr) != 0
 }
+
+// GetHeader returns the block header associated with this block tree entry.
+func (bi *BlockTreeEntry) GetHeader() *BlockHeader {
+	return newBlockHeader(C.btck_block_tree_entry_get_block_header(bi.ptr), true)
+}

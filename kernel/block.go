@@ -47,6 +47,11 @@ func (b *Block) Hash() *BlockHash {
 	return newBlockHash(C.btck_block_get_hash((*C.btck_Block)(b.ptr)), true)
 }
 
+// GetHeader extracts the block header from this block.
+func (b *Block) GetHeader() *BlockHeader {
+	return newBlockHeader(C.btck_block_get_header((*C.btck_Block)(b.ptr)), true)
+}
+
 // Bytes returns the consensus serialized representation of the block.
 //
 // Returns an error if the serialization fails.
