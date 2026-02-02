@@ -133,4 +133,26 @@ func TestBlock(t *testing.T) {
 			t.Errorf("Expected to iterate over 0 transactions, got %d", count)
 		}
 	})
+
+	t.Run("GetHeader", func(t *testing.T) {
+		header := block.GetHeader()
+		if header == nil {
+			t.Fatal("GetHeader() returned nil")
+		}
+		defer header.Destroy()
+
+		if header.ptr == nil {
+			t.Error("Header pointer is nil")
+		}
+
+		// Verify the header matches the genesis block header
+		hash := header.Hash()
+		defer hash.Destroy()
+
+		expectedHash := "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
+		actualHashHex := hash.String()
+		if actualHashHex != expectedHash {
+			t.Errorf("Expected header hash %s, got %s", expectedHash, actualHashHex)
+		}
+	})
 }

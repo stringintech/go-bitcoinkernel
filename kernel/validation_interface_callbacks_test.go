@@ -16,7 +16,7 @@ func TestValidationInterfaceCallbacks(t *testing.T) {
 	suite := ChainstateManagerTestSuite{
 		MaxBlockHeightToImport: 2,
 		ValidationCallbacks: &ValidationInterfaceCallbacks{
-			OnBlockChecked: func(block *Block, state *BlockValidationState) {
+			OnBlockChecked: func(block *Block, state *BlockValidationStateView) {
 				lastValidationMode = state.ValidationMode()
 				var err error
 				lastBlockCheckedBlockData, err = block.Bytes()

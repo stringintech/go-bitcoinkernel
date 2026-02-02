@@ -311,9 +311,25 @@ func (s *ChainstateManagerTestSuite) Setup(t *testing.T) {
 			t.Fatalf("Failed to decode block %d hex: %v", i+1, err)
 		}
 
+		blockHeader, err := NewBlockHeader(blockBytes)
+		if err != nil {
+			t.Fatalf("NewBlockHeader() failed for block %d: %v", i+1, err)
+		}
+		defer blockHeader.Destroy()
+
+		err = manager.ProcessBlockHeader(blockHeader)
+		if err != nil {
+			var validationErr *BlockValidationError
+			if errors.As(err, &validationErr) {
+				state := validationErr.GetState()
+				t.Fatalf("ProcessBlockHeader() validation failed for block %d: mode=%v, result=%v", i+1, state.ValidationMode(), state.ValidationResult())
+			}
+			t.Fatalf("ProcessBlockHeader() failed for block %d: %v", i+1, err)
+		}
+
 		block, err := NewBlock(blockBytes)
 		if err != nil {
-			t.Fatalf("NewBlockFromRaw() failed for block %d: %v", i+1, err)
+			t.Fatalf("NewBlock() failed for block %d: %v", i+1, err)
 		}
 		defer block.Destroy()
 

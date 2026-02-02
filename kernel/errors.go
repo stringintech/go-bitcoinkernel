@@ -65,3 +65,62 @@ func (e *ScriptVerifyError) Error() string {
 }
 
 func (e *ScriptVerifyError) isKernelError() {}
+
+// BlockValidationError represents a block or header validation failure with detailed state information.
+type BlockValidationError struct {
+	State *BlockValidationState
+}
+
+func (e *BlockValidationError) Error() string {
+	if e.State == nil {
+		return "Block validation failed"
+	}
+	mode := e.State.ValidationMode()
+	result := e.State.ValidationResult()
+	return "Block validation failed: mode=" + validationModeString(mode) + ", result=" + blockValidationResultString(result)
+}
+
+func (e *BlockValidationError) isKernelError() {}
+
+// GetState returns the validation state containing detailed error information.
+func (e *BlockValidationError) GetState() *BlockValidationState {
+	return e.State
+}
+
+func validationModeString(mode ValidationMode) string {
+	switch mode {
+	case ValidationStateValid:
+		return "valid"
+	case ValidationStateInvalid:
+		return "invalid"
+	case ValidationStateError:
+		return "error"
+	default:
+		return "unknown"
+	}
+}
+
+func blockValidationResultString(result BlockValidationResult) string {
+	switch result {
+	case BlockResultUnset:
+		return "unset"
+	case BlockConsensus:
+		return "consensus"
+	case BlockCachedInvalid:
+		return "cached_invalid"
+	case BlockInvalidHeader:
+		return "invalid_header"
+	case BlockMutated:
+		return "mutated"
+	case BlockMissingPrev:
+		return "missing_prev"
+	case BlockInvalidPrev:
+		return "invalid_prev"
+	case BlockTimeFuture:
+		return "time_future"
+	case BlockHeaderLowWork:
+		return "header_low_work"
+	default:
+		return "unknown"
+	}
+}
