@@ -83,3 +83,17 @@ func (bh *BlockHeader) Version() int32 {
 func (bh *BlockHeader) Nonce() uint32 {
 	return uint32(C.btck_block_header_get_nonce((*C.btck_BlockHeader)(bh.ptr)))
 }
+
+// Bytes returns the consensus serialized representation of the block header.
+//
+// Returns an error if the serialization fails.
+func (bh *BlockHeader) Bytes() ([80]byte, error) {
+	var buf [80]byte
+	if C.btck_block_header_to_bytes(
+		(*C.btck_BlockHeader)(bh.ptr),
+		(*C.uchar)(unsafe.Pointer(&buf[0])),
+	) != 0 {
+		return [80]byte{}, &SerializationError{"Failed to serialize block header"}
+	}
+	return buf, nil
+}
