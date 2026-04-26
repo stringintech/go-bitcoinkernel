@@ -63,6 +63,29 @@ func TestBlockTreeEntry(t *testing.T) {
 		}
 	})
 
+	t.Run("Ancestor", func(t *testing.T) {
+		entry2 := chain.GetByHeight(2)
+		if entry2 == nil {
+			t.Fatal("Entry at height 2 is nil")
+		}
+
+		for _, height := range []int32{0, 1, 2} {
+			ancestor := entry2.Ancestor(height)
+			if ancestor == nil {
+				t.Fatalf("Ancestor(%d) returned nil", height)
+			}
+			if got := ancestor.Height(); got != height {
+				t.Fatalf("Ancestor(%d) height = %d, want %d", height, got, height)
+			}
+		}
+
+		for _, height := range []int32{-1, 3} {
+			if ancestor := entry2.Ancestor(height); ancestor != nil {
+				t.Fatalf("Ancestor(%d) returned height %d, want nil", height, ancestor.Height())
+			}
+		}
+	})
+
 	t.Run("GetHeader", func(t *testing.T) {
 		// Get genesis block entry
 		genesisEntry := chain.GetByHeight(0)

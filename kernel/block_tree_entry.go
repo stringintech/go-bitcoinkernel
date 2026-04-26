@@ -50,6 +50,17 @@ func (bi *BlockTreeEntry) Equals(other *BlockTreeEntry) bool {
 	return C.btck_block_tree_entry_equals(bi.ptr, other.ptr) != 0
 }
 
+// Ancestor returns the ancestor block tree entry at the given height.
+//
+// Returns nil if height is negative or greater than this entry's height.
+func (bi *BlockTreeEntry) Ancestor(height int32) *BlockTreeEntry {
+	if height < 0 || height > bi.Height() {
+		return nil
+	}
+	ptr := C.btck_block_tree_entry_get_ancestor(bi.ptr, C.int32_t(height))
+	return &BlockTreeEntry{ptr: check(ptr)}
+}
+
 // GetHeader returns the block header associated with this block tree entry.
 func (bi *BlockTreeEntry) GetHeader() *BlockHeader {
 	return newBlockHeader(C.btck_block_tree_entry_get_block_header(bi.ptr), true)
