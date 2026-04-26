@@ -120,4 +120,15 @@ func TestBlockHeader(t *testing.T) {
 			t.Errorf("Expected nonce %d, got %d", expectedNonce, nonce)
 		}
 	})
+
+	t.Run("Bytes", func(t *testing.T) {
+		serialized, err := header.Bytes()
+		if err != nil {
+			t.Fatalf("Bytes() error = %v", err)
+		}
+		serializedStr := hex.EncodeToString(serialized[:])
+		if serializedStr != genesisHeaderHex {
+			t.Errorf("Serialized header doesn't match original.\nExpected: %s\nGot: %s", genesisHeaderHex, serializedStr)
+		}
+	})
 }
