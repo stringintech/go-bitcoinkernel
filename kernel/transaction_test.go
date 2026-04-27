@@ -95,6 +95,12 @@ func TestTransaction(t *testing.T) {
 		}
 	})
 
+	t.Run("GetLockTime", func(t *testing.T) {
+		if got := tx.GetLockTime(); got != 0 {
+			t.Errorf("Expected locktime 0, got %d", got)
+		}
+	})
+
 	t.Run("GetInput", func(t *testing.T) {
 		input, err := tx.GetInput(0)
 		if err != nil {

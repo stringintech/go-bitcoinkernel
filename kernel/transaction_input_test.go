@@ -26,6 +26,11 @@ func TestTransactionInput(t *testing.T) {
 		t.Fatal("GetInput(0) returned nil")
 	}
 
+	// Test GetSequence()
+	if inputView.GetSequence() != 0xffffffff {
+		t.Errorf("Expected coinbase input sequence %d, got %d", uint32(0xffffffff), inputView.GetSequence())
+	}
+
 	// Test Copy()
 	copiedInput := inputView.Copy()
 	if copiedInput == nil {
@@ -37,6 +42,11 @@ func TestTransactionInput(t *testing.T) {
 	outPoint := inputView.GetOutPoint()
 	if outPoint == nil {
 		t.Fatal("GetOutPoint() returned nil")
+	}
+
+	// Verify sequence from copied input matches
+	if inputView.GetSequence() != copiedInput.GetSequence() {
+		t.Errorf("Input sequences differ: %d != %d", inputView.GetSequence(), copiedInput.GetSequence())
 	}
 
 	// Verify out point from copied input matches
