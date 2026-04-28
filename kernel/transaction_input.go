@@ -56,3 +56,8 @@ func (t *transactionInputApi) GetOutPoint() *TransactionOutPointView {
 	ptr := C.btck_transaction_input_get_out_point(t.ptr)
 	return newTransactionOutPointView(check(ptr))
 }
+
+// GetSequence returns the transaction input's nSequence value.
+func (t *transactionInputApi) GetSequence() uint32 {
+	return uint32(C.btck_transaction_input_get_sequence(t.ptr))
+}

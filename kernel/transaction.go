@@ -80,6 +80,11 @@ func (t *transactionApi) Bytes() ([]byte, error) {
 	return bytes, nil
 }
 
+// GetLockTime returns the transaction's nLockTime value.
+func (t *transactionApi) GetLockTime() uint32 {
+	return uint32(C.btck_transaction_get_locktime(t.ptr))
+}
+
 // GetTxid returns the txid for this transaction.
 func (t *transactionApi) GetTxid() *TxidView {
 	ptr := C.btck_transaction_get_txid(t.ptr)
