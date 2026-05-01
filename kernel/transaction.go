@@ -26,7 +26,14 @@ type Transaction struct {
 
 func newTransaction(ptr *C.btck_Transaction, fromOwned bool) *Transaction {
 	h := newHandle(unsafe.Pointer(ptr), transactionCFuncs{}, fromOwned)
-	return &Transaction{handle: h, transactionApi: transactionApi{(*C.btck_Transaction)(h.ptr)}}
+	return &Transaction{
+		handle: h,
+		transactionApi: transactionApi{
+			ptr: func() *C.btck_Transaction {
+				return (*C.btck_Transaction)(h.ptr)
+			},
+		},
+	}
 }
 
 // NewTransaction creates a new transaction from raw serialized transaction data.
@@ -45,18 +52,20 @@ func NewTransaction(rawTransaction []byte) (*Transaction, error) {
 
 type TransactionView struct {
 	transactionApi
-	ptr *C.btck_Transaction
 }
 
 func newTransactionView(ptr *C.btck_Transaction) *TransactionView {
 	return &TransactionView{
-		transactionApi: transactionApi{ptr},
-		ptr:            ptr,
+		transactionApi: transactionApi{
+			ptr: func() *C.btck_Transaction {
+				return ptr
+			},
+		},
 	}
 }
 
 type transactionApi struct {
-	ptr *C.btck_Transaction
+	ptr func() *C.btck_Transaction
 }
 
 // Copy creates a shallow copy of the transaction by incrementing its reference count.
@@ -64,7 +73,7 @@ type transactionApi struct {
 // Transactions are reference-counted internally, so this operation is efficient and does
 // not duplicate the underlying data.
 func (t *transactionApi) Copy() *Transaction {
-	return newTransaction(t.ptr, false)
+	return newTransaction(t.ptr(), false)
 }
 
 // Bytes returns the consensus serialized representation of the transaction.
@@ -72,7 +81,7 @@ func (t *transactionApi) Copy() *Transaction {
 // Returns an error if the serialization fails.
 func (t *transactionApi) Bytes() ([]byte, error) {
 	bytes, ok := writeToBytes(func(writer C.btck_WriteBytes, userData unsafe.Pointer) C.int {
-		return C.btck_transaction_to_bytes(t.ptr, writer, userData)
+		return C.btck_transaction_to_bytes(t.ptr(), writer, userData)
 	})
 	if !ok {
 		return nil, &SerializationError{"Failed to serialize transaction"}
@@ -82,18 +91,18 @@ func (t *transactionApi) Bytes() ([]byte, error) {
 
 // GetLockTime returns the transaction's nLockTime value.
 func (t *transactionApi) GetLockTime() uint32 {
-	return uint32(C.btck_transaction_get_locktime(t.ptr))
+	return uint32(C.btck_transaction_get_locktime(t.ptr()))
 }
 
 // GetTxid returns the txid for this transaction.
 func (t *transactionApi) GetTxid() *TxidView {
-	ptr := C.btck_transaction_get_txid(t.ptr)
+	ptr := C.btck_transaction_get_txid(t.ptr())
 	return newTxidView(check(ptr))
 }
 
 // CountInputs returns the number of inputs in the transaction.
 func (t *transactionApi) CountInputs() uint64 {
-	return uint64(C.btck_transaction_count_inputs(t.ptr))
+	return uint64(C.btck_transaction_count_inputs(t.ptr()))
 }
 
 // GetInput retrieves the input at the specified index.
@@ -108,7 +117,7 @@ func (t *transactionApi) GetInput(index uint64) (*TransactionInputView, error) {
 	if index >= t.CountInputs() {
 		return nil, ErrKernelIndexOutOfBounds
 	}
-	ptr := C.btck_transaction_get_input_at(t.ptr, C.size_t(index))
+	ptr := C.btck_transaction_get_input_at(t.ptr(), C.size_t(index))
 	return newTransactionInputView(check(ptr)), nil
 }
 
@@ -185,7 +194,7 @@ func (t *transactionApi) iterInputs(from, to uint64, yield func(*TransactionInpu
 
 // CountOutputs returns the number of outputs in the transaction.
 func (t *transactionApi) CountOutputs() uint64 {
-	return uint64(C.btck_transaction_count_outputs(t.ptr))
+	return uint64(C.btck_transaction_count_outputs(t.ptr()))
 }
 
 // GetOutput retrieves the output at the specified index.
@@ -200,7 +209,7 @@ func (t *transactionApi) GetOutput(index uint64) (*TransactionOutputView, error)
 	if index >= t.CountOutputs() {
 		return nil, ErrKernelIndexOutOfBounds
 	}
-	ptr := C.btck_transaction_get_output_at(t.ptr, C.size_t(index))
+	ptr := C.btck_transaction_get_output_at(t.ptr(), C.size_t(index))
 	return newTransactionOutputView(check(ptr)), nil
 }
 

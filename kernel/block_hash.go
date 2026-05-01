@@ -27,28 +27,37 @@ type BlockHash struct {
 
 func newBlockHash(ptr *C.btck_BlockHash, fromOwned bool) *BlockHash {
 	h := newHandle(unsafe.Pointer(ptr), blockHashCFuncs{}, fromOwned)
-	return &BlockHash{handle: h, blockHashApi: blockHashApi{(*C.btck_BlockHash)(h.ptr)}}
+	return &BlockHash{
+		handle: h,
+		blockHashApi: blockHashApi{
+			ptr: func() *C.btck_BlockHash {
+				return (*C.btck_BlockHash)(h.ptr)
+			},
+		},
+	}
 }
 
 // BlockHashView is a type-safe identifier for a block.
 type BlockHashView struct {
 	blockHashApi
-	ptr *C.btck_BlockHash
 }
 
 func newBlockHashView(ptr *C.btck_BlockHash) *BlockHashView {
 	return &BlockHashView{
-		blockHashApi: blockHashApi{ptr},
-		ptr:          ptr,
+		blockHashApi: blockHashApi{
+			ptr: func() *C.btck_BlockHash {
+				return ptr
+			},
+		},
 	}
 }
 
 type blockHashApi struct {
-	ptr *C.btck_BlockHash
+	ptr func() *C.btck_BlockHash
 }
 
 func (bh *blockHashApi) blockHashPtr() *C.btck_BlockHash {
-	return bh.ptr
+	return bh.ptr()
 }
 
 // BlockHashLike is an interface for types that can provide a block hash pointer.
@@ -68,13 +77,13 @@ func NewBlockHash(hashBytes [32]byte) *BlockHash {
 // Bytes returns the 32-byte representation of the block hash.
 func (bh *blockHashApi) Bytes() [32]byte {
 	var output [32]C.uchar
-	C.btck_block_hash_to_bytes(bh.ptr, &output[0])
+	C.btck_block_hash_to_bytes(bh.ptr(), &output[0])
 	return *(*[32]byte)(unsafe.Pointer(&output[0]))
 }
 
 // Copy creates a copy of the block hash.
 func (bh *blockHashApi) Copy() *BlockHash {
-	return newBlockHash(bh.ptr, false)
+	return newBlockHash(bh.ptr(), false)
 }
 
 // Equals checks if two block hashes are equal.
@@ -84,7 +93,7 @@ func (bh *blockHashApi) Copy() *BlockHash {
 //
 // Returns true if the block hashes are equal.
 func (bh *blockHashApi) Equals(other BlockHashLike) bool {
-	return C.btck_block_hash_equals(bh.ptr, other.blockHashPtr()) != 0
+	return C.btck_block_hash_equals(bh.ptr(), other.blockHashPtr()) != 0
 }
 
 // String returns the block hash as a hex string in display order (reversed).

@@ -25,7 +25,14 @@ type TransactionOutput struct {
 
 func newTransactionOutput(ptr *C.btck_TransactionOutput, fromOwned bool) *TransactionOutput {
 	h := newHandle(unsafe.Pointer(ptr), transactionOutputCFuncs{}, fromOwned)
-	return &TransactionOutput{handle: h, transactionOutputApi: transactionOutputApi{(*C.btck_TransactionOutput)(h.ptr)}}
+	return &TransactionOutput{
+		handle: h,
+		transactionOutputApi: transactionOutputApi{
+			ptr: func() *C.btck_TransactionOutput {
+				return (*C.btck_TransactionOutput)(h.ptr)
+			},
+		},
+	}
 }
 
 // NewTransactionOutput creates a transaction output from a script pubkey and an amount.
@@ -40,23 +47,25 @@ func NewTransactionOutput(scriptPubkey *ScriptPubkey, amount int64) *Transaction
 
 type TransactionOutputView struct {
 	transactionOutputApi
-	ptr *C.btck_TransactionOutput
 }
 
 func newTransactionOutputView(ptr *C.btck_TransactionOutput) *TransactionOutputView {
 	return &TransactionOutputView{
-		transactionOutputApi: transactionOutputApi{ptr},
-		ptr:                  ptr,
+		transactionOutputApi: transactionOutputApi{
+			ptr: func() *C.btck_TransactionOutput {
+				return ptr
+			},
+		},
 	}
 }
 
 type transactionOutputApi struct {
-	ptr *C.btck_TransactionOutput
+	ptr func() *C.btck_TransactionOutput
 }
 
 // Copy creates a copy of the transaction output.
 func (t *transactionOutputApi) Copy() *TransactionOutput {
-	return newTransactionOutput(t.ptr, false)
+	return newTransactionOutput(t.ptr(), false)
 }
 
 // ScriptPubkey returns the script pubkey of this output.
@@ -64,11 +73,11 @@ func (t *transactionOutputApi) Copy() *TransactionOutput {
 // The returned ScriptPubkeyView is a non-owned pointer valid for the lifetime of
 // this transaction output.
 func (t *transactionOutputApi) ScriptPubkey() *ScriptPubkeyView {
-	ptr := C.btck_transaction_output_get_script_pubkey(t.ptr)
+	ptr := C.btck_transaction_output_get_script_pubkey(t.ptr())
 	return newScriptPubkeyView(check(ptr))
 }
 
 // Amount returns the amount in the output
 func (t *transactionOutputApi) Amount() int64 {
-	return int64(C.btck_transaction_output_get_amount(t.ptr))
+	return int64(C.btck_transaction_output_get_amount(t.ptr()))
 }

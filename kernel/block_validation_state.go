@@ -27,7 +27,14 @@ type BlockValidationState struct {
 
 func newBlockValidationState(ptr *C.btck_BlockValidationState, fromOwned bool) *BlockValidationState {
 	h := newHandle(unsafe.Pointer(ptr), blockValidationStateCFuncs{}, fromOwned)
-	return &BlockValidationState{handle: h, blockValidationStateApi: blockValidationStateApi{(*C.btck_BlockValidationState)(h.ptr)}}
+	return &BlockValidationState{
+		handle: h,
+		blockValidationStateApi: blockValidationStateApi{
+			ptr: func() *C.btck_BlockValidationState {
+				return (*C.btck_BlockValidationState)(h.ptr)
+			},
+		},
+	}
 }
 
 // NewBlockValidationState creates a new owned BlockValidationState.
@@ -41,23 +48,25 @@ func NewBlockValidationState() *BlockValidationState {
 // It provides read-only access to validation state without managing the underlying memory.
 type BlockValidationStateView struct {
 	blockValidationStateApi
-	ptr *C.btck_BlockValidationState
 }
 
 func newBlockValidationStateView(ptr *C.btck_BlockValidationState) *BlockValidationStateView {
 	return &BlockValidationStateView{
-		blockValidationStateApi: blockValidationStateApi{ptr},
-		ptr:                     ptr,
+		blockValidationStateApi: blockValidationStateApi{
+			ptr: func() *C.btck_BlockValidationState {
+				return ptr
+			},
+		},
 	}
 }
 
 type blockValidationStateApi struct {
-	ptr *C.btck_BlockValidationState
+	ptr func() *C.btck_BlockValidationState
 }
 
 // Copy creates a copy of the block validation state.
 func (s *blockValidationStateApi) Copy() *BlockValidationState {
-	return newBlockValidationState(s.ptr, false)
+	return newBlockValidationState(s.ptr(), false)
 }
 
 // ValidationMode returns whether the block is valid, invalid, or encountered an error.
@@ -67,7 +76,7 @@ func (s *blockValidationStateApi) Copy() *BlockValidationState {
 //   - ValidationStateInvalid: Block failed validation
 //   - ValidationStateError: Internal error during validation
 func (s *blockValidationStateApi) ValidationMode() ValidationMode {
-	mode := C.btck_block_validation_state_get_validation_mode(s.ptr)
+	mode := C.btck_block_validation_state_get_validation_mode(s.ptr())
 	return ValidationMode(mode)
 }
 
@@ -76,7 +85,7 @@ func (s *blockValidationStateApi) ValidationMode() ValidationMode {
 // This provides detailed information about the specific validation failure, such as
 // consensus violations, invalid headers, or missing previous blocks.
 func (s *blockValidationStateApi) ValidationResult() BlockValidationResult {
-	result := C.btck_block_validation_state_get_block_validation_result(s.ptr)
+	result := C.btck_block_validation_state_get_block_validation_result(s.ptr())
 	return BlockValidationResult(result)
 }
 
