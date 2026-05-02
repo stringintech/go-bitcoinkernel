@@ -57,6 +57,22 @@ type coinApi struct {
 	ptr func() *C.btck_Coin
 }
 
+func (c *coinApi) cPtr() *C.btck_Coin {
+	return c.ptr()
+}
+
+// CoinLike is implemented by *Coin and *CoinView.
+type CoinLike interface {
+	cPtr() *C.btck_Coin
+	Copy() *Coin
+	GetOutput() *TransactionOutputView
+	ConfirmationHeight() uint32
+	IsCoinbase() bool
+}
+
+var _ CoinLike = (*Coin)(nil)
+var _ CoinLike = (*CoinView)(nil)
+
 // Copy creates a copy of the coin.
 func (c *coinApi) Copy() *Coin {
 	return newCoin(c.ptr(), false)

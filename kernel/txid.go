@@ -54,14 +54,30 @@ type txidApi struct {
 	ptr func() *C.btck_Txid
 }
 
+func (t *txidApi) cPtr() *C.btck_Txid {
+	return t.ptr()
+}
+
+// TxidLike is implemented by *Txid and *TxidView.
+type TxidLike interface {
+	cPtr() *C.btck_Txid
+	Copy() *Txid
+	Equals(TxidLike) bool
+	Bytes() [32]byte
+	String() string
+}
+
+var _ TxidLike = (*Txid)(nil)
+var _ TxidLike = (*TxidView)(nil)
+
 // Copy creates a copy of the txid.
 func (t *txidApi) Copy() *Txid {
 	return newTxid(t.ptr(), false)
 }
 
 // Equals checks if two txids are equal.
-func (t *txidApi) Equals(other *Txid) bool {
-	return C.btck_txid_equals(t.ptr(), other.txidApi.ptr()) != 0
+func (t *txidApi) Equals(other TxidLike) bool {
+	return C.btck_txid_equals(t.ptr(), other.cPtr()) != 0
 }
 
 // Bytes returns the 32-byte representation of the txid.

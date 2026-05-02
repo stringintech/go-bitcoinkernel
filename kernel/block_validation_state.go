@@ -64,6 +64,21 @@ type blockValidationStateApi struct {
 	ptr func() *C.btck_BlockValidationState
 }
 
+func (s *blockValidationStateApi) cPtr() *C.btck_BlockValidationState {
+	return s.ptr()
+}
+
+// BlockValidationStateLike is implemented by *BlockValidationState and *BlockValidationStateView.
+type BlockValidationStateLike interface {
+	cPtr() *C.btck_BlockValidationState
+	Copy() *BlockValidationState
+	ValidationMode() ValidationMode
+	ValidationResult() BlockValidationResult
+}
+
+var _ BlockValidationStateLike = (*BlockValidationState)(nil)
+var _ BlockValidationStateLike = (*BlockValidationStateView)(nil)
+
 // Copy creates a copy of the block validation state.
 func (s *blockValidationStateApi) Copy() *BlockValidationState {
 	return newBlockValidationState(s.ptr(), false)

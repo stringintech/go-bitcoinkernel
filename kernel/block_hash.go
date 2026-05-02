@@ -56,14 +56,21 @@ type blockHashApi struct {
 	ptr func() *C.btck_BlockHash
 }
 
-func (bh *blockHashApi) blockHashPtr() *C.btck_BlockHash {
+func (bh *blockHashApi) cPtr() *C.btck_BlockHash {
 	return bh.ptr()
 }
 
-// BlockHashLike is an interface for types that can provide a block hash pointer.
+// BlockHashLike is implemented by *BlockHash and *BlockHashView.
 type BlockHashLike interface {
-	blockHashPtr() *C.btck_BlockHash
+	cPtr() *C.btck_BlockHash
+	Bytes() [32]byte
+	Copy() *BlockHash
+	Equals(BlockHashLike) bool
+	String() string
 }
+
+var _ BlockHashLike = (*BlockHash)(nil)
+var _ BlockHashLike = (*BlockHashView)(nil)
 
 // NewBlockHash creates a new BlockHash from a 32-byte hash value.
 //
@@ -93,7 +100,7 @@ func (bh *blockHashApi) Copy() *BlockHash {
 //
 // Returns true if the block hashes are equal.
 func (bh *blockHashApi) Equals(other BlockHashLike) bool {
-	return C.btck_block_hash_equals(bh.ptr(), other.blockHashPtr()) != 0
+	return C.btck_block_hash_equals(bh.ptr(), other.cPtr()) != 0
 }
 
 // String returns the block hash as a hex string in display order (reversed).

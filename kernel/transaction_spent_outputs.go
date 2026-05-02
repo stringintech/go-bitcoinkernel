@@ -58,6 +58,24 @@ type transactionSpentOutputsApi struct {
 	ptr func() *C.btck_TransactionSpentOutputs
 }
 
+func (t *transactionSpentOutputsApi) cPtr() *C.btck_TransactionSpentOutputs {
+	return t.ptr()
+}
+
+// TransactionSpentOutputsLike is implemented by *TransactionSpentOutputs and *TransactionSpentOutputsView.
+type TransactionSpentOutputsLike interface {
+	cPtr() *C.btck_TransactionSpentOutputs
+	Copy() *TransactionSpentOutputs
+	Count() uint64
+	GetCoinAt(uint64) (*CoinView, error)
+	Coins() iter.Seq[*CoinView]
+	CoinsRange(uint64, uint64) iter.Seq[*CoinView]
+	CoinsFrom(uint64) iter.Seq[*CoinView]
+}
+
+var _ TransactionSpentOutputsLike = (*TransactionSpentOutputs)(nil)
+var _ TransactionSpentOutputsLike = (*TransactionSpentOutputsView)(nil)
+
 // Copy creates a copy of the transaction spent outputs.
 func (t *transactionSpentOutputsApi) Copy() *TransactionSpentOutputs {
 	return newTransactionSpentOutputs(t.ptr(), false)

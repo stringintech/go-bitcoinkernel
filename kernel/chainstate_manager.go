@@ -185,7 +185,7 @@ func (cm *ChainstateManager) GetActiveChain() *Chain {
 // BlockTreeEntry is a non-owned pointer valid for the lifetime of this chainstate
 // manager.
 func (cm *ChainstateManager) GetBlockTreeEntryByHash(blockHash BlockHashLike) *BlockTreeEntry {
-	ptr := C.btck_chainstate_manager_get_block_tree_entry_by_hash((*C.btck_ChainstateManager)(cm.ptr), blockHash.blockHashPtr())
+	ptr := C.btck_chainstate_manager_get_block_tree_entry_by_hash((*C.btck_ChainstateManager)(cm.ptr), blockHash.cPtr())
 	if ptr == nil {
 		return nil
 	}

@@ -64,6 +64,21 @@ type scriptPubkeyApi struct {
 	ptr func() *C.btck_ScriptPubkey
 }
 
+func (s *scriptPubkeyApi) cPtr() *C.btck_ScriptPubkey {
+	return s.ptr()
+}
+
+// ScriptPubkeyLike is implemented by *ScriptPubkey and *ScriptPubkeyView.
+type ScriptPubkeyLike interface {
+	cPtr() *C.btck_ScriptPubkey
+	Copy() *ScriptPubkey
+	Bytes() ([]byte, error)
+	Verify(int64, TransactionLike, *PrecomputedTransactionData, uint, ScriptFlags) (bool, error)
+}
+
+var _ ScriptPubkeyLike = (*ScriptPubkey)(nil)
+var _ ScriptPubkeyLike = (*ScriptPubkeyView)(nil)
+
 // Copy creates a copy of the script pubkey.
 func (s *scriptPubkeyApi) Copy() *ScriptPubkey {
 	return newScriptPubkey(s.ptr(), false)
@@ -98,7 +113,7 @@ func (s *scriptPubkeyApi) Bytes() ([]byte, error) {
 //   - bool: true if the script is valid, false if invalid (only meaningful when error is nil)
 //   - error: non-nil if verification could not be performed due to malformed input;
 //     nil if verification completed successfully (check bool for validity result)
-func (s *scriptPubkeyApi) Verify(amount int64, txTo *Transaction, precomputedTxData *PrecomputedTransactionData, inputIndex uint, flags ScriptFlags) (bool, error) {
+func (s *scriptPubkeyApi) Verify(amount int64, txTo TransactionLike, precomputedTxData *PrecomputedTransactionData, inputIndex uint, flags ScriptFlags) (bool, error) {
 	inputCount := txTo.CountInputs()
 	if inputIndex >= uint(inputCount) {
 		return false, ErrVerifyScriptVerifyTxInputIndex
@@ -118,7 +133,7 @@ func (s *scriptPubkeyApi) Verify(amount int64, txTo *Transaction, precomputedTxD
 	result := C.btck_script_pubkey_verify(
 		s.ptr(),
 		C.int64_t(amount),
-		(*C.btck_Transaction)(txTo.handle.ptr),
+		txTo.cPtr(),
 		cPrecomputedTxData,
 		C.uint(inputIndex),
 		C.btck_ScriptVerificationFlags(flags),

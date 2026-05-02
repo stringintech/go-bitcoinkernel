@@ -55,6 +55,21 @@ type transactionOutPointApi struct {
 	ptr func() *C.btck_TransactionOutPoint
 }
 
+func (t *transactionOutPointApi) cPtr() *C.btck_TransactionOutPoint {
+	return t.ptr()
+}
+
+// TransactionOutPointLike is implemented by *TransactionOutPoint and *TransactionOutPointView.
+type TransactionOutPointLike interface {
+	cPtr() *C.btck_TransactionOutPoint
+	Copy() *TransactionOutPoint
+	GetIndex() uint32
+	GetTxid() *TxidView
+}
+
+var _ TransactionOutPointLike = (*TransactionOutPoint)(nil)
+var _ TransactionOutPointLike = (*TransactionOutPointView)(nil)
+
 // Copy creates a copy of the transaction out point.
 func (t *transactionOutPointApi) Copy() *TransactionOutPoint {
 	return newTransactionOutPoint(t.ptr(), false)

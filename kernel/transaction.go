@@ -68,6 +68,32 @@ type transactionApi struct {
 	ptr func() *C.btck_Transaction
 }
 
+func (t *transactionApi) cPtr() *C.btck_Transaction {
+	return t.ptr()
+}
+
+// TransactionLike is implemented by *Transaction and *TransactionView.
+type TransactionLike interface {
+	cPtr() *C.btck_Transaction
+	Copy() *Transaction
+	Bytes() ([]byte, error)
+	GetLockTime() uint32
+	GetTxid() *TxidView
+	CountInputs() uint64
+	GetInput(uint64) (*TransactionInputView, error)
+	Inputs() iter.Seq[*TransactionInputView]
+	InputsRange(uint64, uint64) iter.Seq[*TransactionInputView]
+	InputsFrom(uint64) iter.Seq[*TransactionInputView]
+	CountOutputs() uint64
+	GetOutput(uint64) (*TransactionOutputView, error)
+	Outputs() iter.Seq[*TransactionOutputView]
+	OutputsRange(uint64, uint64) iter.Seq[*TransactionOutputView]
+	OutputsFrom(uint64) iter.Seq[*TransactionOutputView]
+}
+
+var _ TransactionLike = (*Transaction)(nil)
+var _ TransactionLike = (*TransactionView)(nil)
+
 // Copy creates a shallow copy of the transaction by incrementing its reference count.
 //
 // Transactions are reference-counted internally, so this operation is efficient and does

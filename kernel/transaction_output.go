@@ -40,8 +40,8 @@ func newTransactionOutput(ptr *C.btck_TransactionOutput, fromOwned bool) *Transa
 // Parameters:
 //   - scriptPubkey: ScriptPubkey defining the conditions to spend this output
 //   - amount: The amount associated with the script pubkey for this output
-func NewTransactionOutput(scriptPubkey *ScriptPubkey, amount int64) *TransactionOutput {
-	ptr := C.btck_transaction_output_create((*C.btck_ScriptPubkey)(scriptPubkey.handle.ptr), C.int64_t(amount))
+func NewTransactionOutput(scriptPubkey ScriptPubkeyLike, amount int64) *TransactionOutput {
+	ptr := C.btck_transaction_output_create(scriptPubkey.cPtr(), C.int64_t(amount))
 	return newTransactionOutput(check(ptr), true)
 }
 
@@ -62,6 +62,21 @@ func newTransactionOutputView(ptr *C.btck_TransactionOutput) *TransactionOutputV
 type transactionOutputApi struct {
 	ptr func() *C.btck_TransactionOutput
 }
+
+func (t *transactionOutputApi) cPtr() *C.btck_TransactionOutput {
+	return t.ptr()
+}
+
+// TransactionOutputLike is implemented by *TransactionOutput and *TransactionOutputView.
+type TransactionOutputLike interface {
+	cPtr() *C.btck_TransactionOutput
+	Copy() *TransactionOutput
+	ScriptPubkey() *ScriptPubkeyView
+	Amount() int64
+}
+
+var _ TransactionOutputLike = (*TransactionOutput)(nil)
+var _ TransactionOutputLike = (*TransactionOutputView)(nil)
 
 // Copy creates a copy of the transaction output.
 func (t *transactionOutputApi) Copy() *TransactionOutput {

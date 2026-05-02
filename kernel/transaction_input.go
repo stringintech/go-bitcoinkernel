@@ -55,6 +55,21 @@ type transactionInputApi struct {
 	ptr func() *C.btck_TransactionInput
 }
 
+func (t *transactionInputApi) cPtr() *C.btck_TransactionInput {
+	return t.ptr()
+}
+
+// TransactionInputLike is implemented by *TransactionInput and *TransactionInputView.
+type TransactionInputLike interface {
+	cPtr() *C.btck_TransactionInput
+	Copy() *TransactionInput
+	GetOutPoint() *TransactionOutPointView
+	GetSequence() uint32
+}
+
+var _ TransactionInputLike = (*TransactionInput)(nil)
+var _ TransactionInputLike = (*TransactionInputView)(nil)
+
 // Copy creates a copy of the transaction input.
 func (t *transactionInputApi) Copy() *TransactionInput {
 	return newTransactionInput(t.ptr(), false)
