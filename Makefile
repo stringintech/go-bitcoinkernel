@@ -32,6 +32,7 @@ build:
 
 test:
 	go test -v ./...
+	go test -race ./kernel -run TestTransactionHandlePtrRaceDetector
 
 clean:
 	rm -rf depend/bitcoin/build
