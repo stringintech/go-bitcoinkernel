@@ -42,18 +42,18 @@ func newPrecomputedTransactionData(ptr *C.btck_PrecomputedTransactionData, fromO
 //   - spentOutputs: Outputs spent by the transaction. May be nil for non-taproot verification.
 //
 // Returns an error if the precomputation fails.
-func NewPrecomputedTransactionData(txTo *Transaction, spentOutputs []*TransactionOutput) (*PrecomputedTransactionData, error) {
+func NewPrecomputedTransactionData(txTo TransactionLike, spentOutputs []TransactionOutputLike) (*PrecomputedTransactionData, error) {
 	var cSpentOutputsPtr **C.btck_TransactionOutput
 	if len(spentOutputs) > 0 {
 		cSpentOutputs := make([]*C.btck_TransactionOutput, len(spentOutputs))
 		for i, output := range spentOutputs {
-			cSpentOutputs[i] = (*C.btck_TransactionOutput)(output.handle.ptr)
+			cSpentOutputs[i] = output.cPtr()
 		}
 		cSpentOutputsPtr = (**C.btck_TransactionOutput)(unsafe.Pointer(&cSpentOutputs[0]))
 	}
 
 	ptr := C.btck_precomputed_transaction_data_create(
-		(*C.btck_Transaction)(txTo.handle.ptr),
+		txTo.cPtr(),
 		cSpentOutputsPtr,
 		C.size_t(len(spentOutputs)),
 	)

@@ -25,7 +25,14 @@ type ScriptPubkey struct {
 
 func newScriptPubkey(ptr *C.btck_ScriptPubkey, fromOwned bool) *ScriptPubkey {
 	h := newHandle(unsafe.Pointer(ptr), scriptPubkeyCFuncs{}, fromOwned)
-	return &ScriptPubkey{handle: h, scriptPubkeyApi: scriptPubkeyApi{(*C.btck_ScriptPubkey)(h.ptr)}}
+	return &ScriptPubkey{
+		handle: h,
+		scriptPubkeyApi: scriptPubkeyApi{
+			ptr: func() *C.btck_ScriptPubkey {
+				return (*C.btck_ScriptPubkey)(h.ptr)
+			},
+		},
+	}
 }
 
 // NewScriptPubkey creates a new script pubkey from raw serialized script data.
@@ -41,23 +48,40 @@ func NewScriptPubkey(rawScriptPubkey []byte) *ScriptPubkey {
 
 type ScriptPubkeyView struct {
 	scriptPubkeyApi
-	ptr *C.btck_ScriptPubkey
 }
 
 func newScriptPubkeyView(ptr *C.btck_ScriptPubkey) *ScriptPubkeyView {
 	return &ScriptPubkeyView{
-		scriptPubkeyApi: scriptPubkeyApi{ptr},
-		ptr:             ptr,
+		scriptPubkeyApi: scriptPubkeyApi{
+			ptr: func() *C.btck_ScriptPubkey {
+				return ptr
+			},
+		},
 	}
 }
 
 type scriptPubkeyApi struct {
-	ptr *C.btck_ScriptPubkey
+	ptr func() *C.btck_ScriptPubkey
 }
+
+func (s *scriptPubkeyApi) cPtr() *C.btck_ScriptPubkey {
+	return s.ptr()
+}
+
+// ScriptPubkeyLike is implemented by *ScriptPubkey and *ScriptPubkeyView.
+type ScriptPubkeyLike interface {
+	cPtr() *C.btck_ScriptPubkey
+	Copy() *ScriptPubkey
+	Bytes() ([]byte, error)
+	Verify(int64, TransactionLike, *PrecomputedTransactionData, uint, ScriptFlags) (bool, error)
+}
+
+var _ ScriptPubkeyLike = (*ScriptPubkey)(nil)
+var _ ScriptPubkeyLike = (*ScriptPubkeyView)(nil)
 
 // Copy creates a copy of the script pubkey.
 func (s *scriptPubkeyApi) Copy() *ScriptPubkey {
-	return newScriptPubkey(s.ptr, false)
+	return newScriptPubkey(s.ptr(), false)
 }
 
 // Bytes returns the serialized representation of the script pubkey.
@@ -65,7 +89,7 @@ func (s *scriptPubkeyApi) Copy() *ScriptPubkey {
 // Returns an error if the serialization fails.
 func (s *scriptPubkeyApi) Bytes() ([]byte, error) {
 	bytes, ok := writeToBytes(func(writer C.btck_WriteBytes, user_data unsafe.Pointer) C.int {
-		return C.btck_script_pubkey_to_bytes(s.ptr, writer, user_data)
+		return C.btck_script_pubkey_to_bytes(s.ptr(), writer, user_data)
 	})
 	if !ok {
 		return nil, &SerializationError{"Failed to serialize script pubkey"}
@@ -89,7 +113,7 @@ func (s *scriptPubkeyApi) Bytes() ([]byte, error) {
 //   - bool: true if the script is valid, false if invalid (only meaningful when error is nil)
 //   - error: non-nil if verification could not be performed due to malformed input;
 //     nil if verification completed successfully (check bool for validity result)
-func (s *scriptPubkeyApi) Verify(amount int64, txTo *Transaction, precomputedTxData *PrecomputedTransactionData, inputIndex uint, flags ScriptFlags) (bool, error) {
+func (s *scriptPubkeyApi) Verify(amount int64, txTo TransactionLike, precomputedTxData *PrecomputedTransactionData, inputIndex uint, flags ScriptFlags) (bool, error) {
 	inputCount := txTo.CountInputs()
 	if inputIndex >= uint(inputCount) {
 		return false, ErrVerifyScriptVerifyTxInputIndex
@@ -107,9 +131,9 @@ func (s *scriptPubkeyApi) Verify(amount int64, txTo *Transaction, precomputedTxD
 
 	var cStatus C.btck_ScriptVerifyStatus
 	result := C.btck_script_pubkey_verify(
-		s.ptr,
+		s.ptr(),
 		C.int64_t(amount),
-		(*C.btck_Transaction)(txTo.handle.ptr),
+		txTo.cPtr(),
 		cPrecomputedTxData,
 		C.uint(inputIndex),
 		C.btck_ScriptVerificationFlags(flags),

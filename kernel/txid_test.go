@@ -39,6 +39,9 @@ func TestTxid(t *testing.T) {
 	if !txid.Equals(copiedTxid) {
 		t.Error("txid.Equals(copiedTxid) = false, want true")
 	}
+	if !copiedTxid.Equals(txid) {
+		t.Error("copiedTxid.Equals(txid) = false, want true")
+	}
 
 	// Test String()
 	expected := hex.EncodeToString(ReverseBytes(txidBytes[:]))

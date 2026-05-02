@@ -26,39 +26,64 @@ type Txid struct {
 
 func newTxid(ptr *C.btck_Txid, fromOwned bool) *Txid {
 	h := newHandle(unsafe.Pointer(ptr), txidCFuncs{}, fromOwned)
-	return &Txid{handle: h, txidApi: txidApi{(*C.btck_Txid)(h.ptr)}}
+	return &Txid{
+		handle: h,
+		txidApi: txidApi{
+			ptr: func() *C.btck_Txid {
+				return (*C.btck_Txid)(h.ptr)
+			},
+		},
+	}
 }
 
 type TxidView struct {
 	txidApi
-	ptr *C.btck_Txid
 }
 
 func newTxidView(ptr *C.btck_Txid) *TxidView {
 	return &TxidView{
-		txidApi: txidApi{ptr},
-		ptr:     ptr,
+		txidApi: txidApi{
+			ptr: func() *C.btck_Txid {
+				return ptr
+			},
+		},
 	}
 }
 
 type txidApi struct {
-	ptr *C.btck_Txid
+	ptr func() *C.btck_Txid
 }
+
+func (t *txidApi) cPtr() *C.btck_Txid {
+	return t.ptr()
+}
+
+// TxidLike is implemented by *Txid and *TxidView.
+type TxidLike interface {
+	cPtr() *C.btck_Txid
+	Copy() *Txid
+	Equals(TxidLike) bool
+	Bytes() [32]byte
+	String() string
+}
+
+var _ TxidLike = (*Txid)(nil)
+var _ TxidLike = (*TxidView)(nil)
 
 // Copy creates a copy of the txid.
 func (t *txidApi) Copy() *Txid {
-	return newTxid(t.ptr, false)
+	return newTxid(t.ptr(), false)
 }
 
 // Equals checks if two txids are equal.
-func (t *txidApi) Equals(other *Txid) bool {
-	return C.btck_txid_equals(t.ptr, other.txidApi.ptr) != 0
+func (t *txidApi) Equals(other TxidLike) bool {
+	return C.btck_txid_equals(t.ptr(), other.cPtr()) != 0
 }
 
 // Bytes returns the 32-byte representation of the txid.
 func (t *txidApi) Bytes() [32]byte {
 	var output [32]C.uchar
-	C.btck_txid_to_bytes(t.ptr, &output[0])
+	C.btck_txid_to_bytes(t.ptr(), &output[0])
 	return *(*[32]byte)(unsafe.Pointer(&output[0]))
 }
 

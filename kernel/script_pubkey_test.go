@@ -207,7 +207,7 @@ func TestValidTaprootMultiInput(t *testing.T) {
 		{scriptHex: "5120ab78e077d062e7b8acd7063668b4db5355a1b5d5fd2a46a8e98e62e5e63fab77", amount: 135125},
 	}
 
-	outputs := make([]*TransactionOutput, len(spentOutputs))
+	outputs := make([]TransactionOutputLike, len(spentOutputs))
 	for i, spent := range spentOutputs {
 		spentScriptBytes, err := hex.DecodeString(spent.scriptHex)
 		if err != nil {
@@ -216,8 +216,9 @@ func TestValidTaprootMultiInput(t *testing.T) {
 		spentScript := NewScriptPubkey(spentScriptBytes)
 		defer spentScript.Destroy()
 
-		outputs[i] = NewTransactionOutput(spentScript, spent.amount)
-		defer outputs[i].Destroy()
+		output := NewTransactionOutput(spentScript, spent.amount)
+		defer output.Destroy()
+		outputs[i] = output
 	}
 
 	precomputed, err := NewPrecomputedTransactionData(txTo, outputs)
@@ -456,9 +457,9 @@ func testVerifyScript(
 	defer txTo.Destroy()
 
 	// Create spent outputs if provided
-	var outputs []*TransactionOutput
+	var outputs []TransactionOutputLike
 	if len(spentOutputs) > 0 {
-		outputs = make([]*TransactionOutput, len(spentOutputs))
+		outputs = make([]TransactionOutputLike, len(spentOutputs))
 		for i, spent := range spentOutputs {
 			spentScriptBytes, err := hex.DecodeString(spent.scriptHex)
 			if err != nil {
@@ -467,8 +468,9 @@ func testVerifyScript(
 			spentScript := NewScriptPubkey(spentScriptBytes)
 			defer spentScript.Destroy()
 
-			outputs[i] = NewTransactionOutput(spentScript, spent.amount)
-			defer outputs[i].Destroy()
+			output := NewTransactionOutput(spentScript, spent.amount)
+			defer output.Destroy()
+			outputs[i] = output
 		}
 	}
 
