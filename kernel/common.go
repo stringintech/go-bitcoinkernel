@@ -3,7 +3,6 @@ package kernel
 import "C"
 import (
 	"runtime"
-	"runtime/cgo"
 	"unsafe"
 )
 
@@ -86,11 +85,6 @@ func (h *handle) destroy() {
 func (h *handle) Destroy() {
 	runtime.SetFinalizer(h, nil)
 	h.destroy()
-}
-
-//export go_delete_handle
-func go_delete_handle(handle unsafe.Pointer) {
-	cgo.Handle(handle).Delete()
 }
 
 func ReverseBytes(data []byte) []byte {

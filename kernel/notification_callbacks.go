@@ -5,7 +5,6 @@ package kernel
 */
 import "C"
 import (
-	"runtime/cgo"
 	"unsafe"
 )
 
@@ -39,8 +38,7 @@ const (
 
 //export go_notify_block_tip_bridge
 func go_notify_block_tip_bridge(user_data unsafe.Pointer, state C.btck_SynchronizationState, entry *C.btck_BlockTreeEntry, verification_progress C.double) {
-	handle := cgo.Handle(user_data)
-	callbacks := handle.Value().(*NotificationCallbacks)
+	callbacks := cgoHandleFromPointer(user_data).Value().(*NotificationCallbacks)
 
 	if callbacks.OnBlockTip != nil {
 		goState := SynchronizationState(state)
@@ -51,8 +49,7 @@ func go_notify_block_tip_bridge(user_data unsafe.Pointer, state C.btck_Synchroni
 
 //export go_notify_header_tip_bridge
 func go_notify_header_tip_bridge(user_data unsafe.Pointer, state C.btck_SynchronizationState, height C.int64_t, timestamp C.int64_t, presync C.int) {
-	handle := cgo.Handle(user_data)
-	callbacks := handle.Value().(*NotificationCallbacks)
+	callbacks := cgoHandleFromPointer(user_data).Value().(*NotificationCallbacks)
 
 	if callbacks.OnHeaderTip != nil {
 		goState := SynchronizationState(state)
@@ -62,8 +59,7 @@ func go_notify_header_tip_bridge(user_data unsafe.Pointer, state C.btck_Synchron
 
 //export go_notify_progress_bridge
 func go_notify_progress_bridge(user_data unsafe.Pointer, title *C.char, title_len C.size_t, progress_percent C.int, resume_possible C.int) {
-	handle := cgo.Handle(user_data)
-	callbacks := handle.Value().(*NotificationCallbacks)
+	callbacks := cgoHandleFromPointer(user_data).Value().(*NotificationCallbacks)
 
 	if callbacks.OnProgress != nil {
 		goTitle := C.GoStringN(title, C.int(title_len))
@@ -73,8 +69,7 @@ func go_notify_progress_bridge(user_data unsafe.Pointer, title *C.char, title_le
 
 //export go_notify_warning_set_bridge
 func go_notify_warning_set_bridge(user_data unsafe.Pointer, warning C.btck_Warning, message *C.char, message_len C.size_t) {
-	handle := cgo.Handle(user_data)
-	callbacks := handle.Value().(*NotificationCallbacks)
+	callbacks := cgoHandleFromPointer(user_data).Value().(*NotificationCallbacks)
 
 	if callbacks.OnWarningSet != nil {
 		goWarning := Warning(warning)
@@ -85,8 +80,7 @@ func go_notify_warning_set_bridge(user_data unsafe.Pointer, warning C.btck_Warni
 
 //export go_notify_warning_unset_bridge
 func go_notify_warning_unset_bridge(user_data unsafe.Pointer, warning C.btck_Warning) {
-	handle := cgo.Handle(user_data)
-	callbacks := handle.Value().(*NotificationCallbacks)
+	callbacks := cgoHandleFromPointer(user_data).Value().(*NotificationCallbacks)
 
 	if callbacks.OnWarningUnset != nil {
 		goWarning := Warning(warning)
@@ -96,8 +90,7 @@ func go_notify_warning_unset_bridge(user_data unsafe.Pointer, warning C.btck_War
 
 //export go_notify_flush_error_bridge
 func go_notify_flush_error_bridge(user_data unsafe.Pointer, message *C.char, message_len C.size_t) {
-	handle := cgo.Handle(user_data)
-	callbacks := handle.Value().(*NotificationCallbacks)
+	callbacks := cgoHandleFromPointer(user_data).Value().(*NotificationCallbacks)
 
 	if callbacks.OnFlushError != nil {
 		goMessage := C.GoStringN(message, C.int(message_len))
@@ -107,8 +100,7 @@ func go_notify_flush_error_bridge(user_data unsafe.Pointer, message *C.char, mes
 
 //export go_notify_fatal_error_bridge
 func go_notify_fatal_error_bridge(user_data unsafe.Pointer, message *C.char, message_len C.size_t) {
-	handle := cgo.Handle(user_data)
-	callbacks := handle.Value().(*NotificationCallbacks)
+	callbacks := cgoHandleFromPointer(user_data).Value().(*NotificationCallbacks)
 
 	if callbacks.OnFatalError != nil {
 		goMessage := C.GoStringN(message, C.int(message_len))

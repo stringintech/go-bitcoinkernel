@@ -4,8 +4,8 @@ package kernel
 #include "bitcoinkernel.h"
 #include <stdint.h>
 
-// Bridge functions: exported Go functions that C library can call
-// user_data contains the cgo.Handle ID as void* for callback identification
+// Bridge functions exported from Go for kernel callbacks.
+// user_data points to cgo.Handle storage.
 extern void go_notify_block_tip_bridge(void* user_data, btck_SynchronizationState state, btck_BlockTreeEntry* entry, double verification_progress);
 extern void go_notify_header_tip_bridge(void* user_data, btck_SynchronizationState state, int64_t height, int64_t timestamp, int presync);
 extern void go_notify_progress_bridge(void* user_data, const char* title, size_t title_len, int progress_percent, int resume_possible);
@@ -21,10 +21,6 @@ extern void go_validation_interface_block_disconnected_bridge(void* user_data, b
 extern void go_delete_handle(void* user_data);
 */
 import "C"
-import (
-	"runtime/cgo"
-	"unsafe"
-)
 
 // ContextOption is a functional option for configuring context options.
 type ContextOption func(*C.btck_ContextOptions) error
@@ -54,7 +50,7 @@ func WithChainType(chainType ChainType) ContextOption {
 func WithNotifications(callbacks *NotificationCallbacks) ContextOption {
 	return func(opts *C.btck_ContextOptions) error {
 		notificationCallbacks := C.btck_NotificationInterfaceCallbacks{
-			user_data:         unsafe.Pointer(cgo.NewHandle(callbacks)),
+			user_data:         newCgoHandlePointer(callbacks),
 			user_data_destroy: C.btck_DestroyCallback(C.go_delete_handle),
 			block_tip:         C.btck_NotifyBlockTip(C.go_notify_block_tip_bridge),
 			header_tip:        C.btck_NotifyHeaderTip(C.go_notify_header_tip_bridge),
@@ -78,7 +74,7 @@ func WithNotifications(callbacks *NotificationCallbacks) ContextOption {
 func WithValidationInterface(callbacks *ValidationInterfaceCallbacks) ContextOption {
 	return func(opts *C.btck_ContextOptions) error {
 		validationCallbacks := C.btck_ValidationInterfaceCallbacks{
-			user_data:          unsafe.Pointer(cgo.NewHandle(callbacks)),
+			user_data:          newCgoHandlePointer(callbacks),
 			user_data_destroy:  C.btck_DestroyCallback(C.go_delete_handle),
 			block_checked:      C.btck_ValidationInterfaceBlockChecked(C.go_validation_interface_block_checked_bridge),
 			pow_valid_block:    C.btck_ValidationInterfacePoWValidBlock(C.go_validation_interface_pow_valid_block_bridge),

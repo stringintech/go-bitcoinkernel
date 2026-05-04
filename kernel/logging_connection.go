@@ -5,15 +5,14 @@ package kernel
 #include <stdlib.h>
 #include <stdint.h>
 
-// Bridge function: exported Go function that C library can call
-// user_data contains the cgo.Handle ID as void* for callback identification
+// Bridge function exported from Go for kernel log callbacks.
+// user_data points to cgo.Handle storage.
 extern void go_log_callback_bridge(void* user_data, char* message, size_t message_len);
 
 extern void go_delete_handle(void* user_data);
 */
 import "C"
 import (
-	"runtime/cgo"
 	"unsafe"
 )
 
@@ -38,8 +37,7 @@ type LoggingConnection struct {
 
 //export go_log_callback_bridge
 func go_log_callback_bridge(user_data unsafe.Pointer, message *C.char, message_len C.size_t) {
-	handle := cgo.Handle(user_data)
-	callback := handle.Value().(LogCallback)
+	callback := cgoHandleFromPointer(user_data).Value().(LogCallback)
 	goMessage := C.GoStringN(message, C.int(message_len))
 	callback(goMessage)
 }
@@ -54,11 +52,11 @@ func go_log_callback_bridge(user_data unsafe.Pointer, message *C.char, message_l
 //
 // Returns an error if the logging connection cannot be created.
 func NewLoggingConnection(callback LogCallback) (*LoggingConnection, error) {
-	callbackHandle := cgo.NewHandle(callback)
+	userData := newCgoHandlePointer(callback)
 	ptr := C.btck_logging_connection_create((C.btck_LogCallback)(C.go_log_callback_bridge),
-		unsafe.Pointer(callbackHandle), C.btck_DestroyCallback(C.go_delete_handle))
+		userData, C.btck_DestroyCallback(C.go_delete_handle))
 	if ptr == nil {
-		callbackHandle.Delete()
+		deleteCgoHandlePointer(userData)
 		return nil, &InternalError{"Failed to create logging connection"}
 	}
 	h := newUniqueHandle(unsafe.Pointer(ptr), loggingConnectionCFuncs{})

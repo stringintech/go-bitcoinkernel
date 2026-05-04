@@ -21,7 +21,7 @@ type writerCallbackData struct {
 //export go_writer_callback_bridge
 func go_writer_callback_bridge(bytes unsafe.Pointer, size C.size_t, userdata unsafe.Pointer) C.int {
 	if size > 0 {
-		data := cgo.Handle(userdata).Value().(*writerCallbackData)
+		data := cgoHandleFromPointer(userdata).Value().(*writerCallbackData)
 		// Create a Go slice view of the C memory
 		cBytes := unsafe.Slice((*byte)(bytes), int(size))
 		data.buffer = append(data.buffer, cBytes...)
@@ -36,7 +36,7 @@ func writeToBytes(writerFunc func(C.btck_WriteBytes, unsafe.Pointer) C.int) (byt
 	handle := cgo.NewHandle(callbackData)
 	defer handle.Delete()
 
-	result := writerFunc((C.btck_WriteBytes)(C.go_writer_callback_bridge), unsafe.Pointer(handle))
+	result := writerFunc((C.btck_WriteBytes)(C.go_writer_callback_bridge), unsafe.Pointer(&handle))
 	if result != 0 {
 		return nil, false
 	}
