@@ -5,7 +5,6 @@ package kernel
 */
 import "C"
 import (
-	"runtime/cgo"
 	"unsafe"
 )
 
@@ -21,8 +20,7 @@ type ValidationInterfaceCallbacks struct {
 
 //export go_validation_interface_block_checked_bridge
 func go_validation_interface_block_checked_bridge(user_data unsafe.Pointer, block *C.btck_Block, state *C.btck_BlockValidationState) {
-	handle := cgo.Handle(user_data)
-	callbacks := handle.Value().(*ValidationInterfaceCallbacks)
+	callbacks := cgoHandleFromPointer(user_data).Value().(*ValidationInterfaceCallbacks)
 	if callbacks.OnBlockChecked != nil {
 		callbacks.OnBlockChecked(newBlock(block, true), newBlockValidationStateView(state))
 	}
@@ -30,8 +28,7 @@ func go_validation_interface_block_checked_bridge(user_data unsafe.Pointer, bloc
 
 //export go_validation_interface_pow_valid_block_bridge
 func go_validation_interface_pow_valid_block_bridge(user_data unsafe.Pointer, block *C.btck_Block, entry *C.btck_BlockTreeEntry) {
-	handle := cgo.Handle(user_data)
-	callbacks := handle.Value().(*ValidationInterfaceCallbacks)
+	callbacks := cgoHandleFromPointer(user_data).Value().(*ValidationInterfaceCallbacks)
 	if callbacks.OnPoWValidBlock != nil {
 		callbacks.OnPoWValidBlock(newBlock(block, true), &BlockTreeEntry{ptr: entry})
 	}
@@ -39,8 +36,7 @@ func go_validation_interface_pow_valid_block_bridge(user_data unsafe.Pointer, bl
 
 //export go_validation_interface_block_connected_bridge
 func go_validation_interface_block_connected_bridge(user_data unsafe.Pointer, block *C.btck_Block, entry *C.btck_BlockTreeEntry) {
-	handle := cgo.Handle(user_data)
-	callbacks := handle.Value().(*ValidationInterfaceCallbacks)
+	callbacks := cgoHandleFromPointer(user_data).Value().(*ValidationInterfaceCallbacks)
 	if callbacks.OnBlockConnected != nil {
 		callbacks.OnBlockConnected(newBlock(block, true), &BlockTreeEntry{ptr: entry})
 	}
@@ -48,8 +44,7 @@ func go_validation_interface_block_connected_bridge(user_data unsafe.Pointer, bl
 
 //export go_validation_interface_block_disconnected_bridge
 func go_validation_interface_block_disconnected_bridge(user_data unsafe.Pointer, block *C.btck_Block, entry *C.btck_BlockTreeEntry) {
-	handle := cgo.Handle(user_data)
-	callbacks := handle.Value().(*ValidationInterfaceCallbacks)
+	callbacks := cgoHandleFromPointer(user_data).Value().(*ValidationInterfaceCallbacks)
 	if callbacks.OnBlockDisconnected != nil {
 		callbacks.OnBlockDisconnected(newBlock(block, true), &BlockTreeEntry{ptr: entry})
 	}
