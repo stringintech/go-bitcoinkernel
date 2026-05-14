@@ -14,7 +14,10 @@ func TestBlockTreeEntry(t *testing.T) {
 
 	t.Run("Previous", func(t *testing.T) {
 		// Get block at height 1
-		entry := chain.GetByHeight(1)
+		entry, err := chain.GetByHeight(1)
+		if err != nil {
+			t.Fatalf("GetByHeight(1) error = %v", err)
+		}
 
 		// Test getting previous block (should be genesis)
 		prevEntry := entry.Previous()
@@ -29,7 +32,10 @@ func TestBlockTreeEntry(t *testing.T) {
 		}
 
 		// Test genesis block has no previous
-		genesisEntry := chain.GetByHeight(0)
+		genesisEntry, err := chain.GetByHeight(0)
+		if err != nil {
+			t.Fatalf("GetByHeight(0) error = %v", err)
+		}
 
 		// Genesis should have no previous block (should return nil)
 		genesisPrevious := genesisEntry.Previous()
@@ -40,19 +46,28 @@ func TestBlockTreeEntry(t *testing.T) {
 
 	t.Run("Equals", func(t *testing.T) {
 		// Same entry should equal itself
-		entry1 := chain.GetByHeight(1)
+		entry1, err := chain.GetByHeight(1)
+		if err != nil {
+			t.Fatalf("GetByHeight(1) error = %v", err)
+		}
 		if !entry1.Equals(entry1) {
 			t.Error("Entry should equal itself")
 		}
 
 		// Different retrievals of same height should be equal
-		entry1Again := chain.GetByHeight(1)
+		entry1Again, err := chain.GetByHeight(1)
+		if err != nil {
+			t.Fatalf("GetByHeight(1) error = %v", err)
+		}
 		if !entry1.Equals(entry1Again) {
 			t.Error("Same height entries should be equal")
 		}
 
 		// Different heights should not be equal
-		entry0 := chain.GetByHeight(0)
+		entry0, err := chain.GetByHeight(0)
+		if err != nil {
+			t.Fatalf("GetByHeight(0) error = %v", err)
+		}
 		if entry1.Equals(entry0) {
 			t.Error("Different height entries should not be equal")
 		}
@@ -64,9 +79,9 @@ func TestBlockTreeEntry(t *testing.T) {
 	})
 
 	t.Run("Ancestor", func(t *testing.T) {
-		entry2 := chain.GetByHeight(2)
-		if entry2 == nil {
-			t.Fatal("Entry at height 2 is nil")
+		entry2, err := chain.GetByHeight(2)
+		if err != nil {
+			t.Fatalf("GetByHeight(2) error = %v", err)
 		}
 
 		for _, height := range []int32{0, 1, 2} {
@@ -88,9 +103,9 @@ func TestBlockTreeEntry(t *testing.T) {
 
 	t.Run("GetHeader", func(t *testing.T) {
 		// Get genesis block entry
-		genesisEntry := chain.GetByHeight(0)
-		if genesisEntry == nil {
-			t.Fatal("Genesis block tree entry is nil")
+		genesisEntry, err := chain.GetByHeight(0)
+		if err != nil {
+			t.Fatalf("GetByHeight(0) error = %v", err)
 		}
 
 		// Get the header from the entry

@@ -51,6 +51,54 @@ func handleScriptPubkeyDestroy(registry *Registry, req Request) (Response, error
 	return NewEmptySuccessResponse(), nil
 }
 
+// handleScriptPubkeyToBytes returns the serialized script pubkey as a hex string
+func handleScriptPubkeyToBytes(registry *Registry, req Request) (Response, error) {
+	var params struct {
+		ScriptPubkey RefObject `json:"script_pubkey"`
+	}
+
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return Response{}, fmt.Errorf("failed to parse params: %w", err)
+	}
+
+	spk, err := registry.GetScriptPubkey(params.ScriptPubkey.Ref)
+	if err != nil {
+		return Response{}, err
+	}
+
+	b, err := spk.Bytes()
+	if err != nil {
+		return NewEmptyErrorResponse(), nil
+	}
+
+	return NewSuccessResponse(fmt.Sprintf("%x", b)), nil
+}
+
+// handleScriptPubkeyCopy copies a script pubkey and stores the copy in the registry
+func handleScriptPubkeyCopy(registry *Registry, req Request) (Response, error) {
+	var params struct {
+		ScriptPubkey RefObject `json:"script_pubkey"`
+	}
+
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return Response{}, fmt.Errorf("failed to parse params: %w", err)
+	}
+
+	if req.Ref == "" {
+		return Response{}, fmt.Errorf("ref field is required")
+	}
+
+	spk, err := registry.GetScriptPubkey(params.ScriptPubkey.Ref)
+	if err != nil {
+		return Response{}, err
+	}
+
+	spkCopy := spk.Copy()
+	registry.Store(req.Ref, spkCopy)
+
+	return NewSuccessResponseWithRef(req.Ref), nil
+}
+
 // handleScriptPubkeyVerify verifies a script against a transaction
 func handleScriptPubkeyVerify(registry *Registry, req Request) (Response, error) {
 	var params struct {

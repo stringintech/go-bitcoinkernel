@@ -43,8 +43,8 @@ func handleChainGetByHeight(registry *Registry, req Request) (Response, error) {
 		return Response{}, err
 	}
 
-	entry := chain.GetByHeight(params.BlockHeight)
-	if entry == nil {
+	entry, err := chain.GetByHeight(params.BlockHeight)
+	if err != nil {
 		return NewEmptyErrorResponse(), nil
 	}
 

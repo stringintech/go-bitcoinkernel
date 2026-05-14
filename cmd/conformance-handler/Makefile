@@ -1,7 +1,7 @@
 # Conformance Handler Makefile
 
 # Test suite configuration
-TEST_VERSION := 0.0.3
+TEST_VERSION := 0.0.4
 TEST_REPO := stringintech/kernel-bindings-tests
 TEST_DIR := .conformance-tests
 
