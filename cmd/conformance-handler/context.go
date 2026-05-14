@@ -13,6 +13,8 @@ func handleContextCreate(registry *Registry, req Request) (Response, error) {
 		ChainParameters struct {
 			ChainType string `json:"chain_type"`
 		} `json:"chain_parameters"`
+		Notifications       *RefObject `json:"notifications,omitempty"`
+		ValidationInterface *RefObject `json:"validation_interface,omitempty"`
 	}
 
 	if err := json.Unmarshal(req.Params, &params); err != nil {
@@ -39,7 +41,25 @@ func handleContextCreate(registry *Registry, req Request) (Response, error) {
 		return Response{}, fmt.Errorf("unknown chain_type: %s", params.ChainParameters.ChainType)
 	}
 
-	ctx, err := kernel.NewContext(kernel.WithChainType(chainType))
+	opts := []kernel.ContextOption{kernel.WithChainType(chainType)}
+
+	if params.Notifications != nil {
+		iface, err := registry.GetNotificationCallbacksInterface(params.Notifications.Ref)
+		if err != nil {
+			return Response{}, err
+		}
+		opts = append(opts, kernel.WithNotifications(iface))
+	}
+
+	if params.ValidationInterface != nil {
+		iface, err := registry.GetValidationCallbacksInterface(params.ValidationInterface.Ref)
+		if err != nil {
+			return Response{}, err
+		}
+		opts = append(opts, kernel.WithValidationInterface(iface))
+	}
+
+	ctx, err := kernel.NewContext(opts...)
 	if err != nil {
 		return NewEmptyErrorResponse(), nil
 	}

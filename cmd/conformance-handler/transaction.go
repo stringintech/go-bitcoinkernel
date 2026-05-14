@@ -97,6 +97,103 @@ func handleTransactionOutputDestroy(registry *Registry, req Request) (Response, 
 	return NewEmptySuccessResponse(), nil
 }
 
+// handleTransactionGetInputAt retrieves the input at the given index and stores the view in the registry.
+func handleTransactionGetInputAt(registry *Registry, req Request) (Response, error) {
+	var params struct {
+		Transaction RefObject `json:"transaction"`
+		InputIndex  uint64    `json:"input_index"`
+	}
+
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return Response{}, fmt.Errorf("failed to parse params: %w", err)
+	}
+
+	if req.Ref == "" {
+		return Response{}, fmt.Errorf("ref field is required")
+	}
+
+	tx, err := registry.GetTransaction(params.Transaction.Ref)
+	if err != nil {
+		return Response{}, err
+	}
+
+	inputView, err := tx.GetInput(params.InputIndex)
+	if err != nil {
+		return Response{}, err
+	}
+
+	registry.Store(req.Ref, inputView)
+
+	return NewSuccessResponseWithRef(req.Ref), nil
+}
+
+// handleTransactionCopy copies a Transaction and stores the copy in the registry
+func handleTransactionCopy(registry *Registry, req Request) (Response, error) {
+	var params struct {
+		Transaction RefObject `json:"transaction"`
+	}
+
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return Response{}, fmt.Errorf("failed to parse params: %w", err)
+	}
+
+	if req.Ref == "" {
+		return Response{}, fmt.Errorf("ref field is required")
+	}
+
+	tx, err := registry.GetTransaction(params.Transaction.Ref)
+	if err != nil {
+		return Response{}, err
+	}
+
+	txCopy := tx.Copy()
+	registry.Store(req.Ref, txCopy)
+
+	return NewSuccessResponseWithRef(req.Ref), nil
+}
+
+// handleTransactionInputDestroy destroys a TransactionInput from the registry
+func handleTransactionInputDestroy(registry *Registry, req Request) (Response, error) {
+	var params struct {
+		TransactionInput RefObject `json:"transaction_input"`
+	}
+
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return Response{}, fmt.Errorf("failed to parse params: %w", err)
+	}
+
+	if err := registry.Destroy(params.TransactionInput.Ref); err != nil {
+		return Response{}, err
+	}
+
+	return NewEmptySuccessResponse(), nil
+}
+
+// handleTransactionOutputCopy copies a TransactionOutput and stores the copy in the registry
+func handleTransactionOutputCopy(registry *Registry, req Request) (Response, error) {
+	var params struct {
+		TransactionOutput RefObject `json:"transaction_output"`
+	}
+
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return Response{}, fmt.Errorf("failed to parse params: %w", err)
+	}
+
+	if req.Ref == "" {
+		return Response{}, fmt.Errorf("ref field is required")
+	}
+
+	txOut, err := registry.GetTransactionOutput(params.TransactionOutput.Ref)
+	if err != nil {
+		return Response{}, err
+	}
+
+	txOutCopy := txOut.Copy()
+	registry.Store(req.Ref, txOutCopy)
+
+	return NewSuccessResponseWithRef(req.Ref), nil
+}
+
 // handlePrecomputedTransactionDataCreate creates PrecomputedTransactionData from a tx and spent outputs
 func handlePrecomputedTransactionDataCreate(registry *Registry, req Request) (Response, error) {
 	var params struct {
@@ -133,6 +230,158 @@ func handlePrecomputedTransactionDataCreate(registry *Registry, req Request) (Re
 
 	registry.Store(req.Ref, ptd)
 
+	return NewSuccessResponseWithRef(req.Ref), nil
+}
+
+// handleTransactionGetTxid returns the txid view of a transaction.
+// The request must include ref so the handler can return the txid as a view ref.
+func handleTransactionGetTxid(registry *Registry, req Request) (Response, error) {
+	var params struct {
+		Transaction RefObject `json:"transaction"`
+	}
+
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return Response{}, fmt.Errorf("failed to parse params: %w", err)
+	}
+
+	tx, err := registry.GetTransaction(params.Transaction.Ref)
+	if err != nil {
+		return Response{}, err
+	}
+
+	txidView := tx.GetTxid()
+	registry.Store(req.Ref, txidView)
+	return NewSuccessResponseWithRef(req.Ref), nil
+}
+
+// handleTransactionCountInputs returns the number of inputs in a transaction
+func handleTransactionCountInputs(registry *Registry, req Request) (Response, error) {
+	var params struct {
+		Transaction RefObject `json:"transaction"`
+	}
+
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return Response{}, fmt.Errorf("failed to parse params: %w", err)
+	}
+
+	tx, err := registry.GetTransaction(params.Transaction.Ref)
+	if err != nil {
+		return Response{}, err
+	}
+
+	return NewSuccessResponse(tx.CountInputs()), nil
+}
+
+// handleTransactionCountOutputs returns the number of outputs in a transaction
+func handleTransactionCountOutputs(registry *Registry, req Request) (Response, error) {
+	var params struct {
+		Transaction RefObject `json:"transaction"`
+	}
+
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return Response{}, fmt.Errorf("failed to parse params: %w", err)
+	}
+
+	tx, err := registry.GetTransaction(params.Transaction.Ref)
+	if err != nil {
+		return Response{}, err
+	}
+
+	return NewSuccessResponse(tx.CountOutputs()), nil
+}
+
+// handleTransactionToBytes returns the consensus-serialized transaction as a hex string
+func handleTransactionToBytes(registry *Registry, req Request) (Response, error) {
+	var params struct {
+		Transaction RefObject `json:"transaction"`
+	}
+
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return Response{}, fmt.Errorf("failed to parse params: %w", err)
+	}
+
+	tx, err := registry.GetTransaction(params.Transaction.Ref)
+	if err != nil {
+		return Response{}, err
+	}
+
+	data, err := tx.Bytes()
+	if err != nil {
+		return NewEmptyErrorResponse(), nil
+	}
+
+	return NewSuccessResponse(hex.EncodeToString(data)), nil
+}
+
+// handleTransactionGetOutputAt retrieves the output at the given index and stores the view in the registry.
+func handleTransactionGetOutputAt(registry *Registry, req Request) (Response, error) {
+	var params struct {
+		Transaction RefObject `json:"transaction"`
+		OutputIndex uint64    `json:"output_index"`
+	}
+
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return Response{}, fmt.Errorf("failed to parse params: %w", err)
+	}
+
+	if req.Ref == "" {
+		return Response{}, fmt.Errorf("ref field is required")
+	}
+
+	tx, err := registry.GetTransaction(params.Transaction.Ref)
+	if err != nil {
+		return Response{}, err
+	}
+
+	outputView, err := tx.GetOutput(params.OutputIndex)
+	if err != nil {
+		return NewEmptyErrorResponse(), nil
+	}
+
+	registry.Store(req.Ref, outputView)
+
+	return NewSuccessResponseWithRef(req.Ref), nil
+}
+
+// handleTransactionOutputGetAmount returns the amount of a transaction output
+func handleTransactionOutputGetAmount(registry *Registry, req Request) (Response, error) {
+	var params struct {
+		TransactionOutput RefObject `json:"transaction_output"`
+	}
+
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return Response{}, fmt.Errorf("failed to parse params: %w", err)
+	}
+
+	txOut, err := registry.GetTransactionOutput(params.TransactionOutput.Ref)
+	if err != nil {
+		return Response{}, err
+	}
+
+	return NewSuccessResponse(txOut.Amount()), nil
+}
+
+// handleTransactionOutputGetScriptPubkey returns the script pubkey view of a transaction output.
+func handleTransactionOutputGetScriptPubkey(registry *Registry, req Request) (Response, error) {
+	var params struct {
+		TransactionOutput RefObject `json:"transaction_output"`
+	}
+
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return Response{}, fmt.Errorf("failed to parse params: %w", err)
+	}
+
+	if req.Ref == "" {
+		return Response{}, fmt.Errorf("ref field is required")
+	}
+
+	txOut, err := registry.GetTransactionOutput(params.TransactionOutput.Ref)
+	if err != nil {
+		return Response{}, err
+	}
+
+	spkView := txOut.ScriptPubkey()
+	registry.Store(req.Ref, spkView)
 	return NewSuccessResponseWithRef(req.Ref), nil
 }
 

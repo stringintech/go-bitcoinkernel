@@ -8,15 +8,15 @@ import (
 	"unsafe"
 )
 
-// NotificationCallbacks contains all the Go callback function types for notifications.
-type NotificationCallbacks struct {
-	OnBlockTip     func(state SynchronizationState, entry *BlockTreeEntry, progress float64)
-	OnHeaderTip    func(state SynchronizationState, height int64, timestamp int64, presync bool)
-	OnProgress     func(title string, percent int, resumable bool)
-	OnWarningSet   func(warning Warning, message string)
-	OnWarningUnset func(warning Warning)
-	OnFlushError   func(message string)
-	OnFatalError   func(message string)
+// NotificationCallbacks is implemented by types that want to receive kernel notification events.
+type NotificationCallbacks interface {
+	BlockTip(state SynchronizationState, entry *BlockTreeEntry, progress float64)
+	HeaderTip(state SynchronizationState, height int64, timestamp int64, presync bool)
+	Progress(title string, percent int, resumable bool)
+	WarningSet(warning Warning, message string)
+	WarningUnset(warning Warning)
+	FlushError(message string)
+	FatalError(message string)
 }
 
 // SynchronizationState represents the current sync state passed to tip changed callbacks.
@@ -38,72 +38,42 @@ const (
 
 //export go_notify_block_tip_bridge
 func go_notify_block_tip_bridge(user_data unsafe.Pointer, state C.btck_SynchronizationState, entry *C.btck_BlockTreeEntry, verification_progress C.double) {
-	callbacks := cgoHandleFromPointer(user_data).Value().(*NotificationCallbacks)
-
-	if callbacks.OnBlockTip != nil {
-		goState := SynchronizationState(state)
-		goEntry := &BlockTreeEntry{ptr: (*C.btck_BlockTreeEntry)(unsafe.Pointer(entry))}
-		callbacks.OnBlockTip(goState, goEntry, float64(verification_progress))
-	}
+	callbacks := cgoHandleFromPointer(user_data).Value().(NotificationCallbacks)
+	callbacks.BlockTip(SynchronizationState(state), &BlockTreeEntry{ptr: (*C.btck_BlockTreeEntry)(unsafe.Pointer(entry))}, float64(verification_progress))
 }
 
 //export go_notify_header_tip_bridge
 func go_notify_header_tip_bridge(user_data unsafe.Pointer, state C.btck_SynchronizationState, height C.int64_t, timestamp C.int64_t, presync C.int) {
-	callbacks := cgoHandleFromPointer(user_data).Value().(*NotificationCallbacks)
-
-	if callbacks.OnHeaderTip != nil {
-		goState := SynchronizationState(state)
-		callbacks.OnHeaderTip(goState, int64(height), int64(timestamp), presync != 0)
-	}
+	callbacks := cgoHandleFromPointer(user_data).Value().(NotificationCallbacks)
+	callbacks.HeaderTip(SynchronizationState(state), int64(height), int64(timestamp), presync != 0)
 }
 
 //export go_notify_progress_bridge
 func go_notify_progress_bridge(user_data unsafe.Pointer, title *C.char, title_len C.size_t, progress_percent C.int, resume_possible C.int) {
-	callbacks := cgoHandleFromPointer(user_data).Value().(*NotificationCallbacks)
-
-	if callbacks.OnProgress != nil {
-		goTitle := C.GoStringN(title, C.int(title_len))
-		callbacks.OnProgress(goTitle, int(progress_percent), resume_possible != 0)
-	}
+	callbacks := cgoHandleFromPointer(user_data).Value().(NotificationCallbacks)
+	callbacks.Progress(C.GoStringN(title, C.int(title_len)), int(progress_percent), resume_possible != 0)
 }
 
 //export go_notify_warning_set_bridge
 func go_notify_warning_set_bridge(user_data unsafe.Pointer, warning C.btck_Warning, message *C.char, message_len C.size_t) {
-	callbacks := cgoHandleFromPointer(user_data).Value().(*NotificationCallbacks)
-
-	if callbacks.OnWarningSet != nil {
-		goWarning := Warning(warning)
-		goMessage := C.GoStringN(message, C.int(message_len))
-		callbacks.OnWarningSet(goWarning, goMessage)
-	}
+	callbacks := cgoHandleFromPointer(user_data).Value().(NotificationCallbacks)
+	callbacks.WarningSet(Warning(warning), C.GoStringN(message, C.int(message_len)))
 }
 
 //export go_notify_warning_unset_bridge
 func go_notify_warning_unset_bridge(user_data unsafe.Pointer, warning C.btck_Warning) {
-	callbacks := cgoHandleFromPointer(user_data).Value().(*NotificationCallbacks)
-
-	if callbacks.OnWarningUnset != nil {
-		goWarning := Warning(warning)
-		callbacks.OnWarningUnset(goWarning)
-	}
+	callbacks := cgoHandleFromPointer(user_data).Value().(NotificationCallbacks)
+	callbacks.WarningUnset(Warning(warning))
 }
 
 //export go_notify_flush_error_bridge
 func go_notify_flush_error_bridge(user_data unsafe.Pointer, message *C.char, message_len C.size_t) {
-	callbacks := cgoHandleFromPointer(user_data).Value().(*NotificationCallbacks)
-
-	if callbacks.OnFlushError != nil {
-		goMessage := C.GoStringN(message, C.int(message_len))
-		callbacks.OnFlushError(goMessage)
-	}
+	callbacks := cgoHandleFromPointer(user_data).Value().(NotificationCallbacks)
+	callbacks.FlushError(C.GoStringN(message, C.int(message_len)))
 }
 
 //export go_notify_fatal_error_bridge
 func go_notify_fatal_error_bridge(user_data unsafe.Pointer, message *C.char, message_len C.size_t) {
-	callbacks := cgoHandleFromPointer(user_data).Value().(*NotificationCallbacks)
-
-	if callbacks.OnFatalError != nil {
-		goMessage := C.GoStringN(message, C.int(message_len))
-		callbacks.OnFatalError(goMessage)
-	}
+	callbacks := cgoHandleFromPointer(user_data).Value().(NotificationCallbacks)
+	callbacks.FatalError(C.GoStringN(message, C.int(message_len)))
 }

@@ -29,5 +29,5 @@ The test suite is automatically downloaded for your platform (darwin_arm64, darw
 ## Pinned Test Version
 
 This handler is compatible with:
-- Test Suite Version: `0.0.3`
+- Test Suite Version: `0.0.4-alpha.pr19.1`
 - Test Repository: [stringintech/kernel-bindings-tests](https://github.com/stringintech/kernel-bindings-tests)

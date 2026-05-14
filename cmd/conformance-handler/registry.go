@@ -137,6 +137,123 @@ func (r *Registry) GetPrecomputedTransactionData(ref string) (*kernel.Precompute
 	return ptd, nil
 }
 
+// GetTransactionOutPoint retrieves a transaction out point by reference name.
+func (r *Registry) GetTransactionOutPoint(ref string) (kernel.TransactionOutPointLike, error) {
+	obj, ok := r.objects[ref]
+	if !ok {
+		return nil, fmt.Errorf("reference not found: %s", ref)
+	}
+	op, ok := obj.(kernel.TransactionOutPointLike)
+	if !ok {
+		return nil, fmt.Errorf("reference %s is not a TransactionOutPoint (got %T)", ref, obj)
+	}
+	return op, nil
+}
+
+// GetTxid retrieves a txid by reference name.
+func (r *Registry) GetTxid(ref string) (kernel.TxidLike, error) {
+	obj, ok := r.objects[ref]
+	if !ok {
+		return nil, fmt.Errorf("reference not found: %s", ref)
+	}
+	txid, ok := obj.(kernel.TxidLike)
+	if !ok {
+		return nil, fmt.Errorf("reference %s is not a Txid (got %T)", ref, obj)
+	}
+	return txid, nil
+}
+
+// GetTransactionInput retrieves a transaction input by reference name.
+func (r *Registry) GetTransactionInput(ref string) (kernel.TransactionInputLike, error) {
+	obj, ok := r.objects[ref]
+	if !ok {
+		return nil, fmt.Errorf("reference not found: %s", ref)
+	}
+	ti, ok := obj.(kernel.TransactionInputLike)
+	if !ok {
+		return nil, fmt.Errorf("reference %s is not a TransactionInput (got %T)", ref, obj)
+	}
+	return ti, nil
+}
+
+// GetChainParameters retrieves chain parameters by reference name
+func (r *Registry) GetChainParameters(ref string) (*kernel.ChainParameters, error) {
+	obj, ok := r.objects[ref]
+	if !ok {
+		return nil, fmt.Errorf("reference not found: %s", ref)
+	}
+	cp, ok := obj.(*kernel.ChainParameters)
+	if !ok {
+		return nil, fmt.Errorf("reference %s is not a ChainParameters (got %T)", ref, obj)
+	}
+	return cp, nil
+}
+
+// GetBlockHash retrieves a block hash by reference name.
+func (r *Registry) GetBlockHash(ref string) (kernel.BlockHashLike, error) {
+	obj, ok := r.objects[ref]
+	if !ok {
+		return nil, fmt.Errorf("reference not found: %s", ref)
+	}
+	bh, ok := obj.(kernel.BlockHashLike)
+	if !ok {
+		return nil, fmt.Errorf("reference %s is not a BlockHash (got %T)", ref, obj)
+	}
+	return bh, nil
+}
+
+// GetBlockHeader retrieves a block header by reference name
+func (r *Registry) GetBlockHeader(ref string) (*kernel.BlockHeader, error) {
+	obj, ok := r.objects[ref]
+	if !ok {
+		return nil, fmt.Errorf("reference not found: %s", ref)
+	}
+	bh, ok := obj.(*kernel.BlockHeader)
+	if !ok {
+		return nil, fmt.Errorf("reference %s is not a BlockHeader (got %T)", ref, obj)
+	}
+	return bh, nil
+}
+
+// GetNotificationCallbacksInterface retrieves a notification callbacks interface by reference name
+func (r *Registry) GetNotificationCallbacksInterface(ref string) (*NotificationCallbacksInterface, error) {
+	obj, ok := r.objects[ref]
+	if !ok {
+		return nil, fmt.Errorf("reference not found: %s", ref)
+	}
+	iface, ok := obj.(*NotificationCallbacksInterface)
+	if !ok {
+		return nil, fmt.Errorf("reference %s is not a NotificationCallbacksInterface (got %T)", ref, obj)
+	}
+	return iface, nil
+}
+
+// GetBlockValidationState retrieves a block validation state by reference name
+func (r *Registry) GetBlockValidationState(ref string) (*kernel.BlockValidationState, error) {
+	obj, ok := r.objects[ref]
+	if !ok {
+		return nil, fmt.Errorf("reference not found: %s", ref)
+	}
+	s, ok := obj.(*kernel.BlockValidationState)
+	if !ok {
+		return nil, fmt.Errorf("reference %s is not a BlockValidationState (got %T)", ref, obj)
+	}
+	return s, nil
+}
+
+// GetValidationCallbacksInterface retrieves a validation callbacks interface by reference name
+func (r *Registry) GetValidationCallbacksInterface(ref string) (*ValidationCallbacksInterface, error) {
+	obj, ok := r.objects[ref]
+	if !ok {
+		return nil, fmt.Errorf("reference not found: %s", ref)
+	}
+	iface, ok := obj.(*ValidationCallbacksInterface)
+	if !ok {
+		return nil, fmt.Errorf("reference %s is not a ValidationCallbacksInterface (got %T)", ref, obj)
+	}
+	return iface, nil
+}
+
 // GetBlockTreeEntry retrieves a block tree entry by reference name
 func (r *Registry) GetBlockTreeEntry(ref string) (*kernel.BlockTreeEntry, error) {
 	obj, ok := r.objects[ref]

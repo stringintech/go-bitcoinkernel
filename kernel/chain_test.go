@@ -23,19 +23,28 @@ func TestChain(t *testing.T) {
 	})
 
 	t.Run("GetByHeight", func(t *testing.T) {
-		block1 := chain.GetByHeight(1)
+		block1, err := chain.GetByHeight(1)
+		if err != nil {
+			t.Fatalf("GetByHeight(1) error = %v", err)
+		}
 		if block1.Height() != 1 {
 			t.Errorf("Expected block height 1, got %d", block1.Height())
 		}
 	})
 
 	t.Run("Contains", func(t *testing.T) {
-		genesis := chain.GetByHeight(0)
+		genesis, err := chain.GetByHeight(0)
+		if err != nil {
+			t.Fatalf("GetByHeight(0) error = %v", err)
+		}
 		if !chain.Contains(genesis) {
 			t.Error("Chain should contain genesis block")
 		}
 
-		block1 := chain.GetByHeight(1)
+		block1, err := chain.GetByHeight(1)
+		if err != nil {
+			t.Fatalf("GetByHeight(1) error = %v", err)
+		}
 		if !chain.Contains(block1) {
 			t.Error("Chain should contain block at height 1")
 		}

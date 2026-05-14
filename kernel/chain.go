@@ -18,22 +18,22 @@ type Chain struct {
 
 // GetByHeight retrieves a block tree entry by its height in the currently active chain.
 //
-// Returns nil if the height is out of bounds. Once retrieved, there is no guarantee
-// that it remains in the active chain if new blocks are processed.
+// Returns ErrKernelIndexOutOfBounds if the height is out of bounds. Once retrieved,
+// there is no guarantee that it remains in the active chain if new blocks are processed.
 //
 // Parameters:
 //   - height: Block height to retrieve
 //
 // Example usage:
 //
-//	genesis := chain.GetByHeight(0)
-//	tip := chain.GetByHeight(chain.GetHeight())
-func (c *Chain) GetByHeight(height int32) *BlockTreeEntry {
+//	genesis, _ := chain.GetByHeight(0)
+//	tip, _ := chain.GetByHeight(chain.GetHeight())
+func (c *Chain) GetByHeight(height int32) (*BlockTreeEntry, error) {
 	ptr := C.btck_chain_get_by_height(c.ptr, C.int(height))
 	if ptr == nil {
-		return nil
+		return nil, ErrKernelIndexOutOfBounds
 	}
-	return &BlockTreeEntry{ptr}
+	return &BlockTreeEntry{ptr}, nil
 }
 
 // Contains checks whether the given block tree entry is part of this chain.
@@ -107,8 +107,8 @@ func (c *Chain) EntriesFrom(from int32) iter.Seq[*BlockTreeEntry] {
 // iterEntries is a helper that iterates over block tree entries in [from, to).
 func (c *Chain) iterEntries(from, to int32, yield func(*BlockTreeEntry) bool) {
 	for h := from; h < to; h++ {
-		entry := c.GetByHeight(h)
-		if entry == nil { // Height may become out of bounds due to a reorg
+		entry, err := c.GetByHeight(h)
+		if err != nil { // Height may become out of bounds due to a reorg
 			return
 		}
 		if !yield(entry) {

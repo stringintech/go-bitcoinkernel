@@ -4,39 +4,47 @@ import (
 	"testing"
 )
 
-func TestNotificationCallbacks(t *testing.T) {
-	var blockTipCalled bool
-	var headerTipCalled bool
-	var lastBlockHeight int64
-	var lastHeaderHeight int64
+type notificationTestCallbacks struct {
+	lastBlockHeight  int64
+	lastHeaderHeight int64
+	blockTipCalled   bool
+	headerTipCalled  bool
+}
 
-	callbacks := &NotificationCallbacks{
-		OnBlockTip: func(state SynchronizationState, index *BlockTreeEntry, _ float64) {
-			blockTipCalled = true
-			lastBlockHeight = int64(index.Height())
-		},
-		OnHeaderTip: func(state SynchronizationState, height int64, timestamp int64, presync bool) {
-			headerTipCalled = true
-			lastHeaderHeight = height
-		},
-	}
+func (c *notificationTestCallbacks) BlockTip(state SynchronizationState, entry *BlockTreeEntry, progress float64) {
+	c.blockTipCalled = true
+	c.lastBlockHeight = int64(entry.Height())
+}
+
+func (c *notificationTestCallbacks) HeaderTip(state SynchronizationState, height int64, timestamp int64, presync bool) {
+	c.headerTipCalled = true
+	c.lastHeaderHeight = height
+}
+
+func (c *notificationTestCallbacks) Progress(title string, percent int, resumable bool) {}
+func (c *notificationTestCallbacks) WarningSet(warning Warning, message string)         {}
+func (c *notificationTestCallbacks) WarningUnset(warning Warning)                       {}
+func (c *notificationTestCallbacks) FlushError(message string)                          {}
+func (c *notificationTestCallbacks) FatalError(message string)                          {}
+
+func TestNotificationCallbacks(t *testing.T) {
+	cb := &notificationTestCallbacks{}
 	suite := ChainstateManagerTestSuite{
 		MaxBlockHeightToImport: 5,
-		NotificationCallbacks:  callbacks,
+		NotificationCallbacks:  cb,
 	}
 	suite.Setup(t)
 
-	if !blockTipCalled {
-		t.Error("OnBlockTip callback was not called")
+	if !cb.blockTipCalled {
+		t.Error("BlockTip callback was not called")
 	}
-	if lastBlockHeight != 5 {
-		t.Errorf("Expected last block height 5, got %d", lastBlockHeight)
+	if cb.lastBlockHeight != 5 {
+		t.Errorf("Expected last block height 5, got %d", cb.lastBlockHeight)
 	}
-
-	if !headerTipCalled {
-		t.Error("OnHeaderTip callback was not called")
+	if !cb.headerTipCalled {
+		t.Error("HeaderTip callback was not called")
 	}
-	if lastHeaderHeight != 5 {
-		t.Errorf("Expected last header height 5, got %d", lastHeaderHeight)
+	if cb.lastHeaderHeight != 5 {
+		t.Errorf("Expected last header height 5, got %d", cb.lastHeaderHeight)
 	}
 }
