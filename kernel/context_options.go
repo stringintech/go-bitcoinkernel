@@ -47,7 +47,7 @@ func WithChainType(chainType ChainType) ContextOption {
 //
 // Parameters:
 //   - callbacks: Notification callbacks to set
-func WithNotifications(callbacks *NotificationCallbacks) ContextOption {
+func WithNotifications(callbacks NotificationCallbacks) ContextOption {
 	return func(opts *C.btck_ContextOptions) error {
 		notificationCallbacks := C.btck_NotificationInterfaceCallbacks{
 			user_data:         newCgoHandlePointer(callbacks),
@@ -71,7 +71,7 @@ func WithNotifications(callbacks *NotificationCallbacks) ContextOption {
 //
 // Parameters:
 //   - callbacks: The callbacks used for passing validation information to the user
-func WithValidationInterface(callbacks *ValidationInterfaceCallbacks) ContextOption {
+func WithValidationInterface(callbacks ValidationInterfaceCallbacks) ContextOption {
 	return func(opts *C.btck_ContextOptions) error {
 		validationCallbacks := C.btck_ValidationInterfaceCallbacks{
 			user_data:          newCgoHandlePointer(callbacks),
