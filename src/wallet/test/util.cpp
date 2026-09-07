@@ -7,7 +7,6 @@
 #include <chain.h>
 #include <key.h>
 #include <key_io.h>
-#include <streams.h>
 #include <test/util/setup_common.h>
 #include <validationinterface.h>
 #include <wallet/context.h>
@@ -41,7 +40,7 @@ std::unique_ptr<CWallet> CreateSyncedWallet(interfaces::Chain& chain, CChain& cc
     }
     WalletRescanReserver reserver(*wallet);
     reserver.reserve();
-    CWallet::ScanResult result = wallet->ScanForWalletTransactions(cchain.Genesis()->GetBlockHash(), /*start_height=*/0, /*max_height=*/{}, reserver, /*fUpdate=*/false, /*save_progress=*/false);
+    CWallet::ScanResult result = wallet->ScanForWalletTransactions(cchain.Genesis()->GetBlockHash(), /*start_height=*/0, /*max_height=*/{}, reserver, /*save_progress=*/false);
     assert(result.status == CWallet::ScanResult::SUCCESS);
     assert(result.last_scanned_block == cchain.Tip()->GetBlockHash());
     assert(*result.last_scanned_height == cchain.Height());
@@ -53,7 +52,7 @@ std::shared_ptr<CWallet> TestCreateWallet(std::unique_ptr<WalletDatabase> databa
 {
     bilingual_str _error;
     std::vector<bilingual_str> _warnings;
-    auto wallet = CWallet::CreateNew(context, "", std::move(database), create_flags, _error, _warnings);
+    auto wallet = CWallet::CreateNew(context, "", std::move(database), create_flags, /*born_encrypted=*/false, _error, _warnings);
     NotifyWalletLoaded(context, wallet);
     if (context.chain) {
         wallet->postInitProcess();
@@ -68,7 +67,6 @@ std::shared_ptr<CWallet> TestCreateWallet(WalletContext& context)
     options.create_flags = WALLET_FLAG_DESCRIPTORS;
     DatabaseStatus status;
     bilingual_str error;
-    std::vector<bilingual_str> warnings;
     auto database = MakeWalletDatabase("", options, status, error);
     return TestCreateWallet(std::move(database), context, options.create_flags);
 }
@@ -92,7 +90,6 @@ std::shared_ptr<CWallet> TestLoadWallet(WalletContext& context)
     options.require_existing = true;
     DatabaseStatus status;
     bilingual_str error;
-    std::vector<bilingual_str> warnings;
     auto database = MakeWalletDatabase("", options, status, error);
     return TestLoadWallet(std::move(database), context);
 }
@@ -103,27 +100,6 @@ void TestUnloadWallet(std::shared_ptr<CWallet>&& wallet)
     wallet->chain().waitForNotificationsIfTipChanged({});
     wallet->m_chain_notifications_handler.reset();
     WaitForDeleteWallet(std::move(wallet));
-}
-
-std::unique_ptr<WalletDatabase> DuplicateMockDatabase(WalletDatabase& database)
-{
-    std::unique_ptr<DatabaseBatch> batch_orig = database.MakeBatch();
-    std::unique_ptr<DatabaseCursor> cursor_orig = batch_orig->GetNewCursor();
-
-    std::unique_ptr<WalletDatabase> new_db = CreateMockableWalletDatabase();
-    std::unique_ptr<DatabaseBatch> new_db_batch = new_db->MakeBatch();
-    MockableSQLiteBatch* batch_new = dynamic_cast<MockableSQLiteBatch*>(new_db_batch.get());
-    Assert(batch_new);
-
-    while (true) {
-        DataStream key, value;
-        DatabaseCursor::Status status = cursor_orig->Next(key, value);
-        Assert(status != DatabaseCursor::Status::FAIL);
-        if (status != DatabaseCursor::Status::MORE) break;
-        batch_new->WriteKey(std::move(key), std::move(value));
-    }
-
-    return new_db;
 }
 
 std::string getnewaddress(CWallet& w)
@@ -138,7 +114,7 @@ CTxDestination getNewDestination(CWallet& w, OutputType output_type)
 }
 
 MockableSQLiteDatabase::MockableSQLiteDatabase()
-    : SQLiteDatabase(fs::PathFromString("mock/"), fs::PathFromString("mock/wallet.dat"), DatabaseOptions(), SQLITE_OPEN_MEMORY)
+    : InMemoryWalletDatabase()
 {}
 
 std::unique_ptr<WalletDatabase> CreateMockableWalletDatabase()

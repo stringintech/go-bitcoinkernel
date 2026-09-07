@@ -4,19 +4,30 @@
 
 #include <common/pcp.h>
 
-#include <atomic>
-#include <common/netif.h>
+#include <compat/compat.h>
 #include <crypto/common.h>
-#include <logging.h>
+#include <crypto/hex_base.h>
 #include <netaddress.h>
 #include <netbase.h>
-#include <random.h>
-#include <span.h>
+#include <tinyformat.h>
 #include <util/check.h>
-#include <util/readwritefile.h>
+#include <util/log.h>
 #include <util/sock.h>
-#include <util/strencodings.h>
+#include <util/string.h>
 #include <util/threadinterrupt.h>
+#include <util/time.h>
+
+#include <algorithm>
+#include <atomic>
+#include <compare>
+#include <cstring>
+#include <functional>
+#include <map>
+#include <memory>
+#include <optional>
+#include <span>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -247,7 +258,7 @@ std::optional<std::vector<uint8_t>> PCPSendRecv(Sock &sock, const std::string &p
         while ((cur_time = time_point_cast<milliseconds>(MockableSteadyClock::now())) < deadline) {
             if (interrupt) return std::nullopt;
             Sock::Event occurred = 0;
-            if (!sock.Wait(deadline - cur_time, Sock::RECV, &occurred)) {
+            if (!sock.Wait(deadline - cur_time, Sock::RecvEvent, &occurred)) {
                 LogWarning("%s: Could not wait on socket: %s\n", protocol, NetworkErrorString(WSAGetLastError()));
                 return std::nullopt; // Network-level error, probably no use retrying.
             }

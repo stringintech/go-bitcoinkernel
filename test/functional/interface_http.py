@@ -5,19 +5,20 @@
 """Test the HTTP server basics."""
 
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.netutil import NETWORK_ERRORS
 from test_framework.util import assert_equal, str_to_b64str
 
 import http.client
+import socket
+import threading
 import time
 import urllib.parse
 
-# Configuration option for some test nodes
+# Configuration option for some tests
 RPCSERVERTIMEOUT = 2
-# Set in httpserver.cpp and passed to libevent evhttp_set_max_headers_size()
+# Set in httpserver.h
 MAX_HEADERS_SIZE = 8192
-# Set in serialize.h and passed to libevent evhttp_set_max_body_size()
-MAX_SIZE = 0x02000000
-
+MAX_BODY_SIZE = 32 * 1024 * 1024
 
 class BitcoinHTTPConnection:
     def __init__(self, node):
@@ -37,8 +38,7 @@ class BitcoinHTTPConnection:
             self.conn.request('GET', '/')
             self.conn.getresponse().read()
             return False
-        #       macos/linux           windows
-        except (ConnectionResetError, ConnectionAbortedError):
+        except NETWORK_ERRORS:
             return True
 
     def close_sock(self):
@@ -63,12 +63,15 @@ class BitcoinHTTPConnection:
     def get(self, path, connection_header=None):
         return self._request('GET', path, '', connection_header)
 
+    def send_raw(self, data):
+        self.conn.sock.sendall(data)
+
     def post_raw(self, path, data):
         data_bytes = data.encode("utf-8")
         req = f"POST {path} HTTP/1.1\r\n"
         req += f'Authorization: Basic {str_to_b64str(self.authpair)}\r\n'
         req += f'Content-Length: {len(data_bytes)}\r\n\r\n'
-        self.conn.sock.sendall(req.encode("ascii") + data_bytes)
+        self.send_raw(req.encode("ascii") + data_bytes)
 
     def recv_raw(self):
         '''
@@ -95,7 +98,6 @@ class BitcoinHTTPConnection:
 class HTTPBasicsTest (BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
-        self.supports_cli = False
 
     def setup_network(self):
         self.setup_nodes()
@@ -114,10 +116,21 @@ class HTTPBasicsTest (BitcoinTestFramework):
         self.check_keepalive_connection()
         self.check_close_connection()
         self.check_excessive_request_size()
-        self.check_pipelining()
+        self.check_pipelining(with_invalid_second_request=False)
+        self.check_pipelining(with_invalid_second_request=True)
         self.check_chunked_transfer()
         self.check_idle_timeout()
         self.check_server_busy_idle_timeout()
+        self.check_auth_required()
+        self.check_wrong_credentials()
+        self.check_malformed_auth_headers()
+        self.check_disallowed_http_methods()
+        self.check_path_traversal()
+        self.check_request_smuggling_cl_te()
+        self.check_duplicate_content_length()
+        self.check_null_byte_in_uri()
+        self.check_invalid_http_version()
+        self.check_whitespace_in_headers()
 
 
     def check_default_connection(self):
@@ -186,11 +199,6 @@ class HTTPBasicsTest (BitcoinTestFramework):
         headers_below_limit = (MAX_HEADERS_SIZE - 1000) // header_line_length
         headers_above_limit = MAX_HEADERS_SIZE // header_line_length
 
-        # This is a libevent mystery:
-        # libevent does not reject the request until it is more than
-        # 1,000 bytes above the configured limit.
-        headers_above_limit += 1000 // header_line_length
-
         # Many small header lines is ok
         conn = BitcoinHTTPConnection(self.node)
         for i in range(headers_below_limit):
@@ -208,8 +216,8 @@ class HTTPBasicsTest (BitcoinTestFramework):
         # Compute how much data we can add to a request message body
         # to make / break the limit.
         base_request_body_size = len('{"jsonrpc": "2.0", "id": "0", "method": "submitblock", "params": [""]}}')
-        bytes_below_limit = MAX_SIZE - base_request_body_size
-        bytes_above_limit = MAX_SIZE - base_request_body_size + 2
+        bytes_below_limit = MAX_BODY_SIZE - base_request_body_size
+        bytes_above_limit = MAX_BODY_SIZE - base_request_body_size + 2
 
         # Large request body size is ok
         conn = BitcoinHTTPConnection(self.node)
@@ -217,32 +225,45 @@ class HTTPBasicsTest (BitcoinTestFramework):
         assert_equal(response4.status, http.client.OK)
 
         conn = BitcoinHTTPConnection(self.node)
+
+        # Split off the send into a background thread. When the server detects
+        # the excessive size it will stop reading from the socket, but the client
+        # will continue trying to write until the backpressure eventually
+        # drops the TCP window size to 0. While the send operation is blocking until
+        # it times out, we can still receive the server's response in the foreground.
+
+        def send_excessive_body(self, conn):
+            try:
+                # Excessive body size is invalid
+                conn.post_raw('/', f'{{"jsonrpc": "2.0", "id": "0", "method": "submitblock", "params": ["{"0" * bytes_above_limit}"]}}')
+                # On some platforms (e.g. Windows) the whole request may be
+                # accepted into the OS send buffer before the server disconnects.
+                # It's ok to allow that, the server-side behavior is asserted in
+                # the foreground thread via the 413 response.
+                self.log.info("Client finished sending request before connection was terminated")
+            except NETWORK_ERRORS:
+                self.log.info("Client did not finish sending request before connection was terminated")
+
+        send_thread = threading.Thread(target=send_excessive_body, args=(self, conn))
+        send_thread.start()
+
+        response5 = conn.recv_raw().decode()
+        assert "413 Content too large" in response5
+
         try:
-            # Excessive body size is invalid
-            conn.post_raw('/', f'{{"jsonrpc": "2.0", "id": "0", "method": "submitblock", "params": ["{"0" * bytes_above_limit}"]}}')
-            self.log.info("Client finished sending request before connection was terminated")
-        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
-            self.log.info("Client did not finish sending request before connection was terminated")
-
-        # The server will send a 413 response and disconnect but due to a race
-        # condition, the python client may or may not read the response before
-        # detecting the broken socket (which it may still be trying to write to).
-        try:
-            response5 = conn.conn.getresponse()
-            assert_equal(response5.status, http.client.REQUEST_ENTITY_TOO_LARGE)
-            self.log.info(f"Client got expected response status {response5.status}")
-            assert conn.sock_closed()
-        #       macos/linux                   windows
-        except (http.client.ResponseNotReady, ConnectionAbortedError):
-            self.log.info("Client did not read response before disconnecting")
+            conn.conn.sock.shutdown(socket.SHUT_RDWR)
+            self.log.info("Send thread force-closed by test framework")
+        except OSError:
+            self.log.info("Send thread was already closed by RST from server")
+        send_thread.join()
 
 
-    def check_pipelining(self):
+    def check_pipelining(self, with_invalid_second_request):
         """
         Requests are responded to in the order in which they were received
         See https://www.rfc-editor.org/rfc/rfc7230#section-6.3.2
         """
-        self.log.info("Check pipelining")
+        self.log.info("Check pipelining" + (" with invalid second request" if with_invalid_second_request else ""))
         tip_height = self.node.getblockcount()
         conn = BitcoinHTTPConnection(self.node)
         conn.set_timeout(5)
@@ -250,7 +271,10 @@ class HTTPBasicsTest (BitcoinTestFramework):
         # Send two requests in a row.
         # The first request will block the second indefinitely
         conn.post_raw('/', f'{{"method": "waitforblockheight", "params": [{tip_height + 1}]}}')
-        conn.post_raw('/', '{"method": "getblockcount"}')
+        if with_invalid_second_request:
+            conn.post_raw(f'/{"x" * MAX_HEADERS_SIZE * 2}', '{"method": "getblockcount"}')
+        else:
+            conn.post_raw('/', '{"method": "getblockcount"}')
 
         try:
             # The server should not respond to the second request until the first
@@ -264,16 +288,30 @@ class HTTPBasicsTest (BitcoinTestFramework):
         # Use a separate http connection to generate a block
         self.generate(self.node, 1, sync_fun=self.no_op)
 
-        # Wait for two responses to be received
+        # Wait for responses to be received
+        if with_invalid_second_request:
+            OK = 1
+            BAD = 1
+        else:
+            OK = 2
+            BAD = 0
         res = b""
-        while res.count(b"result") != 2:
+        while True:
             res += conn.recv_raw()
+            if res.count(b"HTTP/1.1 200") == OK and res.count(b"HTTP/1.1 400") == BAD:
+                break
 
         # waitforblockheight was responded to first, and then getblockcount
         # which includes the block added after the request was made
         chunks = res.split(b'"result":')
         assert chunks[1].startswith(b'{"hash":')
-        assert chunks[2].startswith(bytes(f'{tip_height + 1}', 'utf8'))
+        if with_invalid_second_request:
+            # The response to the in-flight first request is sent before the
+            # error generated by parsing the second one, even though the second
+            # request could have been rejected much earlier.
+            assert res.index(b"HTTP/1.1 200") < res.index(b"HTTP/1.1 400")
+        else:
+            assert chunks[2].startswith(bytes(f'{tip_height + 1}', 'utf8'))
 
 
     def check_chunked_transfer(self):
@@ -310,28 +348,41 @@ class HTTPBasicsTest (BitcoinTestFramework):
             b'3' * 10000000,
             b'"]}'
         ]
-        try:
-            conn.conn.request(
-                method='POST',
-                url='/',
-                body=iter(body_chunked),
-                headers=headers_chunked,
-                encode_chunked=True)
-            self.log.info("Client finished sending request before connection was terminated")
-        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
-            self.log.info("Client did not finish sending request before connection was terminated")
 
-        # The server will send a 413 response and disconnect but due to a race
-        # condition, the python client may or may not read the response before
-        # detecting the broken socket (which it may still be trying to write to).
+        # Split off the send into a background thread. When the server detects
+        # the excessive size it will stop reading from the socket, but the client
+        # will continue trying to write until the backpressure eventually
+        # drops the TCP window size to 0. While the send operation is blocking until
+        # it times out, we can still receive the server's response in the foreground.
+
+        def send_excessive_chunked(self, conn):
+            try:
+                conn.conn.request(
+                    method='POST',
+                    url='/',
+                    body=iter(body_chunked),
+                    headers=headers_chunked,
+                    encode_chunked=True)
+                # On some platforms (e.g. Windows) the whole request may be
+                # accepted into the OS send buffer before the server disconnects.
+                # It's ok to allow that, the server-side behavior is asserted in
+                # the foreground thread via the 413 response.
+                self.log.info("Client finished sending request before connection was terminated")
+            except NETWORK_ERRORS:
+                self.log.info("Client did not finish sending request before connection was terminated")
+
+        send_thread = threading.Thread(target=send_excessive_chunked, args=(self, conn))
+        send_thread.start()
+
+        response2 = conn.recv_raw().decode()
+        assert "413 Content too large" in response2
+
         try:
-            response2 = conn.conn.getresponse()
-            assert_equal(response2.status, http.client.REQUEST_ENTITY_TOO_LARGE)
-            self.log.info(f"Client got expected response status {response2.status}")
-            assert conn.sock_closed()
-        #       macos/linux                   windows
-        except (http.client.ResponseNotReady, ConnectionAbortedError):
-            self.log.info("Client did not read response before disconnecting")
+            conn.conn.sock.shutdown(socket.SHUT_RDWR)
+            self.log.info("Send thread force-closed by test framework")
+        except OSError:
+            self.log.info("Send thread was already closed by RST from server")
+        send_thread.join()
 
 
     def check_idle_timeout(self):
@@ -346,14 +397,14 @@ class HTTPBasicsTest (BitcoinTestFramework):
         # A complete request would have an additional "\r\n" at the end.
         bad_http_request = "GET /test1 HTTP/1.1\r\nHost: somehost\r\n"
         conn = BitcoinHTTPConnection(self.node)
-        conn.conn.sock.sendall(bad_http_request.encode("ascii"))
+        conn.send_raw(bad_http_request.encode("ascii"))
 
         conn.expect_timeout(RPCSERVERTIMEOUT)
 
         # Sanity check -- complete requests don't timeout waiting for completion
         good_http_request = "GET /test2 HTTP/1.1\r\nHost: somehost\r\n\r\n"
         conn.reset_conn()
-        conn.conn.sock.sendall(good_http_request.encode("ascii"))
+        conn.send_raw(good_http_request.encode("ascii"))
         response = conn.recv_raw()
         assert response.startswith(b"HTTP/1.1 404 Not Found")
 
@@ -382,6 +433,180 @@ class HTTPBasicsTest (BitcoinTestFramework):
 
         # Now it will actually close due to idle timeout
         conn.expect_timeout(RPCSERVERTIMEOUT)
+
+
+    def check_auth_required(self):
+        self.log.info("Check that requests without credentials return 401 Unauthorized with WWW-Authenticate")
+        conn = BitcoinHTTPConnection(self.node)
+        conn.headers = {}
+        response = conn.post('/', '{"method": "getbestblockhash"}')
+        assert_equal(response.status, http.client.UNAUTHORIZED)
+        assert response.getheader('WWW-Authenticate') is not None
+
+
+    def check_wrong_credentials(self):
+        self.log.info("Check that incorrect credentials return 401 Unauthorized")
+        conn = BitcoinHTTPConnection(self.node)
+        wrong_pair = f"{conn.url.username}:wrong_password"
+        conn.headers = {"Authorization": f"Basic {str_to_b64str(wrong_pair)}"}
+        response = conn.post('/', '{"method": "getbestblockhash"}')
+        assert_equal(response.status, http.client.UNAUTHORIZED)
+        assert response.getheader('WWW-Authenticate') is not None
+
+
+    def check_malformed_auth_headers(self):
+        self.log.info("Check that malformed Authorization headers return 401 Unauthorized")
+        cases = [
+            "Bearer sometoken123",
+            'Digest username="user", realm="test"',
+            "Basic !!!notbase64!!!",
+            f"Basic {str_to_b64str('nocolon')}",
+            "Basic ",
+        ]
+        for auth_value in cases:
+            conn = BitcoinHTTPConnection(self.node)
+            conn.headers = {"Authorization": f"{auth_value}"}
+            response = conn.post('/', '{"method": "getbestblockhash"}')
+            assert_equal(response.status, http.client.UNAUTHORIZED)
+            assert response.getheader('WWW-Authenticate') is not None
+
+
+    def check_disallowed_http_methods(self):
+        self.log.info("Check that unsafe or unsupported HTTP methods are rejected")
+        for method, err in [
+            ['TRACE',   http.client.METHOD_NOT_ALLOWED],
+            ['CONNECT', http.client.METHOD_NOT_ALLOWED],
+            ['DELETE',  http.client.METHOD_NOT_ALLOWED],
+            ['PATCH',   http.client.METHOD_NOT_ALLOWED],
+            ['OPTIONS', http.client.METHOD_NOT_ALLOWED],
+            ['GET',     http.client.METHOD_NOT_ALLOWED] # RPC endpoint '/' only handles POST
+        ]:
+            conn = BitcoinHTTPConnection(self.node)
+            response = conn._request(method, '/', data=None, connection_header=None)
+            assert_equal(response.status, err)
+
+
+    def check_path_traversal(self):
+        self.log.info("Check that path traversal attempts are safely rejected")
+        traversal_paths = [
+            '/../etc/passwd',
+            '/../../etc/shadow',
+            '/%2e%2e/%2e%2e/etc/passwd',     # URL-encoded dots
+            '/..%2Fetc%2Fpasswd',            # URL-encoded slash
+            '/.%2e/.%2e/etc/passwd',         # mixed encoding
+            '/valid/../../../etc/passwd',
+        ]
+        for path in traversal_paths:
+            conn = BitcoinHTTPConnection(self.node)
+            response = conn.get(path)
+            assert_equal(response.status, http.client.NOT_FOUND)
+
+
+    def check_request_smuggling_cl_te(self):
+        self.log.info("Check request smuggling is not possible")
+        # https://www.rfc-editor.org/rfc/rfc7230#section-3.3.3
+        # Transfer-Encoding takes precedence over Content-Length.
+        # Sending both creates a smuggling vector: a front-end proxy that
+        # uses Content-Length while the back-end uses Transfer-Encoding lets an
+        # attacker prepend arbitrary bytes to the next victim's request.
+
+        # The real JSON-RPC body sent as a single chunk.
+        body = b'{"method":"getblockcount"}'
+        # Content-Length is set to the length of just the chunk-size line
+        # ("1a\r\n" = 4 bytes), not the full chunked body — the ambiguity that
+        # smuggling exploits. A server using Transfer-Encoding reads the complete
+        # chunk and responds with the block count; a server confused by the
+        # mismatch may stall, close the connection, or return an error.
+        chunk_size_line = f"{len(body):x}\r\n".encode("ascii")
+        # Signals end of body
+        empty_chunk = b'\r\n0\r\n\r\n'
+        chunk_body = chunk_size_line + body + empty_chunk
+
+        conn = BitcoinHTTPConnection(self.node)
+        raw = (
+            f"POST / HTTP/1.1\r\n"
+            f"Host: {conn.url.hostname}\r\n"
+            f"Authorization: Basic {str_to_b64str(conn.authpair)}\r\n"
+            f"Content-Length: {len(chunk_size_line)}\r\n"
+            f"Transfer-Encoding: chunked\r\n"
+            f"\r\n"
+        ).encode("ascii") + chunk_body
+        conn.send_raw(raw)
+        response = conn.recv_raw().decode()
+        assert "HTTP/1.1 200 OK" in response
+        count = self.node.getblockcount()
+        assert f'"result":{count}' in response
+
+
+    def check_duplicate_content_length(self):
+        self.log.info("Check that duplicate Content-Length headers are handled")
+        # https://www.rfc-editor.org/rfc/rfc7230#section-3.3.3
+        # Multiple Content-Length headers with differing values "MUST"
+        # result in an error.
+        conn = BitcoinHTTPConnection(self.node)
+        body = '{"method":"getblockcount"}'
+        raw = (
+            f"POST / HTTP/1.1\r\n"
+            f"Host: {conn.url.hostname}\r\n"
+            f"Authorization: Basic {str_to_b64str(conn.authpair)}\r\n"
+            f"Content-Length: {len(body)}\r\n"
+            f"Content-Length: 999\r\n"
+            f"\r\n"
+            f"{body}"
+        ).encode("ascii")
+        conn.send_raw(raw)
+        response = conn.recv_raw().decode()
+        assert response.startswith("HTTP/1.1 400")
+
+
+    def check_null_byte_in_uri(self):
+        self.log.info("Check that null bytes in the URI are safely rejected")
+        # Null-byte injection can truncate the path string in C environments,
+        # bypassing suffix/extension checks and causing unexpected file access.
+        conn = BitcoinHTTPConnection(self.node)
+        raw = (
+            "GET /safe\x00/../etc/passwd HTTP/1.1\r\n"
+            f"Host: {conn.url.hostname}\r\n"
+            f"Authorization: Basic {str_to_b64str(conn.authpair)}\r\n"
+            "\r\n"
+        ).encode("ascii")
+        conn.send_raw(raw)
+        response = conn.recv_raw().decode()
+        assert response.startswith("HTTP/1.1 400")
+
+
+    def check_invalid_http_version(self):
+        self.log.info("Check that requests with invalid HTTP versions are safely rejected")
+        cases = [
+            b"GET / \r\n\r\n",                                    # HTTP/0.9 — no version
+            b"GET / HTTP/9.9\r\nHost: localhost\r\n\r\n",         # far-future version
+            b"GET / HTTP/INVALID\r\nHost: localhost\r\n\r\n",     # non-numeric version
+            b"GET / NOTHTTP/1.1\r\nHost: localhost\r\n\r\n",      # wrong protocol name
+        ]
+        for raw in cases:
+            conn = BitcoinHTTPConnection(self.node)
+            conn.send_raw(raw)
+            response = conn.recv_raw().decode()
+            assert response.startswith("HTTP/1.1 400")
+
+
+    def check_whitespace_in_headers(self):
+        self.log.info("Check that requests with whitespace in headers are rejected")
+        # Extra whitespace before colon in header.
+        conn = BitcoinHTTPConnection(self.node)
+        conn.headers = {"Authorization ": f"Basic {str_to_b64str(conn.authpair)}"}
+        response = conn.post('/', '{"method": "getbestblockhash"}')
+        assert_equal(response.status, http.client.BAD_REQUEST)
+
+        # Extra whitespace at start of new line.
+        # "line folding" as defined in
+        # https://www.rfc-editor.org/rfc/rfc2616#section-2.2
+        # is considered unsafe and is explicitly deprecated in
+        # https://www.rfc-editor.org/rfc/rfc7230#section-3.2.4
+        conn = BitcoinHTTPConnection(self.node)
+        conn.headers = {"Authorization": f"Basic \n {str_to_b64str(conn.authpair)}"}
+        response = conn.post('/', '{"method": "getbestblockhash"}')
+        assert_equal(response.status, http.client.BAD_REQUEST)
 
 
 if __name__ == '__main__':

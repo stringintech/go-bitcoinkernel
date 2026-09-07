@@ -5,6 +5,7 @@
 """Helpful routines for regression testing."""
 
 from base64 import b64encode
+from copy import copy
 from decimal import Decimal
 from subprocess import CalledProcessError
 import hashlib
@@ -20,8 +21,6 @@ import shlex
 import time
 import types
 
-from . import coverage
-from .authproxy import AuthServiceProxy, JSONRPCException
 from .descriptors import descsum_create
 from collections.abc import Callable
 from typing import Optional, Union
@@ -29,6 +28,18 @@ from typing import Optional, Union
 SATOSHI_PRECISION = Decimal('0.00000001')
 
 logger = logging.getLogger("TestFramework.utils")
+
+class JSONRPCException(Exception):
+    def __init__(self, rpc_error, http_status=None):
+        self.error = rpc_error
+        self.http_status = http_status
+
+        # throw KeyError if any required fields are missing
+        copied_error = copy(rpc_error)
+        message = copied_error.pop("message")
+        code = copied_error.pop("code")
+        extra = f'{copied_error}' if copied_error else ''
+        super().__init__(f"{message} ({code}) {extra} [http_status={http_status}]")
 
 # Assert functions
 ##################
@@ -294,11 +305,11 @@ class Binaries:
         "Return argv array that should be used to invoke bitcoin-chainstate"
         return self._argv("chainstate", self.paths.bitcoinchainstate)
 
-    def _argv(self, command, bin_path, need_ipc=False):
+    def _argv(self, command, bin_path, *, need_ipc=False, use_gui=False):
         """Return argv array that should be used to invoke the command.
 
-        It either uses the bitcoin wrapper executable (if BITCOIN_CMD is set or
-        need_ipc is True), or the direct binary path (bitcoind, etc). When
+        It either uses the bitcoin wrapper executable (if BITCOIN_CMD, need_ipc,
+        or use_gui are set), or the direct binary path (bitcoind, etc). When
         bin_dir is set (by tests calling binaries from previous releases) it
         always uses the direct path.
 
@@ -308,11 +319,12 @@ class Binaries:
         """
         if self.bin_dir is not None:
             return [os.path.join(self.bin_dir, os.path.basename(bin_path))]
-        elif self.paths.bitcoin_cmd is not None or need_ipc:
-            # If the current test needs IPC functionality, use the bitcoin
-            # wrapper binary and append -m so it calls multiprocess binaries.
+        elif self.paths.bitcoin_cmd is not None or need_ipc or use_gui:
+            # If the current test needs IPC or GUI functionality, use the
+            # bitcoin wrapper binary and add appropriate options.
             bitcoin_cmd = self.paths.bitcoin_cmd or [self.paths.bitcoin_bin]
-            return self.valgrind_cmd + bitcoin_cmd + (["-m"] if need_ipc else []) + [command]
+            subcommand = "gui" if use_gui and command == "node" else command
+            return self.valgrind_cmd + bitcoin_cmd + (["-m"] if need_ipc else []) + [subcommand]
         else:
             return self.valgrind_cmd + [bin_path]
 
@@ -478,32 +490,6 @@ class PortSeed:
     # Must be initialized with a unique integer for each process
     n = None
 
-
-def get_rpc_proxy(url: str, node_number: int, *, timeout: Optional[int]=None, coveragedir: Optional[str]=None) -> coverage.AuthServiceProxyWrapper:
-    """
-    Args:
-        url: URL of the RPC server to call
-        node_number: the node number (or id) that this calls to
-
-    Kwargs:
-        timeout: HTTP timeout in seconds
-        coveragedir: Directory
-
-    Returns:
-        AuthServiceProxy. convenience object for making RPC calls.
-
-    """
-    proxy_kwargs = {}
-    if timeout is not None:
-        proxy_kwargs['timeout'] = int(timeout)
-
-    proxy = AuthServiceProxy(url, **proxy_kwargs)
-
-    coverage_logfile = coverage.get_filename(coveragedir, node_number) if coveragedir else None
-
-    return coverage.AuthServiceProxyWrapper(proxy, url, coverage_logfile)
-
-
 def p2p_port(n):
     assert n <= MAX_NODES
     return PORT_MIN + n + (MAX_NODES * PortSeed.n) % (PORT_RANGE - 1 - MAX_NODES)
@@ -515,19 +501,6 @@ def rpc_port(n):
 
 def tor_port(n):
     return p2p_port(n) + PORT_RANGE * 2
-
-
-def rpc_url(datadir, i, chain, rpchost):
-    rpc_u, rpc_p = get_auth_cookie(datadir, chain)
-    host = '127.0.0.1'
-    port = rpc_port(i)
-    if rpchost:
-        parts = rpchost.split(':')
-        if len(parts) == 2:
-            host, port = parts
-        else:
-            host = rpchost
-    return "http://%s:%s@%s:%d" % (rpc_u, rpc_p, host, int(port))
 
 
 # Node functions
@@ -576,7 +549,7 @@ def write_config(config_path, *, n, chain, extra_config="", disable_autoconnect=
         # in tests.
         f.write("peertimeout=999999999\n")
         f.write("printtoconsole=0\n")
-        f.write("natpmp=0\n")
+        f.write("natpmp=0\n") # Avoid non-loopback network traffic during tests.
         f.write("shrinkdebugfile=0\n")
         # To improve SQLite wallet performance so that the tests don't timeout, use -unsafesqlitesync
         f.write("unsafesqlitesync=1\n")
@@ -594,6 +567,8 @@ def write_config(config_path, *, n, chain, extra_config="", disable_autoconnect=
         #  nMaxConnections = available_fds - min_required_fds = 256 - 161 = 94;
         f.write("maxconnections=94\n")
         f.write("par=" + str(min(2, os.cpu_count())) + "\n")
+        # Use a single prevoutfetch worker thread to keep per-node resource usage low.
+        f.write("prevoutfetchthreads=1\n")
         f.write(extra_config)
 
 
@@ -729,7 +704,8 @@ def dumb_sync_blocks(*, src, dst, height=None):
     height = height or src.getblockcount()
     for i in range(dst.getblockcount() + 1, height + 1):
         block_hash = src.getblockhash(i)
-        block = src.getblock(blockhash=block_hash, verbosity=0)
+        # Use boolean verbosity for v0.14.x compatibility.
+        block = src.getblock(blockhash=block_hash, verbose=False)
         dst.submitblock(block)
     assert_equal(dst.getblockcount(), height)
 
@@ -749,3 +725,17 @@ def wallet_importprivkey(wallet_rpc, privkey, timestamp, *, label=""):
     }]
     import_res = wallet_rpc.importdescriptors(req)
     assert_equal(import_res[0]["success"], True)
+
+def is_dir_writable(dir_path: pathlib.Path) -> bool:
+    """Return True if we can create a file in the directory, False otherwise"""
+    try:
+        tmp = dir_path / f".tmp_{random.randrange(1 << 32)}"
+        tmp.touch()
+        tmp.unlink()
+        return True
+    except OSError:
+        return False
+
+def bitflipper(input):
+    assert isinstance(input, bytes)
+    return (int.from_bytes(input, "little") ^ (1 << random.randrange(len(input) * 8))).to_bytes(len(input), "little")

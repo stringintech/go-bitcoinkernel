@@ -123,7 +123,6 @@ static int secp256k1_schnorrsig_sign_internal(const secp256k1_context* ctx, unsi
     secp256k1_scalar sk;
     secp256k1_scalar e;
     secp256k1_scalar k;
-    secp256k1_gej rj;
     secp256k1_ge pk;
     secp256k1_ge r;
     unsigned char nonce32[32] = { 0 };
@@ -160,8 +159,7 @@ static int secp256k1_schnorrsig_sign_internal(const secp256k1_context* ctx, unsi
     ret &= !secp256k1_scalar_is_zero(&k);
     secp256k1_scalar_cmov(&k, &secp256k1_scalar_one, !ret);
 
-    secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &rj, &k);
-    secp256k1_ge_set_gej(&r, &rj);
+    secp256k1_ecmult_gen_ge(&ctx->ecmult_gen_ctx, &r, &k);
 
     /* We declassify r to allow using it as a branch point. This is fine
      * because r is not a secret. */
@@ -183,7 +181,6 @@ static int secp256k1_schnorrsig_sign_internal(const secp256k1_context* ctx, unsi
     secp256k1_scalar_clear(&sk);
     secp256k1_memclear_explicit(seckey, sizeof(seckey));
     secp256k1_memclear_explicit(nonce32, sizeof(nonce32));
-    secp256k1_gej_clear(&rj);
 
     return ret;
 }
@@ -191,10 +188,6 @@ static int secp256k1_schnorrsig_sign_internal(const secp256k1_context* ctx, unsi
 int secp256k1_schnorrsig_sign32(const secp256k1_context* ctx, unsigned char *sig64, const unsigned char *msg32, const secp256k1_keypair *keypair, const unsigned char *aux_rand32) {
     /* We cast away const from the passed aux_rand32 argument since we know the default nonce function does not modify it. */
     return secp256k1_schnorrsig_sign_internal(ctx, sig64, msg32, 32, keypair, secp256k1_nonce_function_bip340, (unsigned char*)aux_rand32);
-}
-
-int secp256k1_schnorrsig_sign(const secp256k1_context* ctx, unsigned char *sig64, const unsigned char *msg32, const secp256k1_keypair *keypair, const unsigned char *aux_rand32) {
-    return secp256k1_schnorrsig_sign32(ctx, sig64, msg32, keypair, aux_rand32);
 }
 
 int secp256k1_schnorrsig_sign_custom(const secp256k1_context* ctx, unsigned char *sig64, const unsigned char *msg, size_t msglen, const secp256k1_keypair *keypair, secp256k1_schnorrsig_extraparams *extraparams) {
