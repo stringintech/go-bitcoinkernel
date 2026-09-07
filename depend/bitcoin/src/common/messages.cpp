@@ -4,16 +4,17 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <common/messages.h>
+
 #include <common/types.h>
 #include <node/types.h>
 #include <policy/fees/block_policy_estimator.h>
 #include <tinyformat.h>
+#include <util/check.h>
 #include <util/fees.h>
 #include <util/strencodings.h>
 #include <util/string.h>
 #include <util/translation.h>
 
-#include <cassert>
 #include <map>
 #include <string>
 #include <string_view>
@@ -116,6 +117,8 @@ bilingual_str PSBTErrorString(PSBTError err)
             return Untranslated("Signer does not support PSBT");
         case PSBTError::INCOMPLETE:
             return Untranslated("Input needs additional signatures or other data");
+        case PSBTError::INVALID_TX:
+            return Untranslated("The transaction cannot be valid");
         case PSBTError::OK:
             return Untranslated("No errors");
     } // no default case, so the compiler can warn about missing cases
@@ -141,6 +144,8 @@ bilingual_str TransactionErrorString(const TransactionError err)
             return Untranslated("Unspendable output exceeds maximum configured by user (maxburnamount)");
         case TransactionError::INVALID_PACKAGE:
             return Untranslated("Transaction rejected due to invalid package");
+        case TransactionError::PRIVATE_BROADCAST_FULL:
+            return Untranslated("Private broadcast queue is full");
     } // no default case, so the compiler can warn about missing cases
     assert(false);
 }
