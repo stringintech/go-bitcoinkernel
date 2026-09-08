@@ -37,11 +37,15 @@ func newBlockHeader(ptr *C.btck_BlockHeader, fromOwned bool) *BlockHeader {
 // NewBlockHeader creates a new block header from raw serialized header data.
 //
 // Parameters:
-//   - rawHeader: Serialized block header data
+//   - rawHeader: Non-nil pointer to 80 bytes of serialized block header data
 //
-// Returns an error if the header data is malformed, invalid length, or cannot be parsed.
-func NewBlockHeader(rawHeader []byte) (*BlockHeader, error) {
-	ptr := C.btck_block_header_create(unsafe.Pointer(unsafe.SliceData(rawHeader)), C.size_t(len(rawHeader)))
+// Returns an error if deserialization fails.
+func NewBlockHeader(rawHeader *[80]byte) (*BlockHeader, error) {
+	if rawHeader == nil {
+		panic("rawHeader must not be nil")
+	}
+
+	ptr := C.btck_block_header_create(unsafe.Pointer(rawHeader), C.size_t(80))
 	if ptr == nil {
 		return nil, &InternalError{"Failed to create block header from bytes"}
 	}

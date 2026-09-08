@@ -311,7 +311,7 @@ func (s *ChainstateManagerTestSuite) Setup(t *testing.T) {
 			t.Fatalf("Failed to decode block %d hex: %v", i+1, err)
 		}
 
-		blockHeader, err := NewBlockHeader(blockBytes)
+		blockHeader, err := NewBlockHeader((*[80]byte)(blockBytes))
 		if err != nil {
 			t.Fatalf("NewBlockHeader() failed for block %d: %v", i+1, err)
 		}
