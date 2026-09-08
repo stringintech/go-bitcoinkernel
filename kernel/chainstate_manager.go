@@ -138,31 +138,27 @@ func (cm *ChainstateManager) ProcessBlock(block *Block) (ok bool, newBlock bool)
 // Parameters:
 //   - header: Block header to validate
 //
-// Returns a BlockValidationError if the header fails validation. The error contains
-// detailed validation state information accessible via BlockValidationError.GetState().
+// Returns the validation state whether the header is valid or invalid. An error is
+// returned only if the kernel cannot produce a validation state.
 //
 // Example:
 //
-//	err := chainman.ProcessBlockHeader(header)
+//	state, err := chainman.ProcessBlockHeader(header)
 //	if err != nil {
-//	    var validationErr *BlockValidationError
-//	    if errors.As(err, &validationErr) {
-//	        state := validationErr.GetState()
-//	        fmt.Printf("Validation failed: mode=%v, result=%v\n",
-//	            state.ValidationMode(), state.ValidationResult())
-//	    }
+//	    return err
 //	}
-func (cm *ChainstateManager) ProcessBlockHeader(header *BlockHeader) error {
-	state := NewBlockValidationState()
-	result := C.btck_chainstate_manager_process_block_header(
+//	fmt.Printf("Validation result: mode=%v, result=%v\n",
+//	    state.ValidationMode(), state.ValidationResult())
+func (cm *ChainstateManager) ProcessBlockHeader(header *BlockHeader) (*BlockValidationState, error) {
+	statePtr := C.btck_chainstate_manager_process_block_header(
 		(*C.btck_ChainstateManager)(cm.ptr),
 		(*C.btck_BlockHeader)(header.ptr),
-		(*C.btck_BlockValidationState)(state.handle.ptr),
 	)
-	if result != 0 {
-		return &BlockValidationError{State: state}
+	if statePtr == nil {
+		return nil, &InternalError{"Failed to process block header"}
 	}
-	return nil
+
+	return newBlockValidationState(statePtr, true), nil
 }
 
 // GetActiveChain returns the currently active best-known chain.

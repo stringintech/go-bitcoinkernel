@@ -317,14 +317,13 @@ func (s *ChainstateManagerTestSuite) Setup(t *testing.T) {
 		}
 		defer blockHeader.Destroy()
 
-		err = manager.ProcessBlockHeader(blockHeader)
+		state, err := manager.ProcessBlockHeader(blockHeader)
 		if err != nil {
-			var validationErr *BlockValidationError
-			if errors.As(err, &validationErr) {
-				state := validationErr.GetState()
-				t.Fatalf("ProcessBlockHeader() validation failed for block %d: mode=%v, result=%v", i+1, state.ValidationMode(), state.ValidationResult())
-			}
 			t.Fatalf("ProcessBlockHeader() failed for block %d: %v", i+1, err)
+		}
+		defer state.Destroy()
+		if state.ValidationMode() != ValidationStateValid {
+			t.Fatalf("ProcessBlockHeader() validation failed for block %d: mode=%v, result=%v", i+1, state.ValidationMode(), state.ValidationResult())
 		}
 
 		block, err := NewBlock(blockBytes)
