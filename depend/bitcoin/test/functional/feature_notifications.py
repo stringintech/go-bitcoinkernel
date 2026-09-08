@@ -11,6 +11,7 @@ from test_framework.blocktools import (
     create_block,
 )
 from test_framework.descriptors import descsum_create
+from test_framework.extendedkey import ExtendedPrivateKey
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
     assert_equal,
@@ -30,6 +31,10 @@ LARGE_WORK_INVALID_CHAIN_WARNING = (
 
 def notify_outputname(walletname, txid):
     return txid if platform.system() == 'Windows' else f'{walletname}_{txid}'
+
+def shell_escape_posix(arg):
+    # Identical to ShellEscape() in the C++ code
+    return "'" + arg.replace("'", "'\"'\"'") + "'"
 
 
 class NotificationsTest(BitcoinTestFramework):
@@ -51,13 +56,18 @@ class NotificationsTest(BitcoinTestFramework):
         os.mkdir(self.walletnotify_dir)
         os.mkdir(self.shutdownnotify_dir)
 
+        if platform.system() == 'Windows':
+            walletnotify_path = f"\"{os.path.join(self.walletnotify_dir, notify_outputname('%w', '%s'))}\""
+        else:
+            walletnotify_path = f"{shell_escape_posix(os.path.join(self.walletnotify_dir, ''))}{notify_outputname('%w', '%s')}"
+
         # -alertnotify and -blocknotify on node0, walletnotify on node1
         self.extra_args = [[
-            f"-alertnotify=echo %s >> {self.alertnotify_file}",
-            f"-blocknotify=echo > {os.path.join(self.blocknotify_dir, '%s')}",
-            f"-shutdownnotify=echo > {self.shutdownnotify_file}",
+            f"-alertnotify=echo %s >> \"{self.alertnotify_file}\"",
+            f"-blocknotify=echo > \"{os.path.join(self.blocknotify_dir, '%s')}\"",
+            f"-shutdownnotify=echo > \"{self.shutdownnotify_file}\"",
         ], [
-            f"-walletnotify=echo %h_%b > {os.path.join(self.walletnotify_dir, notify_outputname('%w', '%s'))}",
+            f"-walletnotify=echo %h_%b > {walletnotify_path}",
         ]]
         self.wallet_names = [self.default_wallet_name, self.wallet]
         super().setup_network()
@@ -65,7 +75,7 @@ class NotificationsTest(BitcoinTestFramework):
     def run_test(self):
         if self.is_wallet_compiled():
             # Setup the descriptors to be imported to the wallet
-            xpriv = "tprv8ZgxMBicQKsPfHCsTwkiM1KT56RXbGGTqvc2hgqzycpwbHqqpcajQeMRZoBD35kW4RtyCemu6j34Ku5DEspmgjKdt2qe4SvRch5Kk8B8A2v"
+            xpriv = ExtendedPrivateKey.generate().to_string()
             desc_imports = [{
                 "desc": descsum_create(f"wpkh({xpriv}/0/*)"),
                 "timestamp": 0,

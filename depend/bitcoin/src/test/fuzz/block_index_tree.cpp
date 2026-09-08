@@ -42,7 +42,7 @@ void initialize_block_index_tree()
 FUZZ_TARGET(block_index_tree, .init = initialize_block_index_tree)
 {
     FuzzedDataProvider fuzzed_data_provider(buffer.data(), buffer.size());
-    NodeClockContext clock_ctx{ConsumeTime(fuzzed_data_provider)};
+    FakeNodeClock clock{ConsumeTime(fuzzed_data_provider)};
     auto& chainman = static_cast<TestChainstateManager&>(*g_setup->m_node.chainman);
     auto& blockman = static_cast<TestBlockManager&>(chainman.m_blockman);
     CBlockIndex* genesis = chainman.ActiveChainstate().m_chain[0];
@@ -53,8 +53,7 @@ FUZZ_TARGET(block_index_tree, .init = initialize_block_index_tree)
 
     std::vector<CBlockIndex*> pruned_blocks;
 
-    LIMITED_WHILE(fuzzed_data_provider.ConsumeBool(), 1000)
-    {
+    LIMITED_WHILE (fuzzed_data_provider.ConsumeBool(), 1000) {
         if (abort_run) break;
         CallOneOf(
             fuzzed_data_provider,
