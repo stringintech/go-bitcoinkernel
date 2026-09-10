@@ -25,11 +25,11 @@ class CWallet;
 class WalletDatabase;
 struct WalletContext;
 
-static const DatabaseFormat DATABASE_FORMATS[] = {
+inline constexpr DatabaseFormat DATABASE_FORMATS[] = {
        DatabaseFormat::SQLITE,
 };
 
-const std::string ADDRESS_BCRT1_UNSPENDABLE = "bcrt1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq3xueyj";
+inline const std::string ADDRESS_BCRT1_UNSPENDABLE = "bcrt1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq3xueyj";
 
 std::unique_ptr<CWallet> CreateSyncedWallet(interfaces::Chain& chain, CChain& cchain, const CKey& key);
 
@@ -38,9 +38,6 @@ std::shared_ptr<CWallet> TestCreateWallet(std::unique_ptr<WalletDatabase> databa
 std::shared_ptr<CWallet> TestLoadWallet(WalletContext& context);
 std::shared_ptr<CWallet> TestLoadWallet(std::unique_ptr<WalletDatabase> database, WalletContext& context);
 void TestUnloadWallet(std::shared_ptr<CWallet>&& wallet);
-
-// Creates a copy of the provided database
-std::unique_ptr<WalletDatabase> DuplicateMockDatabase(WalletDatabase& database);
 
 /** Returns a new encoded destination from the wallet (hardcoded to BECH32) */
 std::string getnewaddress(CWallet& w);
@@ -59,7 +56,7 @@ public:
 
 /** A WalletDatabase whose contents and return values can be modified as needed for testing
  **/
-class MockableSQLiteDatabase : public SQLiteDatabase
+class MockableSQLiteDatabase : public InMemoryWalletDatabase
 {
 public:
     MockableSQLiteDatabase();
@@ -67,7 +64,6 @@ public:
     bool Backup(const std::string& strDest) const override { return true; }
 
     std::string Filename() override { return "mockable"; }
-    std::vector<fs::path> Files() override { return {}; }
     std::string Format() override { return "sqlite-mock"; }
     std::unique_ptr<DatabaseBatch> MakeBatch() override { return std::make_unique<MockableSQLiteBatch>(*this); }
 };

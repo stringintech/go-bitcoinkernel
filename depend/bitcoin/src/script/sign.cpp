@@ -5,20 +5,35 @@
 
 #include <script/sign.h>
 
+#include <addresstype.h>
+#include <coins.h>
 #include <consensus/amount.h>
+#include <hash.h>
 #include <key.h>
 #include <musig.h>
 #include <policy/policy.h>
+#include <prevector.h>
 #include <primitives/transaction.h>
-#include <random.h>
 #include <script/keyorigin.h>
 #include <script/miniscript.h>
 #include <script/script.h>
+#include <script/script_error.h>
 #include <script/signingprovider.h>
 #include <script/solver.h>
+#include <script/verify_flags.h>
+#include <serialize.h>
 #include <uint256.h>
+#include <util/check.h>
 #include <util/translation.h>
 #include <util/vector.h>
+
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <functional>
+#include <iterator>
+#include <span>
+#include <string>
 
 typedef std::vector<unsigned char> valtype;
 
@@ -119,11 +134,11 @@ std::vector<uint8_t> MutableTransactionSignatureCreator::CreateMuSig2Nonce(const
     if (!sighash.has_value()) return {};
 
     MuSig2SecNonce secnonce;
-    std::vector<uint8_t> out = key.CreateMuSig2Nonce(secnonce, *sighash, aggregate_pubkey, pubkeys);
+    std::vector<uint8_t> out = ::CreateMuSig2Nonce(secnonce, *sighash, key, aggregate_pubkey, pubkeys);
     if (out.empty()) return {};
 
     // Store the secnonce in the SigningProvider
-    provider.SetMuSig2SecNonce(MuSig2SessionID(script_pubkey, part_pubkey, *sighash), std::move(secnonce));
+    provider.SetMuSig2SecNonce(MuSig2SessionID(script_pubkey, part_pubkey, *sighash, out), std::move(secnonce));
 
     return out;
 }
@@ -156,12 +171,14 @@ bool MutableTransactionSignatureCreator::CreateMuSig2PartialSig(const SigningPro
     if (!sighash.has_value()) return false;
 
     // Retrieve the secnonce
-    uint256 session_id = MuSig2SessionID(script_pubkey, part_pubkey, *sighash);
+    auto part_pubnonce_it = pubnonces.find(part_pubkey);
+    if (part_pubnonce_it == pubnonces.end()) return false;
+    uint256 session_id = MuSig2SessionID(script_pubkey, part_pubkey, *sighash, part_pubnonce_it->second);
     std::optional<std::reference_wrapper<MuSig2SecNonce>> secnonce = provider.GetMuSig2SecNonce(session_id);
     if (!secnonce || !secnonce->get().IsValid()) return false;
 
     // Compute the sig
-    std::optional<uint256> sig = key.CreateMuSig2PartialSig(*sighash, aggregate_pubkey, pubkeys, pubnonces, *secnonce, tweaks);
+    std::optional<uint256> sig = ::CreateMuSig2PartialSig(*sighash, key, aggregate_pubkey, pubkeys, pubnonces, *secnonce, tweaks);
     if (!sig) return false;
     partial_sig = std::move(*sig);
 
@@ -296,9 +313,7 @@ static bool SignMuSig2(const BaseSignatureCreator& creator, SignatureData& sigda
         CPubKey plain_pub = agg_pub;
         if (XOnlyPubKey(agg_pub) != script_pubkey) {
             if (agg_info.path.empty()) continue;
-            // Compute and compare fingerprint
-            CKeyID keyid = agg_pub.GetID();
-            if (!std::equal(agg_info.fingerprint, agg_info.fingerprint + sizeof(agg_info.fingerprint), keyid.data())) {
+            if (agg_info.fingerprint != agg_pub.GetID().fingerprint()) {
                 continue;
             }
             // Get the BIP32 derivation tweaks

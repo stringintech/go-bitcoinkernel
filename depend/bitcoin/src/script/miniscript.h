@@ -5,32 +5,34 @@
 #ifndef BITCOIN_SCRIPT_MINISCRIPT_H
 #define BITCOIN_SCRIPT_MINISCRIPT_H
 
-#include <algorithm>
-#include <compare>
-#include <concepts>
-#include <cstdint>
-#include <cstdlib>
-#include <functional>
-#include <iterator>
-#include <memory>
-#include <optional>
-#include <set>
-#include <stdexcept>
-#include <tuple>
-#include <utility>
-#include <vector>
-
 #include <consensus/consensus.h>
+#include <crypto/hex_base.h>
 #include <policy/policy.h>
 #include <script/interpreter.h>
 #include <script/parsing.h>
 #include <script/script.h>
 #include <serialize.h>
-#include <span.h>
 #include <util/check.h>
 #include <util/strencodings.h>
 #include <util/string.h>
 #include <util/vector.h>
+
+#include <algorithm>
+#include <concepts>
+#include <cstdint>
+#include <cstdlib>
+#include <functional>
+#include <memory>
+#include <optional>
+#include <set>
+#include <span>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace miniscript {
 
@@ -266,18 +268,18 @@ constexpr bool IsTapscript(MiniscriptContext ms_ctx)
 namespace internal {
 
 //! The maximum size of a witness item for a Miniscript under Tapscript context. (A BIP340 signature with a sighash type byte.)
-static constexpr uint32_t MAX_TAPMINISCRIPT_STACK_ELEM_SIZE{65};
+inline constexpr uint32_t MAX_TAPMINISCRIPT_STACK_ELEM_SIZE{65};
 
 //! version + nLockTime
-constexpr uint32_t TX_OVERHEAD{4 + 4};
+inline constexpr uint32_t TX_OVERHEAD{4 + 4};
 //! prevout + nSequence + scriptSig
-constexpr uint32_t TXIN_BYTES_NO_WITNESS{36 + 4 + 1};
+inline constexpr uint32_t TXIN_BYTES_NO_WITNESS{36 + 4 + 1};
 //! nValue + script len + OP_0 + pushdata 32.
-constexpr uint32_t P2WSH_TXOUT_BYTES{8 + 1 + 1 + 33};
+inline constexpr uint32_t P2WSH_TXOUT_BYTES{8 + 1 + 1 + 33};
 //! Data other than the witness in a transaction. Overhead + vin count + one vin + vout count + one vout + segwit marker
-constexpr uint32_t TX_BODY_LEEWAY_WEIGHT{(TX_OVERHEAD + GetSizeOfCompactSize(1) + TXIN_BYTES_NO_WITNESS + GetSizeOfCompactSize(1) + P2WSH_TXOUT_BYTES) * WITNESS_SCALE_FACTOR + 2};
+inline constexpr uint32_t TX_BODY_LEEWAY_WEIGHT{(TX_OVERHEAD + GetSizeOfCompactSize(1) + TXIN_BYTES_NO_WITNESS + GetSizeOfCompactSize(1) + P2WSH_TXOUT_BYTES) * WITNESS_SCALE_FACTOR + 2};
 //! Maximum possible stack size to spend a Taproot output (excluding the script itself).
-constexpr uint32_t MAX_TAPSCRIPT_SAT_SIZE{GetSizeOfCompactSize(MAX_STACK_SIZE) + (GetSizeOfCompactSize(MAX_TAPMINISCRIPT_STACK_ELEM_SIZE) + MAX_TAPMINISCRIPT_STACK_ELEM_SIZE) * MAX_STACK_SIZE + GetSizeOfCompactSize(TAPROOT_CONTROL_MAX_SIZE) + TAPROOT_CONTROL_MAX_SIZE};
+inline constexpr uint32_t MAX_TAPSCRIPT_SAT_SIZE{GetSizeOfCompactSize(MAX_STACK_SIZE) + (GetSizeOfCompactSize(MAX_TAPMINISCRIPT_STACK_ELEM_SIZE) + MAX_TAPMINISCRIPT_STACK_ELEM_SIZE) * MAX_STACK_SIZE + GetSizeOfCompactSize(TAPROOT_CONTROL_MAX_SIZE) + TAPROOT_CONTROL_MAX_SIZE};
 /** The maximum size of a script depending on the context. */
 constexpr uint32_t MaxScriptSize(MiniscriptContext ms_ctx)
 {
@@ -340,15 +342,15 @@ struct InputStack {
 };
 
 /** A stack consisting of a single zero-length element (interpreted as 0 by the script interpreter in numeric context). */
-static const auto ZERO = InputStack(std::vector<unsigned char>());
+inline const auto ZERO = InputStack(std::vector<unsigned char>());
 /** A stack consisting of a single malleable 32-byte 0x0000...0000 element (for dissatisfying hash challenges). */
-static const auto ZERO32 = InputStack(std::vector<unsigned char>(32, 0)).SetMalleable();
+inline const auto ZERO32 = InputStack(std::vector<unsigned char>(32, 0)).SetMalleable();
 /** A stack consisting of a single 0x01 element (interpreted as 1 by the script interpreted in numeric context). */
-static const auto ONE = InputStack(Vector((unsigned char)1));
+inline const auto ONE = InputStack(Vector((unsigned char)1));
 /** The empty stack. */
-static const auto EMPTY = InputStack();
+inline const auto EMPTY = InputStack();
 /** A stack representing the lack of any (dis)satisfactions. */
-static const auto INVALID = InputStack().SetAvailable(Availability::NO);
+inline const auto INVALID = InputStack().SetAvailable(Availability::NO);
 
 //! A pair of a satisfaction and a dissatisfaction InputStack.
 struct InputResult {

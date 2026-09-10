@@ -4,29 +4,45 @@
 
 #include <script/descriptor.h>
 
+#include <addresstype.h>
+#include <attributes.h>
+#include <consensus/consensus.h>
+#include <crypto/hex_base.h>
+#include <crypto/sha256.h>
 #include <hash.h>
+#include <key.h>
 #include <key_io.h>
-#include <pubkey.h>
 #include <musig.h>
+#include <primitives/transaction.h>
+#include <pubkey.h>
+#include <script/interpreter.h>
+#include <script/keyorigin.h>
 #include <script/miniscript.h>
 #include <script/parsing.h>
 #include <script/script.h>
 #include <script/signingprovider.h>
 #include <script/solver.h>
+#include <serialize.h>
+#include <tinyformat.h>
 #include <uint256.h>
-
-#include <common/args.h>
-#include <span.h>
 #include <util/bip32.h>
 #include <util/check.h>
 #include <util/strencodings.h>
+#include <util/string.h>
 #include <util/vector.h>
 
 #include <algorithm>
+#include <iterator>
+#include <map>
 #include <memory>
 #include <numeric>
 #include <optional>
+#include <span>
+#include <stdexcept>
 #include <string>
+#include <tuple>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
 using util::Split;
@@ -218,6 +234,14 @@ public:
     /** Derive a private key, if private data is available in arg and put it into out. */
     virtual void GetPrivKey(int pos, const SigningProvider& arg, FlatSigningProvider& out) const = 0;
 
+    /** Whether private data for this provider is available in arg. */
+    virtual bool HavePrivateKeys(const SigningProvider& arg) const
+    {
+        FlatSigningProvider tmp_provider;
+        GetPrivKey(/*pos=*/0, arg, tmp_provider);
+        return !tmp_provider.keys.empty();
+    }
+
     /** Return the non-extended public key for this PubkeyProvider, if it has one. */
     virtual std::optional<CPubKey> GetRootPubKey() const = 0;
     /** Return the extended public key for this PubkeyProvider, if it has one. */
@@ -231,6 +255,9 @@ public:
 
     /** Get the count of keys known by this PubkeyProvider. Usually one, but may be more for key aggregation schemes */
     virtual size_t GetKeyCount() const { return 1; }
+
+    /** Whether this PubkeyProvider can always provide a public key without cache or private key arguments */
+    virtual bool CanSelfExpand() const = 0;
 };
 
 class OriginPubkeyProvider final : public PubkeyProvider
@@ -255,7 +282,7 @@ public:
         Assert(out.pubkeys.contains(pub->GetID()));
         auto& [pubkey, suborigin] = out.origins[pub->GetID()];
         Assert(pubkey == *pub); // m_provider must have a valid origin by this point.
-        std::copy(std::begin(m_origin.fingerprint), std::end(m_origin.fingerprint), suborigin.fingerprint);
+        suborigin.fingerprint = m_origin.fingerprint;
         suborigin.path.insert(suborigin.path.begin(), m_origin.path.begin(), m_origin.path.end());
         return pub;
     }
@@ -301,6 +328,7 @@ public:
     {
         return std::make_unique<OriginPubkeyProvider>(m_expr_index, m_origin, m_provider->Clone(), m_apostrophe);
     }
+    bool CanSelfExpand() const override { return m_provider->CanSelfExpand(); }
 };
 
 /** An object representing a parsed constant public key in a descriptor. */
@@ -323,7 +351,7 @@ public:
     {
         KeyOriginInfo info;
         CKeyID keyid = m_pubkey.GetID();
-        std::copy(keyid.begin(), keyid.begin() + sizeof(info.fingerprint), info.fingerprint);
+        info.fingerprint = keyid.fingerprint();
         out.origins.emplace(keyid, std::make_pair(m_pubkey, info));
         out.pubkeys.emplace(keyid, m_pubkey);
         return m_pubkey;
@@ -365,6 +393,7 @@ public:
     {
         return std::make_unique<ConstPubkeyProvider>(m_expr_index, m_pubkey, m_xonly);
     }
+    bool CanSelfExpand() const final { return true; }
 };
 
 enum class DeriveType {
@@ -388,7 +417,7 @@ class BIP32PubkeyProvider final : public PubkeyProvider
         CKey key;
         if (!arg.GetKey(m_root_extkey.pubkey.GetID(), key)) return false;
         ret.nDepth = m_root_extkey.nDepth;
-        std::copy(m_root_extkey.vchFingerprint, m_root_extkey.vchFingerprint + sizeof(ret.vchFingerprint), ret.vchFingerprint);
+        ret.fingerprint = m_root_extkey.fingerprint;
         ret.nChild = m_root_extkey.nChild;
         ret.chaincode = m_root_extkey.chaincode;
         ret.key = key;
@@ -411,10 +440,7 @@ class BIP32PubkeyProvider final : public PubkeyProvider
     bool IsHardened() const
     {
         if (m_derive == DeriveType::HARDENED_RANGED) return true;
-        for (auto entry : m_path) {
-            if (entry >> 31) return true;
-        }
-        return false;
+        return HasHardenedDerivation(m_path);
     }
 
 public:
@@ -425,8 +451,7 @@ public:
     std::optional<CPubKey> GetPubKey(int pos, const SigningProvider& arg, FlatSigningProvider& out, const DescriptorCache* read_cache = nullptr, DescriptorCache* write_cache = nullptr) const override
     {
         KeyOriginInfo info;
-        CKeyID keyid = m_root_extkey.pubkey.GetID();
-        std::copy(keyid.begin(), keyid.begin() + sizeof(info.fingerprint), info.fingerprint);
+        info.fingerprint = m_root_extkey.id_key_fingerprint();
         info.path = m_path;
         if (m_derive == DeriveType::UNHARDENED_RANGED) info.path.push_back((uint32_t)pos);
         if (m_derive == DeriveType::HARDENED_RANGED) info.path.push_back(((uint32_t)pos) | 0x80000000L);
@@ -543,9 +568,7 @@ public:
         for (; k < (int)m_path.size(); ++k) {
             end_path.push_back(m_path.at(k));
         }
-        // Get the fingerprint
-        CKeyID id = m_root_extkey.pubkey.GetID();
-        std::copy(id.begin(), id.begin() + 4, origin.fingerprint);
+        origin.fingerprint = m_root_extkey.id_key_fingerprint();
 
         CExtPubKey xpub;
         CExtKey lh_xprv;
@@ -591,6 +614,7 @@ public:
     {
         return std::make_unique<BIP32PubkeyProvider>(m_expr_index, m_root_extkey, m_path, m_derive, m_apostrophe);
     }
+    bool CanSelfExpand() const override { return !IsHardened(); }
 };
 
 /** PubkeyProvider for a musig() expression */
@@ -762,6 +786,11 @@ public:
         }
     }
 
+    bool HavePrivateKeys(const SigningProvider& arg) const override
+    {
+        return std::ranges::all_of(m_participants, [&](const auto& prov) { return prov->HavePrivateKeys(arg); });
+    }
+
     // Get RootPubKey and GetRootExtPubKey are used to return the single pubkey underlying the pubkey provider
     // to be presented to the user in gethdkeys. As this is a multisig construction, there is no single underlying
     // pubkey hence nothing should be returned.
@@ -794,6 +823,15 @@ public:
     {
         return 1 + m_participants.size();
     }
+    bool CanSelfExpand() const override
+    {
+        // Participants must be self expandable for all MuSig expressions to be self expandable; the aggregate pubkey cannot be stored
+        // in the descriptor cache, so even aggregate-then-derive still requires the self expansion of participants prior to aggregation.
+        for (const auto& key : m_participants) {
+            if (!key->CanSelfExpand()) return false;
+        }
+        return true;
+    }
 };
 
 /** Base class for all Descriptor implementations. */
@@ -808,7 +846,7 @@ protected:
     std::vector<std::string> m_warnings;
 
     //! The sub-descriptor arguments (empty for everything but SH and WSH).
-    //! In doc/descriptors.m this is referred to as SCRIPT expressions sh(SCRIPT)
+    //! In doc/descriptors.md this is referred to as SCRIPT expressions sh(SCRIPT)
     //! and wsh(SCRIPT), and distinct from KEY expressions and ADDR expressions.
     //! Subdescriptors can only ever generate a single script.
     const std::vector<std::unique_ptr<DescriptorImpl>> m_subdescriptor_args;
@@ -859,11 +897,8 @@ public:
             if (!sub->HavePrivateKeys(arg)) return false;
         }
 
-        FlatSigningProvider tmp_provider;
         for (const auto& pubkey : m_pubkey_args) {
-            tmp_provider.keys.clear();
-            pubkey->GetPrivKey(0, arg, tmp_provider);
-            if (tmp_provider.keys.empty()) return false;
+            if (!pubkey->HavePrivateKeys(arg)) return false;
         }
 
         return true;
@@ -1038,6 +1073,8 @@ public:
 
     virtual std::unique_ptr<DescriptorImpl> Clone() const = 0;
 
+    bool HasScripts() const override { return true; }
+
     // NOLINTNEXTLINE(misc-no-recursion)
     std::vector<std::string> Warnings() const override {
         std::vector<std::string> all = m_warnings;
@@ -1080,6 +1117,18 @@ public:
             }
         }
         return count;
+    }
+
+    // NOLINTNEXTLINE(misc-no-recursion)
+    bool CanSelfExpand() const override
+    {
+        for (const auto& key : m_pubkey_args) {
+            if (!key->CanSelfExpand()) return false;
+        }
+        for (const auto& sub : m_subdescriptor_args) {
+            if (!sub->CanSelfExpand()) return false;
+        }
+        return true;
     }
 };
 
@@ -1738,6 +1787,23 @@ public:
     }
 };
 
+/** A parsed unused(KEY) descriptor */
+class UnusedDescriptor final : public DescriptorImpl
+{
+protected:
+    std::vector<CScript> MakeScripts(const std::vector<CPubKey>& keys, std::span<const CScript> scripts, FlatSigningProvider& out) const override { return {}; }
+public:
+    UnusedDescriptor(std::unique_ptr<PubkeyProvider> prov) : DescriptorImpl(Vector(std::move(prov)), "unused") {}
+    bool IsSingleType() const final { return true; }
+    bool HasScripts() const override { return false; }
+
+    std::unique_ptr<DescriptorImpl> Clone() const override
+    {
+        return std::make_unique<UnusedDescriptor>(m_pubkey_args.at(0)->Clone());
+    }
+};
+
+
 ////////////////////////////////////////////////////////////////////////////
 // Parser                                                                 //
 ////////////////////////////////////////////////////////////////////////////
@@ -2129,7 +2195,7 @@ std::vector<std::unique_ptr<PubkeyProvider>> ParsePubkey(uint32_t& key_exp_index
     KeyOriginInfo info;
     static_assert(sizeof(info.fingerprint) == 4, "Fingerprint must be 4 bytes");
     assert(fpr_bytes.size() == 4);
-    std::copy(fpr_bytes.begin(), fpr_bytes.end(), info.fingerprint);
+    std::copy_n(fpr_bytes.begin(), info.fingerprint.size(), info.fingerprint.begin());
     std::vector<KeyPath> path;
     if (!ParseKeyPath(slash_split, path, apostrophe, error, /*allow_multipath=*/false)) return {};
     info.path = path.at(0);
@@ -2573,6 +2639,27 @@ std::vector<std::unique_ptr<DescriptorImpl>> ParseScript(uint32_t& key_exp_index
         return ret;
     } else if (Func("rawtr", expr)) {
         error = "Can only have rawtr at top level";
+        return {};
+    }
+    if (ctx == ParseScriptContext::TOP && Func("unused", expr)) {
+        // Check for only one expression, should not find commas, brackets, or parentheses
+        auto arg = Expr(expr);
+        if (expr.size()) {
+            error = strprintf("unused(): only one key expected");
+            return {};
+        }
+        auto keys = ParsePubkey(key_exp_index, arg, ctx, out, error);
+        if (keys.empty()) return {};
+        for (auto& pubkey : keys) {
+            if (pubkey->IsRange()) {
+                error = "unused(): key cannot be ranged";
+                return {};
+            }
+            ret.emplace_back(std::make_unique<UnusedDescriptor>(std::move(pubkey)));
+        }
+        return ret;
+    } else if (Func("unused", expr)) {
+        error = "Can only have unused at top level";
         return {};
     }
     if (ctx == ParseScriptContext::TOP && Func("raw", expr)) {

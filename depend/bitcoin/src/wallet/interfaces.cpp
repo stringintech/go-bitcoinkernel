@@ -21,6 +21,7 @@
 #include <util/ui_change_type.h>
 #include <wallet/coincontrol.h>
 #include <wallet/context.h>
+#include <wallet/export.h>
 #include <wallet/feebumper.h>
 #include <wallet/fees.h>
 #include <wallet/load.h>
@@ -44,11 +45,9 @@ using interfaces::WalletAddress;
 using interfaces::WalletBalances;
 using interfaces::WalletLoader;
 using interfaces::WalletMigrationResult;
-using interfaces::WalletOrderForm;
 using interfaces::WalletTx;
 using interfaces::WalletTxOut;
 using interfaces::WalletTxStatus;
-using interfaces::WalletValueMap;
 
 namespace wallet {
 // All members of the classes in this namespace are intentionally public, as the
@@ -59,15 +58,15 @@ WalletTx MakeWalletTx(CWallet& wallet, const CWalletTx& wtx)
 {
     LOCK(wallet.cs_wallet);
     WalletTx result;
-    result.tx = wtx.tx;
-    result.txin_is_mine.reserve(wtx.tx->vin.size());
-    for (const auto& txin : wtx.tx->vin) {
+    result.tx = wtx.GetTx();
+    result.txin_is_mine.reserve(result.tx->vin.size());
+    for (const auto& txin : result.tx->vin) {
         result.txin_is_mine.emplace_back(InputIsMine(wallet, txin));
     }
-    result.txout_is_mine.reserve(wtx.tx->vout.size());
-    result.txout_address.reserve(wtx.tx->vout.size());
-    result.txout_address_is_mine.reserve(wtx.tx->vout.size());
-    for (const auto& txout : wtx.tx->vout) {
+    result.txout_is_mine.reserve(result.tx->vout.size());
+    result.txout_address.reserve(result.tx->vout.size());
+    result.txout_address_is_mine.reserve(result.tx->vout.size());
+    for (const auto& txout : result.tx->vout) {
         result.txout_is_mine.emplace_back(wallet.IsMine(txout));
         result.txout_is_change.push_back(OutputIsChange(wallet, txout));
         result.txout_address.emplace_back();
@@ -79,7 +78,10 @@ WalletTx MakeWalletTx(CWallet& wallet, const CWalletTx& wtx)
     result.debit = CachedTxGetDebit(wallet, wtx, /*avoid_reuse=*/true);
     result.change = CachedTxGetChange(wallet, wtx);
     result.time = wtx.GetTxTime();
-    result.value_map = wtx.mapValue;
+    result.from = wtx.m_from;
+    result.message = wtx.m_message;
+    result.comment = wtx.m_comment;
+    result.comment_to = wtx.m_comment_to;
     result.is_coinbase = wtx.IsCoinBase();
     return result;
 }
@@ -98,7 +100,7 @@ WalletTxStatus MakeWalletTxStatus(const CWallet& wallet, const CWalletTx& wtx)
     result.blocks_to_maturity = wallet.GetTxBlocksToMaturity(wtx);
     result.depth_in_main_chain = wallet.GetTxDepthInMainChain(wtx);
     result.time_received = wtx.nTimeReceived;
-    result.lock_time = wtx.tx->nLockTime;
+    result.lock_time = wtx.GetTx()->nLockTime;
     result.is_trusted = CachedTxIsTrusted(wallet, wtx);
     result.is_abandoned = wtx.isAbandoned();
     result.is_coinbase = wtx.IsCoinBase();
@@ -113,7 +115,7 @@ WalletTxOut MakeWalletTxOut(const CWallet& wallet,
     int depth) EXCLUSIVE_LOCKS_REQUIRED(wallet.cs_wallet)
 {
     WalletTxOut result;
-    result.txout = wtx.tx->vout[n];
+    result.txout = wtx.GetTx()->vout[n];
     result.time = wtx.GetTxTime();
     result.depth_in_main_chain = depth;
     result.is_spent = wallet.IsSpent(COutPoint(wtx.GetHash(), n));
@@ -265,12 +267,10 @@ public:
         LOCK(m_wallet->cs_wallet);
         return CreateTransaction(*m_wallet, recipients, change_pos, coin_control, sign);
     }
-    void commitTransaction(CTransactionRef tx,
-        WalletValueMap value_map,
-        WalletOrderForm order_form) override
+    void commitTransaction(CTransactionRef tx, const std::vector<std::string>& messages) override
     {
         LOCK(m_wallet->cs_wallet);
-        m_wallet->CommitTransaction(std::move(tx), std::move(value_map), std::move(order_form));
+        m_wallet->CommitTransaction(std::move(tx), /*replaces_txid=*/std::nullopt, /*comment=*/std::nullopt, /*comment_to=*/std::nullopt, messages);
     }
     bool transactionCanBeAbandoned(const Txid& txid) override { return m_wallet->TransactionCanBeAbandoned(txid); }
     bool abandonTransaction(const Txid& txid) override
@@ -306,7 +306,7 @@ public:
         LOCK(m_wallet->cs_wallet);
         auto mi = m_wallet->mapWallet.find(txid);
         if (mi != m_wallet->mapWallet.end()) {
-            return mi->second.tx;
+            return mi->second.GetTx();
         }
         return {};
     }
@@ -349,7 +349,8 @@ public:
     }
     WalletTx getWalletTxDetails(const Txid& txid,
         WalletTxStatus& tx_status,
-        WalletOrderForm& order_form,
+        std::vector<std::string>& messages,
+        std::vector<std::string>& payment_requests,
         bool& in_mempool,
         int& num_blocks) override
     {
@@ -358,7 +359,8 @@ public:
         if (mi != m_wallet->mapWallet.end()) {
             num_blocks = m_wallet->GetLastBlockHeight();
             in_mempool = mi->second.InMempool();
-            order_form = mi->second.vOrderForm;
+            messages = mi->second.m_messages;
+            payment_requests = mi->second.m_payment_requests;
             tx_status = MakeWalletTxStatus(*m_wallet, mi->second);
             return MakeWalletTx(*m_wallet, mi->second);
         }
@@ -521,6 +523,12 @@ public:
     }
     CWallet* wallet() override { return m_wallet.get(); }
 
+    util::Result<std::string> exportWatchOnlyWallet(const fs::path& destination) override {
+        LOCK(m_wallet->cs_wallet);
+        m_wallet->TopUpKeyPool();
+        return ExportWatchOnlyWallet(*m_wallet, destination, m_context);
+    }
+
     WalletContext& m_context;
     std::shared_ptr<CWallet> m_wallet;
 };
@@ -544,6 +552,7 @@ public:
                 wallet_request.context = &m_context;
                 return command.actor(wallet_request, result, last_handler);
             }, command.argNames, command.unique_id);
+            m_rpc_commands.back().metadata_fn = command.metadata_fn;
             m_rpc_handlers.emplace_back(m_context.chain->handleRpc(m_rpc_commands.back()));
         }
     }
@@ -599,14 +608,14 @@ public:
         }
         return wallet;
     }
-    util::Result<WalletMigrationResult> migrateWallet(const std::string& name, const SecureString& passphrase) override
+    util::Result<WalletMigrationResult> migrateWallet(const std::string& name, const SecureString& passphrase, bool load_wallet) override
     {
-        auto res = wallet::MigrateLegacyToDescriptor(name, passphrase, m_context);
+        auto res = wallet::MigrateLegacyToDescriptor(name, passphrase, m_context, load_wallet);
         if (!res) return util::Error{util::ErrorString(res)};
         WalletMigrationResult out{
             .wallet = MakeWallet(m_context, res->wallet),
-            .watchonly_wallet_name = res->watchonly_wallet ? std::make_optional(res->watchonly_wallet->GetName()) : std::nullopt,
-            .solvables_wallet_name = res->solvables_wallet ? std::make_optional(res->solvables_wallet->GetName()) : std::nullopt,
+            .watchonly_wallet_name = res->watchonly_wallet_name,
+            .solvables_wallet_name = res->solvables_wallet_name,
             .backup_path = res->backup_path,
         };
         return out;

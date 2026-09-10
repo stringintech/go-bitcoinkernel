@@ -11,6 +11,7 @@ from math import ceil
 from test_framework.address import address_to_scriptpubkey
 
 from test_framework.descriptors import descsum_create
+from test_framework.extendedkey import ExtendedPrivateKey
 from test_framework.messages import (
     COIN,
     CTransaction,
@@ -294,6 +295,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         assert_equal(utx['txid'], dec_tx['vin'][0]['txid'])
 
         assert_raises_rpc_error(-8, "Unknown named parameter foo", self.nodes[2].fundrawtransaction, rawtx, foo='bar')
+        assert_raises_rpc_error(-3, "JSON value of type bool is not of expected type object", self.nodes[2].fundrawtransaction, rawtx, True)
 
         # reserveChangeKey was deprecated and is now removed
         assert_raises_rpc_error(-8, "Unknown named parameter reserveChangeKey", lambda: self.nodes[2].fundrawtransaction(hexstring=rawtx, reserveChangeKey=True))
@@ -612,12 +614,12 @@ class RawTransactionsTest(BitcoinTestFramework):
 
         with WalletUnlock(wallet, "test"):
             wallet.importdescriptors([{
-                'desc': descsum_create('wpkh(tprv8ZgxMBicQKsPdYeeZbPSKd2KYLmeVKtcFA7kqCxDvDR13MQ6us8HopUR2wLcS2ZKPhLyKsqpDL2FtL73LMHcgoCL7DXsciA8eX8nbjCR2eG/0h/*h)'),
+                'desc': descsum_create(f'wpkh({ExtendedPrivateKey.generate().to_string()}/0h/*h)'),
                 'timestamp': 'now',
                 'active': True
             },
             {
-                'desc': descsum_create('wpkh(tprv8ZgxMBicQKsPdYeeZbPSKd2KYLmeVKtcFA7kqCxDvDR13MQ6us8HopUR2wLcS2ZKPhLyKsqpDL2FtL73LMHcgoCL7DXsciA8eX8nbjCR2eG/1h/*h)'),
+                'desc': descsum_create(f'wpkh({ExtendedPrivateKey.generate().to_string()}/1h/*h)'),
                 'timestamp': 'now',
                 'active': True,
                 'internal': True
@@ -761,8 +763,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         }]
         wwatch.importdescriptors(desc_import)
 
-        # Backward compatibility test (2nd params is includeWatching)
-        result = wwatch.fundrawtransaction(rawtx, True)
+        result = wwatch.fundrawtransaction(rawtx)
         res_dec = self.nodes[0].decoderawtransaction(result["hex"])
         assert_equal(len(res_dec["vin"]), 1)
         assert_equal(res_dec["vin"][0]["txid"], self.watchonly_utxo['txid'])
@@ -1176,10 +1177,10 @@ class RawTransactionsTest(BitcoinTestFramework):
         tx = wallet.send(outputs=[{addr1: 8}], **options)
         assert tx["complete"]
         # Check that only the preset inputs were added to the tx
-        decoded_psbt_inputs = self.nodes[0].decodepsbt(tx["psbt"])['tx']['vin']
+        decoded_psbt_inputs = self.nodes[0].decodepsbt(tx["psbt"])["inputs"]
         assert_equal(len(decoded_psbt_inputs), 2)
         for input in decoded_psbt_inputs:
-            assert_equal(input["txid"], source_tx["txid"])
+            assert_equal(input["previous_txid"], source_tx["txid"])
 
         # Case (5), assert that inputs are added to the tx by explicitly setting add_inputs=true
         options = {"add_inputs": True, "add_to_wallet": True}
@@ -1218,10 +1219,10 @@ class RawTransactionsTest(BitcoinTestFramework):
         })
         psbt_tx = wallet.walletcreatefundedpsbt(outputs=[{addr1: 8}], inputs=inputs, **options)
         # Check that only the preset inputs were added to the tx
-        decoded_psbt_inputs = self.nodes[0].decodepsbt(psbt_tx["psbt"])['tx']['vin']
+        decoded_psbt_inputs = self.nodes[0].decodepsbt(psbt_tx["psbt"])["inputs"]
         assert_equal(len(decoded_psbt_inputs), 2)
         for input in decoded_psbt_inputs:
-            assert_equal(input["txid"], source_tx["txid"])
+            assert_equal(input["previous_txid"], source_tx["txid"])
 
         # Case (5), 'walletcreatefundedpsbt' command
         # Explicit add_inputs=true, no preset inputs

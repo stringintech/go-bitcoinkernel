@@ -2,33 +2,11 @@ package kernel
 
 import (
 	"encoding/hex"
-	"errors"
 	"testing"
 )
 
 // genesisHeaderHex is the Bitcoin mainnet genesis block header (80 bytes)
 const genesisHeaderHex = "0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff001d1dac2b7c"
-
-func TestInvalidBlockHeaderData(t *testing.T) {
-	tests := []struct {
-		name string
-		data []byte
-	}{
-		{"invalid bytes", []byte{0x00, 0x01, 0x02}},
-		{"nil slice", nil},
-		{"too short", make([]byte, 79)},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewBlockHeader(tt.data)
-			var internalErr *InternalError
-			if !errors.As(err, &internalErr) {
-				t.Errorf("Expected InternalError, got %v", err)
-			}
-		})
-	}
-}
 
 func TestBlockHeader(t *testing.T) {
 	headerBytes, err := hex.DecodeString(genesisHeaderHex)
@@ -36,7 +14,7 @@ func TestBlockHeader(t *testing.T) {
 		t.Fatalf("Failed to decode genesis header hex: %v", err)
 	}
 
-	header, err := NewBlockHeader(headerBytes)
+	header, err := NewBlockHeader((*[80]byte)(headerBytes))
 	if err != nil {
 		t.Fatalf("NewBlockHeader() error = %v", err)
 	}

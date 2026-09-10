@@ -117,6 +117,15 @@ BOOST_FIXTURE_TEST_CASE(chainstatemanager, TestChain100Setup)
     m_node.validation_signals->SyncWithValidationInterfaceQueue();
 }
 
+BOOST_FIXTURE_TEST_CASE(chainstatemanager_delete_chainstate_no_mempool, ChainTestingSetup)
+{
+    auto& manager{*Assert(m_node.chainman)};
+    auto& validated{WITH_LOCK(::cs_main, return manager.InitializeChainstate(/*mempool=*/nullptr))};
+    auto& snapshot{WITH_LOCK(::cs_main, return manager.AddChainstate(std::make_unique<Chainstate>(nullptr, manager.m_blockman, manager, uint256::ONE)))};
+    WITH_LOCK(::cs_main, validated.SetTargetBlock(nullptr));
+    BOOST_CHECK(WITH_LOCK(::cs_main, return manager.DeleteChainstate(snapshot))); // Accept Kernel's null mempool
+}
+
 //! Test rebalancing the caches associated with each chainstate.
 BOOST_FIXTURE_TEST_CASE(chainstatemanager_rebalance_caches, TestChain100Setup)
 {
@@ -991,6 +1000,12 @@ BOOST_FIXTURE_TEST_CASE(chainstatemanager_args, BasicTestingSetup)
 
     BOOST_CHECK(!get_opts({"-minimumchainwork=xyz"}));                                                               // invalid hex characters
     BOOST_CHECK(!get_opts({"-minimumchainwork=01234567890123456789012345678901234567890123456789012345678901234"})); // > 64 hex chars
+
+    BOOST_CHECK_EQUAL(get_valid_opts({}).prevoutfetch_threads_num, DEFAULT_PREVOUTFETCH_THREADS);
+    BOOST_CHECK_EQUAL(get_valid_opts({"-prevoutfetchthreads=0"}).prevoutfetch_threads_num, 0);
+    BOOST_CHECK_EQUAL(get_valid_opts({"-prevoutfetchthreads=3"}).prevoutfetch_threads_num, 3);
+    BOOST_CHECK_EQUAL(get_valid_opts({"-prevoutfetchthreads=100"}).prevoutfetch_threads_num, MAX_PREVOUTFETCH_THREADS);
+    BOOST_CHECK(!get_opts({"-prevoutfetchthreads=-1"}));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -14,6 +14,7 @@
 #include <uint256.h>
 #include <undo.h>
 #include <util/byte_units.h>
+#include <util/check.h>
 #include <util/strencodings.h>
 
 #include <map>
@@ -193,7 +194,7 @@ void SimulationTest(CCoinsView* base, bool fake_best_block)
                     coin = newcoin;
                 }
                 if (COutPoint op(txid, 0); !stack.back()->map().contains(op) && !newcoin.out.scriptPubKey.IsUnspendable() && m_rng.randbool()) {
-                    stack.back()->EmplaceCoinInternalDANGER(std::move(op), std::move(newcoin));
+                    stack.back()->EmplaceCoinInternalDANGER(op, std::move(newcoin));
                 } else {
                     stack.back()->AddCoin(op, std::move(newcoin), /*possible_overwrite=*/!coin.IsSpent() || m_rng.randbool());
                 }
@@ -1060,6 +1061,30 @@ BOOST_FIXTURE_TEST_CASE(ccoins_flush_behavior, FlushTest)
     }
 }
 
+BOOST_FIXTURE_TEST_CASE(coins_db_leveldb_layout, FlushTest)
+{
+    auto level2_files{[](CCoinsViewDB& base) {
+        return *Assert(ToIntegral<int>(*Assert(base.GetDBProperty("leveldb.num-files-at-level2"))));
+    }};
+    const COutPoint outpoint{Txid::FromUint256(m_rng.rand256()), 0};
+    const Coin coin{MakeCoin()};
+    const uint256 block_hash{m_rng.rand256()};
+
+    CCoinsViewDB base{{.path = m_args.GetDataDirBase() / "coins_db_leveldb_layout", .cache_bytes = 1_MiB, .wipe_data = true}, {}};
+    CCoinsViewCache cache{&base};
+
+    cache.EmplaceCoinInternalDANGER(COutPoint{outpoint}, Coin{coin});
+    cache.SetBestBlock(block_hash);
+    cache.Sync();
+
+    BOOST_CHECK_EQUAL(level2_files(base), 0);
+    WITH_LOCK(::cs_main, return base.CompactFullAsync()).wait();
+    BOOST_CHECK_EQUAL(level2_files(base), 1);
+
+    BOOST_CHECK(*Assert(base.GetCoin(outpoint)) == coin);
+    BOOST_CHECK_EQUAL(base.GetBestBlock(), block_hash);
+}
+
 BOOST_AUTO_TEST_CASE(coins_resource_is_used)
 {
     CCoinsMapMemoryResource resource;
@@ -1109,11 +1134,11 @@ BOOST_AUTO_TEST_CASE(ccoins_emplace_duplicate_keeps_usage_balanced)
     const COutPoint outpoint{Txid::FromUint256(m_rng.rand256()), m_rng.rand32()};
 
     const Coin coin1{CTxOut{m_rng.randrange(10), CScript{} << m_rng.randbytes(CScriptBase::STATIC_SIZE + 1)}, 1, false};
-    cache.EmplaceCoinInternalDANGER(COutPoint{outpoint}, Coin{coin1});
+    cache.EmplaceCoinInternalDANGER(outpoint, Coin{coin1});
     cache.SelfTest();
 
     const Coin coin2{CTxOut{m_rng.randrange(20), CScript{} << m_rng.randbytes(CScriptBase::STATIC_SIZE + 2)}, 2, false};
-    cache.EmplaceCoinInternalDANGER(COutPoint{outpoint}, Coin{coin2});
+    cache.EmplaceCoinInternalDANGER(outpoint, Coin{coin2});
     cache.SelfTest();
 
     BOOST_CHECK(cache.AccessCoin(outpoint) == coin1);
@@ -1132,7 +1157,7 @@ BOOST_AUTO_TEST_CASE(ccoins_reset_guard)
     const COutPoint outpoint{Txid::FromUint256(m_rng.rand256()), m_rng.rand32()};
 
     const Coin coin{CTxOut{m_rng.randrange(10), CScript{} << m_rng.randbytes(CScriptBase::STATIC_SIZE + 1)}, 1, false};
-    cache.EmplaceCoinInternalDANGER(COutPoint{outpoint}, Coin{coin});
+    cache.EmplaceCoinInternalDANGER(outpoint, Coin{coin});
     BOOST_CHECK_EQUAL(cache.GetDirtyCount(), 1U);
 
     uint256 cache_best_block{m_rng.rand256()};

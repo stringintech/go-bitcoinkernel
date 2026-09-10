@@ -8,10 +8,10 @@
 
 #include <chainparams.h>
 #include <crypto/common.h>
-#include <logging.h>
 #include <sync.h>
 #include <util/check.h>
 #include <util/fs_helpers.h>
+#include <util/log.h>
 #include <util/strencodings.h>
 #include <util/translation.h>
 #include <wallet/db.h>
@@ -116,7 +116,7 @@ SQLiteDatabase::SQLiteDatabase(const fs::path& dir_path, const fs::path& file_pa
 {}
 
 SQLiteDatabase::SQLiteDatabase(const fs::path& dir_path, const fs::path& file_path, const DatabaseOptions& options, int additional_flags)
-    : WalletDatabase(), m_dir_path(dir_path), m_file_path(fs::PathToString(file_path)), m_write_semaphore(1), m_use_unsafe_sync(options.use_unsafe_sync)
+    : WalletDatabase(), m_dir_path(dir_path), m_file_path(fs::PathToString(file_path)), m_additional_flags(additional_flags), m_write_semaphore(1), m_use_unsafe_sync(options.use_unsafe_sync)
 {
     {
         LOCK(g_sqlite_mutex);
@@ -139,7 +139,7 @@ SQLiteDatabase::SQLiteDatabase(const fs::path& dir_path, const fs::path& file_pa
     }
 
     try {
-        Open(additional_flags);
+        Open(m_additional_flags);
     } catch (const std::runtime_error&) {
         // If open fails, cleanup this object and rethrow the exception
         Cleanup();
@@ -247,7 +247,10 @@ bool SQLiteDatabase::Verify(bilingual_str& error)
 
 void SQLiteDatabase::Open()
 {
-    Open(/*additional_flags*/0);
+    if (m_additional_flags & SQLITE_OPEN_MEMORY) {
+        throw std::runtime_error("SQLiteDatabase: Cannot reopen an in-memory database");
+    }
+    Open(m_additional_flags);
 }
 
 void SQLiteDatabase::Open(int additional_flags)
@@ -257,7 +260,11 @@ void SQLiteDatabase::Open(int additional_flags)
     if (m_db == nullptr) {
         if (!(flags & SQLITE_OPEN_MEMORY)) {
             TryCreateDirectories(m_dir_path);
+            if (!IsDirWritable(m_dir_path)) {
+                throw std::runtime_error(strprintf("SQLiteDatabase: Failed to open database in directory '%s': directory is not writable", fs::PathToString(m_dir_path)));
+            }
         }
+
         int ret = sqlite3_open_v2(m_file_path.c_str(), &m_db, flags, nullptr);
         if (ret != SQLITE_OK) {
             throw std::runtime_error(strprintf("SQLiteDatabase: Failed to open database: %s\n", sqlite3_errstr(ret)));
@@ -267,7 +274,7 @@ void SQLiteDatabase::Open(int additional_flags)
             throw std::runtime_error(strprintf("SQLiteDatabase: Failed to enable extended result codes: %s\n", sqlite3_errstr(ret)));
         }
         // Trace SQL statements if tracing is enabled with -debug=walletdb -loglevel=walletdb:trace
-        if (LogAcceptCategory(BCLog::WALLETDB, BCLog::Level::Trace)) {
+        if (util::log::ShouldTraceLog(BCLog::WALLETDB)) {
            ret = sqlite3_trace_v2(m_db, SQLITE_TRACE_STMT, TraceSqlCallback, this);
            if (ret != SQLITE_OK) {
                LogWarning("Failed to enable SQL tracing for %s", Filename());
@@ -444,6 +451,9 @@ void SQLiteBatch::Close()
     }
 
     if (force_conn_refresh) {
+        if (m_database.m_additional_flags & SQLITE_OPEN_MEMORY) {
+            throw std::runtime_error("SQLiteDatabase: Cannot recover in-memory database connection");
+        }
         m_database.Close();
         try {
             m_database.Open();
@@ -710,6 +720,15 @@ std::unique_ptr<SQLiteDatabase> MakeSQLiteDatabase(const fs::path& path, const D
         error = Untranslated(e.what());
         return nullptr;
     }
+}
+
+InMemoryWalletDatabase::InMemoryWalletDatabase()
+    : SQLiteDatabase(fs::path{}, fs::path{":memory:"}, DatabaseOptions(), SQLITE_OPEN_MEMORY)
+{}
+
+std::unique_ptr<WalletDatabase> MakeInMemoryWalletDatabase()
+{
+    return std::make_unique<InMemoryWalletDatabase>();
 }
 
 std::string SQLiteDatabaseVersion()

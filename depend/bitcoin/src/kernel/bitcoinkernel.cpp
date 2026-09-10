@@ -8,6 +8,7 @@
 
 #include <chain.h>
 #include <coins.h>
+#include <consensus/tx_check.h>
 #include <consensus/validation.h>
 #include <dbwrapper.h>
 #include <kernel/caches.h>
@@ -23,6 +24,7 @@
 #include <primitives/transaction.h>
 #include <script/interpreter.h>
 #include <script/script.h>
+#include <script/verify_flags.h>
 #include <serialize.h>
 #include <streams.h>
 #include <sync.h>
@@ -33,6 +35,7 @@
 #include <util/result.h>
 #include <util/signalinterrupt.h>
 #include <util/task_runner.h>
+#include <util/time.h>
 #include <util/translation.h>
 #include <validation.h>
 #include <validationinterface.h>
@@ -41,8 +44,10 @@
 #include <cstring>
 #include <exception>
 #include <functional>
+#include <limits>
 #include <list>
 #include <memory>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -146,6 +151,7 @@ struct Handle {
 struct btck_BlockTreeEntry: Handle<btck_BlockTreeEntry, CBlockIndex> {};
 struct btck_Block : Handle<btck_Block, std::shared_ptr<const CBlock>> {};
 struct btck_BlockValidationState : Handle<btck_BlockValidationState, BlockValidationState> {};
+struct btck_TxValidationState : Handle<btck_TxValidationState, TxValidationState> {};
 
 namespace {
 
@@ -451,6 +457,7 @@ struct ChainstateManagerOptions {
     node::BlockManager::Options m_blockman_options GUARDED_BY(m_mutex);
     std::shared_ptr<const Context> m_context;
     node::ChainstateLoadOptions m_chainstate_load_options GUARDED_BY(m_mutex);
+    uint64_t m_db_cache_bytes GUARDED_BY(m_mutex){DEFAULT_KERNEL_CACHE};
 
     ChainstateManagerOptions(const std::shared_ptr<const Context>& context, const fs::path& data_dir, const fs::path& blocks_dir)
         : m_chainman_options{ChainstateManager::Options{
@@ -496,6 +503,7 @@ struct btck_TransactionSpentOutputs : Handle<btck_TransactionSpentOutputs, CTxUn
 struct btck_Coin : Handle<btck_Coin, Coin> {};
 struct btck_BlockHash : Handle<btck_BlockHash, uint256> {};
 struct btck_TransactionInput : Handle<btck_TransactionInput, CTxIn> {};
+struct btck_WitnessStack : Handle<btck_WitnessStack, CScriptWitness> {};
 struct btck_TransactionOutPoint: Handle<btck_TransactionOutPoint, COutPoint> {};
 struct btck_Txid: Handle<btck_Txid, Txid> {};
 struct btck_PrecomputedTransactionData : Handle<btck_PrecomputedTransactionData, PrecomputedTransactionData> {};
@@ -504,9 +512,7 @@ struct btck_ConsensusParams: Handle<btck_ConsensusParams, Consensus::Params> {};
 
 btck_Transaction* btck_transaction_create(const void* raw_transaction, size_t raw_transaction_len)
 {
-    if (raw_transaction == nullptr && raw_transaction_len != 0) {
-        return nullptr;
-    }
+    assert(raw_transaction != nullptr || raw_transaction_len == 0);
     try {
         SpanReader stream{std::span{reinterpret_cast<const std::byte*>(raw_transaction), raw_transaction_len}};
         return btck_Transaction::create(std::make_shared<const CTransaction>(deserialize, TX_WITH_WITNESS, stream));
@@ -571,9 +577,7 @@ void btck_transaction_destroy(btck_Transaction* transaction)
 
 btck_ScriptPubkey* btck_script_pubkey_create(const void* script_pubkey, size_t script_pubkey_len)
 {
-    if (script_pubkey == nullptr && script_pubkey_len != 0) {
-        return nullptr;
-    }
+    assert(script_pubkey != nullptr || script_pubkey_len == 0);
     auto data = std::span{reinterpret_cast<const uint8_t*>(script_pubkey), script_pubkey_len};
     return btck_ScriptPubkey::create(data.begin(), data.end());
 }
@@ -707,9 +711,42 @@ uint32_t btck_transaction_input_get_sequence(const btck_TransactionInput* input)
     return btck_TransactionInput::get(input).nSequence;
 }
 
+const btck_WitnessStack* btck_transaction_input_get_witness_stack(const btck_TransactionInput* input)
+{
+    return btck_WitnessStack::ref(&btck_TransactionInput::get(input).scriptWitness);
+}
+
+int btck_transaction_input_get_script_sig(const btck_TransactionInput* input, btck_WriteBytes writer, void* user_data)
+{
+    const auto& script_sig{btck_TransactionInput::get(input).scriptSig};
+    return writer(script_sig.data(), script_sig.size(), user_data);
+}
+
 void btck_transaction_input_destroy(btck_TransactionInput* input)
 {
     delete input;
+}
+
+size_t btck_witness_stack_count_items(const btck_WitnessStack* witness_stack)
+{
+    return btck_WitnessStack::get(witness_stack).stack.size();
+}
+
+int btck_witness_stack_get_item_at(const btck_WitnessStack* witness_stack, size_t index, btck_WriteBytes writer, void* user_data)
+{
+    const auto& stack{btck_WitnessStack::get(witness_stack).stack};
+    assert(index < stack.size());
+    return writer(stack[index].data(), stack[index].size(), user_data);
+}
+
+btck_WitnessStack* btck_witness_stack_copy(const btck_WitnessStack* witness_stack)
+{
+    return btck_WitnessStack::copy(witness_stack);
+}
+
+void btck_witness_stack_destroy(btck_WitnessStack* witness_stack)
+{
+    delete witness_stack;
 }
 
 btck_TransactionOutPoint* btck_transaction_out_point_copy(const btck_TransactionOutPoint* out_point)
@@ -814,13 +851,23 @@ btck_ChainParameters* btck_chain_parameters_create(const btck_ChainType chain_ty
         return btck_ChainParameters::ref(const_cast<CChainParams*>(CChainParams::TestNet4().release()));
     }
     case btck_ChainType_SIGNET: {
-        return btck_ChainParameters::ref(const_cast<CChainParams*>(CChainParams::SigNet({}).release()));
+        return btck_ChainParameters::ref(const_cast<CChainParams*>(CChainParams::SigNet().release()));
     }
     case btck_ChainType_REGTEST: {
-        return btck_ChainParameters::ref(const_cast<CChainParams*>(CChainParams::RegTest({}).release()));
+        return btck_ChainParameters::ref(const_cast<CChainParams*>(CChainParams::RegTest().release()));
     }
     }
     assert(false);
+}
+
+btck_ChainParameters* btck_chain_parameters_create_signet(const void* challenge, size_t challenge_len)
+{
+    assert(challenge != nullptr || challenge_len == 0);
+    const uint8_t* p = static_cast<const uint8_t*>(challenge);
+    CChainParams::SigNetOptions options{
+        .challenge = std::vector<uint8_t>{p, p + challenge_len},
+    };
+    return btck_ChainParameters::ref(const_cast<CChainParams*>(CChainParams::SigNet(options).release()));
 }
 
 btck_ChainParameters* btck_chain_parameters_copy(const btck_ChainParameters* chain_parameters)
@@ -963,7 +1010,9 @@ btck_BlockValidationResult btck_block_validation_state_get_block_validation_resu
 
 btck_ChainstateManagerOptions* btck_chainstate_manager_options_create(const btck_Context* context, const char* data_dir, size_t data_dir_len, const char* blocks_dir, size_t blocks_dir_len)
 {
-    if (data_dir == nullptr || data_dir_len == 0 || blocks_dir == nullptr || blocks_dir_len == 0) {
+    assert(data_dir != nullptr || data_dir_len == 0);
+    assert(blocks_dir != nullptr || blocks_dir_len == 0);
+    if (data_dir_len == 0 || blocks_dir_len == 0) {
         LogError("Failed to create chainstate manager options: dir must be non-null and non-empty");
         return nullptr;
     }
@@ -983,6 +1032,20 @@ void btck_chainstate_manager_options_set_worker_threads_num(btck_ChainstateManag
 {
     LOCK(btck_ChainstateManagerOptions::get(opts).m_mutex);
     btck_ChainstateManagerOptions::get(opts).m_chainman_options.worker_threads_num = worker_threads;
+}
+
+int btck_chainstate_manager_options_set_database_cache_bytes(btck_ChainstateManagerOptions* chainman_opts, uint64_t database_cache_bytes)
+{
+    if (database_cache_bytes < MIN_DBCACHE_BYTES || database_cache_bytes > MAX_DBCACHE_BYTES) {
+        LogError("Failed to set database cache: size is outside the supported range.");
+        return -1;
+    }
+
+    auto& opts{btck_ChainstateManagerOptions::get(chainman_opts)};
+    LOCK(opts.m_mutex);
+    opts.m_db_cache_bytes = database_cache_bytes;
+    opts.m_blockman_options.block_tree_db_params.cache_bytes = kernel::CacheSizes{database_cache_bytes}.block_tree_db;
+    return 0;
 }
 
 void btck_chainstate_manager_options_destroy(btck_ChainstateManagerOptions* options)
@@ -1037,7 +1100,7 @@ btck_ChainstateManager* btck_chainstate_manager_create(
     try {
         const auto chainstate_load_opts{WITH_LOCK(opts.m_mutex, return opts.m_chainstate_load_options)};
 
-        kernel::CacheSizes cache_sizes{DEFAULT_KERNEL_CACHE};
+        const kernel::CacheSizes cache_sizes{WITH_LOCK(opts.m_mutex, return opts.m_db_cache_bytes)};
         auto [status, chainstate_err]{node::LoadChainstate(*chainman, cache_sizes, chainstate_load_opts)};
         if (status != node::ChainstateLoadStatus::SUCCESS) {
             LogError("Failed to load chain state from your data directory: %s", chainstate_err.original);
@@ -1114,9 +1177,7 @@ int btck_chainstate_manager_import_blocks(btck_ChainstateManager* chainman, cons
 
 btck_Block* btck_block_create(const void* raw_block, size_t raw_block_length)
 {
-    if (raw_block == nullptr && raw_block_length != 0) {
-        return nullptr;
-    }
+    assert(raw_block != nullptr || raw_block_length == 0);
     auto block{std::make_shared<CBlock>()};
 
     SpanReader stream{std::span{reinterpret_cast<const std::byte*>(raw_block), raw_block_length}};
@@ -1338,19 +1399,20 @@ int btck_chainstate_manager_process_block(
     return result ? 0 : -1;
 }
 
-int btck_chainstate_manager_process_block_header(
+btck_BlockValidationState* btck_chainstate_manager_process_block_header(
     btck_ChainstateManager* chainstate_manager,
-    const btck_BlockHeader* header,
-    btck_BlockValidationState* state)
+    const btck_BlockHeader* header)
 {
     try {
         auto& chainman = btck_ChainstateManager::get(chainstate_manager).m_chainman;
-        auto result = chainman->ProcessNewBlockHeaders({&btck_BlockHeader::get(header), 1}, /*min_pow_checked=*/true, btck_BlockValidationState::get(state), /*ppindex=*/nullptr);
 
-        return result ? 0 : -1;
+        auto state = btck_BlockValidationState::create();
+        bool result{chainman->ProcessNewBlockHeaders({&btck_BlockHeader::get(header), 1}, /*min_pow_checked=*/true, btck_BlockValidationState::get(state))};
+        assert(result == btck_BlockValidationState::get(state).IsValid());
+        return state;
     } catch (const std::exception& e) {
         LogError("Failed to process block header: %s", e.what());
-        return -1;
+        return nullptr;
     }
 }
 
@@ -1379,9 +1441,7 @@ int btck_chain_contains(const btck_Chain* chain, const btck_BlockTreeEntry* entr
 
 btck_BlockHeader* btck_block_header_create(const void* raw_block_header, size_t raw_block_header_len)
 {
-    if (raw_block_header == nullptr && raw_block_header_len != 0) {
-        return nullptr;
-    }
+    assert(raw_block_header != nullptr && raw_block_header_len == 80);
     auto header{std::make_unique<CBlockHeader>()};
     SpanReader stream{std::span{reinterpret_cast<const std::byte*>(raw_block_header), raw_block_header_len}};
 
@@ -1443,4 +1503,60 @@ int btck_block_header_to_bytes(const btck_BlockHeader* header, unsigned char out
 void btck_block_header_destroy(btck_BlockHeader* header)
 {
     delete header;
+}
+
+btck_ValidationMode btck_tx_validation_state_get_validation_mode(const btck_TxValidationState* state_)
+{
+    const auto& state = btck_TxValidationState::get(state_);
+    if (state.IsValid()) return btck_ValidationMode_VALID;
+    if (state.IsInvalid()) return btck_ValidationMode_INVALID;
+    return btck_ValidationMode_INTERNAL_ERROR;
+}
+
+btck_TxValidationState* btck_tx_validation_state_create()
+{
+    return btck_TxValidationState::create();
+}
+
+btck_TxValidationResult btck_tx_validation_state_get_tx_validation_result(const btck_TxValidationState* state_)
+{
+    switch (btck_TxValidationState::get(state_).GetResult()) {
+    case TxValidationResult::TX_RESULT_UNSET:        return btck_TxValidationResult_UNSET;
+    case TxValidationResult::TX_CONSENSUS:           return btck_TxValidationResult_CONSENSUS;
+    case TxValidationResult::TX_INPUTS_NOT_STANDARD: return btck_TxValidationResult_INPUTS_NOT_STANDARD;
+    case TxValidationResult::TX_NOT_STANDARD:        return btck_TxValidationResult_NOT_STANDARD;
+    case TxValidationResult::TX_MISSING_INPUTS:      return btck_TxValidationResult_MISSING_INPUTS;
+    case TxValidationResult::TX_PREMATURE_SPEND:     return btck_TxValidationResult_PREMATURE_SPEND;
+    case TxValidationResult::TX_WITNESS_MUTATED:     return btck_TxValidationResult_WITNESS_MUTATED;
+    case TxValidationResult::TX_WITNESS_STRIPPED:    return btck_TxValidationResult_WITNESS_STRIPPED;
+    case TxValidationResult::TX_CONFLICT:            return btck_TxValidationResult_CONFLICT;
+    case TxValidationResult::TX_MEMPOOL_POLICY:      return btck_TxValidationResult_MEMPOOL_POLICY;
+    case TxValidationResult::TX_NO_MEMPOOL:          return btck_TxValidationResult_NO_MEMPOOL;
+    case TxValidationResult::TX_RECONSIDERABLE:      return btck_TxValidationResult_RECONSIDERABLE;
+    case TxValidationResult::TX_UNKNOWN:             return btck_TxValidationResult_UNKNOWN;
+    } // no default case, so the compiler can warn about missing cases
+    assert(false);
+}
+
+void btck_tx_validation_state_destroy(btck_TxValidationState* state)
+{
+    delete state;
+}
+
+int btck_transaction_check(const btck_Transaction* tx, btck_TxValidationState* validation_state)
+{
+    auto& state = btck_TxValidationState::get(validation_state);
+    state = TxValidationState{};
+    const bool ok = CheckTransaction(*btck_Transaction::get(tx), state);
+    return ok ? 1 : 0;
+}
+
+int btck_set_mock_time(int64_t timestamp)
+{
+    constexpr int64_t max_time{std::numeric_limits<uint32_t>::max()};
+    if (timestamp < 0 || timestamp > max_time) {
+        return -1;
+    }
+    SetMockTime(std::chrono::seconds{timestamp});
+    return 0;
 }

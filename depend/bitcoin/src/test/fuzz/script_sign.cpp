@@ -49,7 +49,7 @@ FUZZ_TARGET(script_sign, .init = initialize_script_sign)
 
     {
         std::map<CPubKey, KeyOriginInfo> hd_keypaths;
-        LIMITED_WHILE(fuzzed_data_provider.ConsumeBool(), 10000) {
+        LIMITED_WHILE (fuzzed_data_provider.ConsumeBool(), 10000) {
             const std::optional<CPubKey> pub_key = ConsumeDeserializable<CPubKey>(fuzzed_data_provider);
             if (!pub_key) {
                 break;
@@ -67,7 +67,7 @@ FUZZ_TARGET(script_sign, .init = initialize_script_sign)
         }
         std::map<CPubKey, KeyOriginInfo> deserialized_hd_keypaths;
         try {
-            DeserializeHDKeypaths(serialized, key, hd_keypaths);
+            DeserializeHDKeypaths(serialized, key, deserialized_hd_keypaths);
         } catch (const std::ios_base::failure&) {
         }
         assert(hd_keypaths.size() >= deserialized_hd_keypaths.size());

@@ -2,26 +2,53 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <chain.h>
+#include <coins.h>
+#include <consensus/amount.h>
+#include <consensus/consensus.h>
 #include <consensus/validation.h>
-#include <node/context.h>
-#include <node/mempool_args.h>
 #include <node/miner.h>
+#include <node/mining_types.h>
+#include <policy/feerate.h>
+#include <policy/packages.h>
+#include <policy/policy.h>
 #include <policy/truc_policy.h>
+#include <primitives/block.h>
+#include <primitives/transaction.h>
+#include <script/script.h>
+#include <sync.h>
 #include <test/fuzz/FuzzedDataProvider.h>
 #include <test/fuzz/fuzz.h>
 #include <test/fuzz/util.h>
 #include <test/fuzz/util/mempool.h>
 #include <test/util/mining.h>
+#include <test/util/random.h>
 #include <test/util/script.h>
 #include <test/util/setup_common.h>
 #include <test/util/txmempool.h>
+#include <txmempool.h>
 #include <util/check.h>
-#include <util/rbf.h>
+#include <util/string.h>
+#include <util/time.h>
 #include <util/translation.h>
 #include <validation.h>
 #include <validationinterface.h>
 
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <iterator>
+#include <limits>
+#include <map>
+#include <memory>
+#include <optional>
+#include <set>
+#include <span>
+#include <string>
+#include <utility>
+#include <vector>
 using node::BlockAssembler;
+using node::BlockCreateOptions;
 using node::NodeContext;
 using util::ToString;
 
@@ -46,12 +73,10 @@ void initialize_tx_pool()
     g_setup = testing_setup.get();
     SetMockTime(WITH_LOCK(g_setup->m_node.chainman->GetMutex(), return g_setup->m_node.chainman->ActiveTip()->Time()));
 
-    BlockAssembler::Options options;
-    options.coinbase_output_script = P2WSH_OP_TRUE;
-    options.include_dummy_extranonce = true;
-
     for (int i = 0; i < 2 * COINBASE_MATURITY; ++i) {
-        COutPoint prevout{MineBlock(g_setup->m_node, options)};
+        COutPoint prevout{MineBlock(g_setup->m_node, {
+            .coinbase_output_script = P2WSH_OP_TRUE,
+        })};
         // Remember the txids to avoid expensive disk access later on
         auto& outpoints = i < COINBASE_MATURITY ?
                               g_outpoints_coinbase_init_mature :
@@ -91,14 +116,40 @@ void SetMempoolConstraints(ArgsManager& args, FuzzedDataProvider& fuzzed_data_pr
                      ToString(fuzzed_data_provider.ConsumeIntegralInRange<unsigned>(0, 999)));
 }
 
+/** Get a list of wtxids to query from the mempool for relay. Make the list heterogeneous with
+ * wtxids of mempool transactions, non-mempool transactions, and duplicates. */
+std::vector<Wtxid> WtxidsToRelay(FuzzedDataProvider& fuzzed_data_provider, const MockedTxPool& tx_pool)
+{
+    LOCK(tx_pool.cs);
+    std::vector<Wtxid> res;
+
+    uint8_t dummy{0};
+    const auto mempool_entries{tx_pool.entryAll()};
+    LIMITED_WHILE(fuzzed_data_provider.ConsumeBool(), 100) {
+        if (!mempool_entries.empty() && fuzzed_data_provider.ConsumeBool()) {
+            // Wtxid of an in-mempool transaction
+            const auto& entry_ref{PickValue(fuzzed_data_provider, mempool_entries).get()};
+            res.push_back(entry_ref.GetTx().GetWitnessHash());
+            // Don't remove it from the mempool, so the next pick is possibly a duplicate
+        } else {
+            // Wtxid of a not-in-mempool transaction
+            res.push_back(Wtxid::FromUint256(uint256{dummy}));
+            // Possibly make the next wtxid of a not-in-mempool transaction, a duplicate
+            if (fuzzed_data_provider.ConsumeBool()) dummy++;
+        }
+    }
+
+    return res;
+}
+
 void Finish(FuzzedDataProvider& fuzzed_data_provider, MockedTxPool& tx_pool, Chainstate& chainstate)
 {
     WITH_LOCK(::cs_main, tx_pool.check(chainstate.CoinsTip(), chainstate.m_chain.Height() + 1));
     {
-        BlockAssembler::Options options;
-        options.nBlockMaxWeight = fuzzed_data_provider.ConsumeIntegralInRange(0U, MAX_BLOCK_WEIGHT);
-        options.blockMinFeeRate = CFeeRate{ConsumeMoney(fuzzed_data_provider, /*max=*/COIN)};
-        options.include_dummy_extranonce = true;
+        BlockCreateOptions options{
+            .block_min_fee_rate = CFeeRate{ConsumeMoney(fuzzed_data_provider, /*max=*/COIN)},
+            .block_max_weight = fuzzed_data_provider.ConsumeIntegralInRange<uint64_t>(DEFAULT_BLOCK_RESERVED_WEIGHT, MAX_BLOCK_WEIGHT),
+        };
         auto assembler = BlockAssembler{chainstate, &tx_pool, options};
         auto block_template = assembler.CreateNewBlock();
         Assert(block_template->block.vtx.size() >= 1);
@@ -124,6 +175,28 @@ void Finish(FuzzedDataProvider& fuzzed_data_provider, MockedTxPool& tx_pool, Cha
         const auto& tx_to_remove = *PickValue(fuzzed_data_provider, info_all).tx;
         WITH_LOCK(tx_pool.cs, tx_pool.removeRecursive(tx_to_remove, MemPoolRemovalReason::BLOCK /* dummy */));
         assert(tx_pool.size() < info_all.size());
+    }
+
+    // Query a number of mempool entries as if to relay them, and assert some invariants on the result.
+    auto wtxids_to_relay{WtxidsToRelay(fuzzed_data_provider, tx_pool)};
+    const auto wtxids_count_before{wtxids_to_relay.size()};
+    const auto n_to_sort{fuzzed_data_provider.ConsumeIntegralInRange<size_t>(0, 100)};
+    const auto sorted_iter{WITH_LOCK(tx_pool.cs, return tx_pool.ExtractBestByMiningScoreWithTopology(wtxids_to_relay, n_to_sort))};
+    const auto expected_count{std::min(n_to_sort, wtxids_count_before)};
+    // We removed at least as many transactions from the list as we expected sorted entries.
+    Assert(wtxids_to_relay.size() <= wtxids_count_before - expected_count);
+    // When there is enough non-duplicate in-mempool transactions (list of remaining wtxids is
+    // non-empty), we must have received the expected number of entries.
+    Assert(sorted_iter.size() == expected_count || wtxids_to_relay.empty());
+    if (n_to_sort > 0) {
+        // If we asked for a positive number of entries, we must have removed all wtxids that do
+        // not correspond to a mempool entry..
+        const auto is_in_mempool = [&](const auto& wtxid) EXCLUSIVE_LOCKS_REQUIRED(tx_pool.cs) { return tx_pool.GetIter(wtxid).has_value(); };
+        Assert(WITH_LOCK(tx_pool.cs, return std::ranges::all_of(wtxids_to_relay, is_in_mempool)));
+        // ..As well as all duplicates.
+        const auto wtxids_count{wtxids_to_relay.size()};
+        const std::set<Wtxid> unique_wtxids{std::make_move_iterator(wtxids_to_relay.begin()), std::make_move_iterator(wtxids_to_relay.end())};
+        Assert(unique_wtxids.size() == wtxids_count);
     }
 
     if (fuzzed_data_provider.ConsumeBool()) {
@@ -248,8 +321,7 @@ FUZZ_TARGET(tx_pool_standard, .init = initialize_tx_pool)
         return coin.out.nValue;
     };
 
-    LIMITED_WHILE(fuzzed_data_provider.ConsumeBool(), 100)
-    {
+    LIMITED_WHILE (fuzzed_data_provider.ConsumeBool(), 100) {
         {
             // Total supply is the mempool fee + all outpoints
             CAmount supply_now{WITH_LOCK(tx_pool.cs, return tx_pool.GetTotalFee())};
@@ -430,8 +502,7 @@ FUZZ_TARGET(tx_pool, .init = initialize_tx_pool)
     // If we ever bypass limits, do not do TRUC invariants checks
     bool ever_bypassed_limits{false};
 
-    LIMITED_WHILE(fuzzed_data_provider.ConsumeBool(), 300)
-    {
+    LIMITED_WHILE (fuzzed_data_provider.ConsumeBool(), 300) {
         const auto mut_tx = ConsumeTransaction(fuzzed_data_provider, txids);
 
         if (fuzzed_data_provider.ConsumeBool()) {

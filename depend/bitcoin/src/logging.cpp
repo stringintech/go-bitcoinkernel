@@ -194,7 +194,6 @@ static const std::map<std::string, BCLog::LogFlags, std::less<>> LOG_CATEGORIES_
     {"prune", BCLog::PRUNE},
     {"proxy", BCLog::PROXY},
     {"mempoolrej", BCLog::MEMPOOLREJ},
-    {"libevent", BCLog::LIBEVENT},
     {"coindb", BCLog::COINDB},
     {"qt", BCLog::QT},
     {"leveldb", BCLog::LEVELDB},
@@ -224,7 +223,7 @@ static const std::unordered_map<BCLog::LogFlags, std::string> LOG_CATEGORIES_BY_
     }(LOG_CATEGORIES_BY_STR)
 };
 
-std::optional<BCLog::LogFlags> GetLogCategory(std::string_view str)
+std::optional<BCLog::LogFlags> BCLog::Logger::GetLogCategory(std::string_view str)
 {
     if (str.empty() || str == "1" || str == "all") {
         return BCLog::ALL;
@@ -232,6 +231,10 @@ std::optional<BCLog::LogFlags> GetLogCategory(std::string_view str)
     auto it = LOG_CATEGORIES_BY_STR.find(str);
     if (it != LOG_CATEGORIES_BY_STR.end()) {
         return it->second;
+    }
+    if (str == "libevent") {
+       LogWarning("The logging category `%s` is deprecated, does nothing, and will be removed in a future version", str);
+       return BCLog::NONE;
     }
     return std::nullopt;
 }
@@ -514,6 +517,8 @@ void BCLog::Logger::LogPrint_(util::log::Entry entry)
 
 void BCLog::Logger::ShrinkDebugFile()
 {
+    STDLOCK(m_cs);
+
     // Amount of debug.log to save at end when shrinking (must fit in memory)
     constexpr size_t RECENT_DEBUG_HISTORY_SIZE = 10 * 1000000;
 
@@ -535,7 +540,14 @@ void BCLog::Logger::ShrinkDebugFile()
         // Restart the file with some of the end
         std::vector<char> vch(RECENT_DEBUG_HISTORY_SIZE, 0);
         if (fseek(file, -((long)vch.size()), SEEK_END)) {
-            LogWarning("Failed to shrink debug log file: fseek(...) failed");
+            // LogWarning, except with m_cs held
+            LogPrint_({
+                .category = BCLog::ALL,
+                .level = Level::Warning,
+                .should_ratelimit = true,
+                .source_loc = SourceLocation{__func__},
+                .message = "Failed to shrink debug log file: fseek(...) failed",
+            });
             fclose(file);
             return;
         }
@@ -563,8 +575,7 @@ void BCLog::LogRateLimiter::Reset()
     }
     for (const auto& [source_loc, stats] : source_locations) {
         if (stats.m_dropped_bytes == 0) continue;
-        LogPrintLevel_(
-            LogFlags::ALL, Level::Warning, /*should_ratelimit=*/false,
+        LogWarning(util::log::NO_RATE_LIMIT,
             "Restarting logging from %s:%d (%s): %d bytes were dropped during the last %ss.",
             source_loc.file_name(), source_loc.line(), source_loc.function_name_short(),
             stats.m_dropped_bytes, Ticks<std::chrono::seconds>(m_reset_window));
@@ -598,15 +609,21 @@ bool BCLog::Logger::SetCategoryLogLevel(std::string_view category_str, std::stri
 
     const auto level = GetLogLevel(level_str);
     if (!level.has_value() || level.value() > MAX_USER_SETABLE_SEVERITY_LEVEL) return false;
+    if (*flag == BCLog::NONE) return true;
 
     STDLOCK(m_cs);
     m_category_log_levels[*flag] = level.value();
     return true;
 }
 
-bool util::log::ShouldLog(Category category, Level level)
+bool util::log::ShouldDebugLog(Category category)
 {
-    return LogInstance().WillLogCategoryLevel(static_cast<BCLog::LogFlags>(category), level);
+    return LogInstance().WillLogCategoryLevel(static_cast<BCLog::LogFlags>(category), util::log::Level::Debug);
+}
+
+bool util::log::ShouldTraceLog(Category category)
+{
+    return LogInstance().WillLogCategoryLevel(static_cast<BCLog::LogFlags>(category), util::log::Level::Trace);
 }
 
 void util::log::Log(util::log::Entry entry)

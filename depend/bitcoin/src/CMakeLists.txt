@@ -37,9 +37,15 @@ if(NOT CMAKE_ARCHIVE_OUTPUT_DIRECTORY)
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
 endif()
 
+set(IS_SOURCE_TARBALL FALSE)
+# git will expand the next line to "set(IS_SOURCE_TARBALL TRUE)" inside archives:
+#$Format:%nset(IS_SOURCE_TARBALL TRUE)$
+if(NOT IS_SOURCE_TARBALL AND PROJECT_IS_TOP_LEVEL)
+  find_package(Git QUIET)
+endif()
 add_custom_target(generate_build_info
   BYPRODUCTS ${PROJECT_BINARY_DIR}/src/bitcoin-build-info.h
-  COMMAND ${CMAKE_COMMAND} -DBUILD_INFO_HEADER_PATH=${PROJECT_BINARY_DIR}/src/bitcoin-build-info.h -DSOURCE_DIR=${PROJECT_SOURCE_DIR} -P ${PROJECT_SOURCE_DIR}/cmake/script/GenerateBuildInfo.cmake
+  COMMAND ${CMAKE_COMMAND} -DGIT_EXECUTABLE=${GIT_EXECUTABLE} -DBUILD_INFO_HEADER_PATH=${PROJECT_BINARY_DIR}/src/bitcoin-build-info.h -DSOURCE_DIR=${PROJECT_SOURCE_DIR} -P ${PROJECT_SOURCE_DIR}/cmake/script/GenerateBuildInfo.cmake
   COMMENT "Generating bitcoin-build-info.h"
   VERBATIM
 )
@@ -158,10 +164,10 @@ if(ENABLE_WALLET)
   if(BUILD_WALLET_TOOL)
     add_executable(bitcoin-wallet
       bitcoin-wallet.cpp
+      bitcoin-wallet-res.rc
       init/bitcoin-wallet.cpp
       wallet/wallettool.cpp
     )
-    add_windows_resources(bitcoin-wallet bitcoin-wallet-res.rc)
     add_windows_application_manifest(bitcoin-wallet)
     target_link_libraries(bitcoin-wallet
       core_interface
@@ -226,6 +232,7 @@ add_library(bitcoin_node STATIC EXCLUDE_FROM_ALL
   node/mempool_persist.cpp
   node/mempool_persist_args.cpp
   node/miner.cpp
+  node/mining_args.cpp
   node/mini_miner.cpp
   node/minisketchwrapper.cpp
   node/peerman_args.cpp
@@ -282,10 +289,7 @@ target_link_libraries(bitcoin_node
     leveldb
     minisketch
     univalue
-    Boost::headers
-    $<TARGET_NAME_IF_EXISTS:libevent::core>
-    $<TARGET_NAME_IF_EXISTS:libevent::extra>
-    $<TARGET_NAME_IF_EXISTS:libevent::pthreads>
+    $<TARGET_NAME_IF_EXISTS:Boost::headers>
     $<TARGET_NAME_IF_EXISTS:USDT::headers>
 )
 if(WITH_EMBEDDED_ASMAP)
@@ -298,8 +302,10 @@ endif()
 
 # Bitcoin wrapper executable that can call other executables.
 if(BUILD_BITCOIN_BIN)
-  add_executable(bitcoin bitcoin.cpp)
-  add_windows_resources(bitcoin bitcoin-res.rc)
+  add_executable(bitcoin
+    bitcoin.cpp
+    bitcoin-res.rc
+  )
   add_windows_application_manifest(bitcoin)
   target_link_libraries(bitcoin core_interface bitcoin_common bitcoin_util)
   install_binary_component(bitcoin HAS_MANPAGE)
@@ -309,9 +315,9 @@ endif()
 if(BUILD_DAEMON)
   add_executable(bitcoind
     bitcoind.cpp
+    bitcoind-res.rc
     init/bitcoind.cpp
   )
-  add_windows_resources(bitcoind bitcoind-res.rc)
   add_windows_application_manifest(bitcoind)
   target_link_libraries(bitcoind
     core_interface
@@ -348,8 +354,11 @@ target_link_libraries(bitcoin_cli
 
 # Bitcoin Core RPC client
 if(BUILD_CLI)
-  add_executable(bitcoin-cli bitcoin-cli.cpp init/basic.cpp)
-  add_windows_resources(bitcoin-cli bitcoin-cli-res.rc)
+  add_executable(bitcoin-cli
+    bitcoin-cli.cpp
+    bitcoin-cli-res.rc
+    init/basic.cpp
+  )
   add_windows_application_manifest(bitcoin-cli)
   target_link_libraries(bitcoin-cli
     core_interface
@@ -357,16 +366,16 @@ if(BUILD_CLI)
     bitcoin_common
     bitcoin_ipc
     bitcoin_util
-    libevent::core
-    libevent::extra
   )
   install_binary_component(bitcoin-cli HAS_MANPAGE)
 endif()
 
 
 if(BUILD_TX)
-  add_executable(bitcoin-tx bitcoin-tx.cpp)
-  add_windows_resources(bitcoin-tx bitcoin-tx-res.rc)
+  add_executable(bitcoin-tx
+    bitcoin-tx.cpp
+    bitcoin-tx-res.rc
+  )
   add_windows_application_manifest(bitcoin-tx)
   target_link_libraries(bitcoin-tx
     core_interface
@@ -379,13 +388,16 @@ endif()
 
 
 if(BUILD_UTIL)
-  add_executable(bitcoin-util bitcoin-util.cpp)
-  add_windows_resources(bitcoin-util bitcoin-util-res.rc)
+  add_executable(bitcoin-util
+    bitcoin-util.cpp
+    bitcoin-util-res.rc
+  )
   add_windows_application_manifest(bitcoin-util)
   target_link_libraries(bitcoin-util
     core_interface
     bitcoin_common
     bitcoin_util
+    univalue
   )
   install_binary_component(bitcoin-util HAS_MANPAGE)
 endif()
