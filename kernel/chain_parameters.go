@@ -5,6 +5,7 @@ package kernel
 */
 import "C"
 import (
+	"runtime"
 	"unsafe"
 )
 
@@ -46,7 +47,9 @@ func NewChainParameters(chainType ChainType) (*ChainParameters, error) {
 
 // Copy creates a copy of the chain parameters.
 func (cp *ChainParameters) Copy() *ChainParameters {
-	return newChainParameters((*C.btck_ChainParameters)(cp.ptr), false)
+	params := newChainParameters((*C.btck_ChainParameters)(cp.ptr), false)
+	runtime.KeepAlive(cp)
+	return params
 }
 
 type ChainType C.btck_ChainType

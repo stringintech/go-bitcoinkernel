@@ -6,6 +6,7 @@ package kernel
 import "C"
 import (
 	"iter"
+	"runtime"
 	"unsafe"
 )
 
@@ -81,12 +82,16 @@ var _ TransactionSpentOutputsLike = (*TransactionSpentOutputsView)(nil)
 
 // Copy creates a copy of the transaction spent outputs.
 func (t *transactionSpentOutputsApi) Copy() *TransactionSpentOutputs {
-	return newTransactionSpentOutputs(t.ptr(), false)
+	spentOutputs := newTransactionSpentOutputs(t.ptr(), false)
+	runtime.KeepAlive(t)
+	return spentOutputs
 }
 
 // Count returns the number of previous transaction outputs contained in the transaction spent outputs data.
 func (t *transactionSpentOutputsApi) Count() uint64 {
-	return uint64(C.btck_transaction_spent_outputs_count(t.ptr()))
+	count := uint64(C.btck_transaction_spent_outputs_count(t.ptr()))
+	runtime.KeepAlive(t)
+	return count
 }
 
 // GetCoinAt returns a coin contained in the transaction spent outputs at a
@@ -102,6 +107,7 @@ func (t *transactionSpentOutputsApi) GetCoinAt(index uint64) (*CoinView, error) 
 		return nil, ErrKernelIndexOutOfBounds
 	}
 	ptr := C.btck_transaction_spent_outputs_get_coin_at(t.ptr(), C.size_t(index))
+	runtime.KeepAlive(t)
 	return newCoinView(check(ptr), t.owner), nil
 }
 

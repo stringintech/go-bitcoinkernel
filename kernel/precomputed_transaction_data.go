@@ -5,6 +5,7 @@ package kernel
 */
 import "C"
 import (
+	"runtime"
 	"unsafe"
 )
 
@@ -57,6 +58,8 @@ func NewPrecomputedTransactionData(txTo TransactionLike, spentOutputs []Transact
 		cSpentOutputsPtr,
 		C.size_t(len(spentOutputs)),
 	)
+	runtime.KeepAlive(txTo)
+	runtime.KeepAlive(spentOutputs)
 	if ptr == nil {
 		return nil, &InternalError{"Failed to create precomputed transaction data"}
 	}
@@ -65,5 +68,7 @@ func NewPrecomputedTransactionData(txTo TransactionLike, spentOutputs []Transact
 
 // Copy creates a copy of the precomputed transaction data.
 func (p *PrecomputedTransactionData) Copy() *PrecomputedTransactionData {
-	return newPrecomputedTransactionData((*C.btck_PrecomputedTransactionData)(p.ptr), false)
+	data := newPrecomputedTransactionData((*C.btck_PrecomputedTransactionData)(p.ptr), false)
+	runtime.KeepAlive(p)
+	return data
 }

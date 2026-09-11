@@ -5,6 +5,7 @@ package kernel
 */
 import "C"
 import (
+	"runtime"
 	"unsafe"
 )
 
@@ -75,16 +76,21 @@ var _ TransactionOutPointLike = (*TransactionOutPointView)(nil)
 
 // Copy creates a copy of the transaction out point.
 func (t *transactionOutPointApi) Copy() *TransactionOutPoint {
-	return newTransactionOutPoint(t.ptr(), false)
+	outPoint := newTransactionOutPoint(t.ptr(), false)
+	runtime.KeepAlive(t)
+	return outPoint
 }
 
 // GetIndex returns the output position from the transaction out point.
 func (t *transactionOutPointApi) GetIndex() uint32 {
-	return uint32(C.btck_transaction_out_point_get_index(t.ptr()))
+	index := uint32(C.btck_transaction_out_point_get_index(t.ptr()))
+	runtime.KeepAlive(t)
+	return index
 }
 
 // GetTxid returns the txid from the out point.
 func (t *transactionOutPointApi) GetTxid() *TxidView {
 	ptr := C.btck_transaction_out_point_get_txid(t.ptr())
+	runtime.KeepAlive(t)
 	return newTxidView(check(ptr), t.owner)
 }

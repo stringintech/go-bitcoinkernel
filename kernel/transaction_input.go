@@ -5,6 +5,7 @@ package kernel
 */
 import "C"
 import (
+	"runtime"
 	"unsafe"
 )
 
@@ -75,16 +76,21 @@ var _ TransactionInputLike = (*TransactionInputView)(nil)
 
 // Copy creates a copy of the transaction input.
 func (t *transactionInputApi) Copy() *TransactionInput {
-	return newTransactionInput(t.ptr(), false)
+	input := newTransactionInput(t.ptr(), false)
+	runtime.KeepAlive(t)
+	return input
 }
 
 // GetOutPoint returns the transaction out point.
 func (t *transactionInputApi) GetOutPoint() *TransactionOutPointView {
 	ptr := C.btck_transaction_input_get_out_point(t.ptr())
+	runtime.KeepAlive(t)
 	return newTransactionOutPointView(check(ptr), t.owner)
 }
 
 // GetSequence returns the transaction input's nSequence value.
 func (t *transactionInputApi) GetSequence() uint32 {
-	return uint32(C.btck_transaction_input_get_sequence(t.ptr()))
+	sequence := uint32(C.btck_transaction_input_get_sequence(t.ptr()))
+	runtime.KeepAlive(t)
+	return sequence
 }

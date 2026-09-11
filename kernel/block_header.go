@@ -4,7 +4,10 @@ package kernel
 #include "bitcoinkernel.h"
 */
 import "C"
-import "unsafe"
+import (
+	"runtime"
+	"unsafe"
+)
 
 type blockHeaderCFuncs struct{}
 
@@ -54,38 +57,51 @@ func NewBlockHeader(rawHeader *[80]byte) (*BlockHeader, error) {
 
 // Copy creates a copy of the block header.
 func (bh *BlockHeader) Copy() *BlockHeader {
-	return newBlockHeader((*C.btck_BlockHeader)(bh.ptr), false)
+	header := newBlockHeader((*C.btck_BlockHeader)(bh.ptr), false)
+	runtime.KeepAlive(bh)
+	return header
 }
 
 // Hash calculates and returns the hash of this block header.
 func (bh *BlockHeader) Hash() *BlockHash {
-	return newBlockHash(C.btck_block_header_get_hash((*C.btck_BlockHeader)(bh.ptr)), true)
+	hash := newBlockHash(C.btck_block_header_get_hash((*C.btck_BlockHeader)(bh.ptr)), true)
+	runtime.KeepAlive(bh)
+	return hash
 }
 
 // PrevHash returns the hash of the previous block in the chain.
 func (bh *BlockHeader) PrevHash() *BlockHashView {
 	ptr := C.btck_block_header_get_prev_hash((*C.btck_BlockHeader)(bh.ptr))
+	runtime.KeepAlive(bh)
 	return newBlockHashView(check(ptr), bh.handle)
 }
 
 // Timestamp returns the block timestamp.
 func (bh *BlockHeader) Timestamp() uint32 {
-	return uint32(C.btck_block_header_get_timestamp((*C.btck_BlockHeader)(bh.ptr)))
+	timestamp := uint32(C.btck_block_header_get_timestamp((*C.btck_BlockHeader)(bh.ptr)))
+	runtime.KeepAlive(bh)
+	return timestamp
 }
 
 // Bits returns the nBits difficulty target.
 func (bh *BlockHeader) Bits() uint32 {
-	return uint32(C.btck_block_header_get_bits((*C.btck_BlockHeader)(bh.ptr)))
+	bits := uint32(C.btck_block_header_get_bits((*C.btck_BlockHeader)(bh.ptr)))
+	runtime.KeepAlive(bh)
+	return bits
 }
 
 // Version returns the block version.
 func (bh *BlockHeader) Version() int32 {
-	return int32(C.btck_block_header_get_version((*C.btck_BlockHeader)(bh.ptr)))
+	version := int32(C.btck_block_header_get_version((*C.btck_BlockHeader)(bh.ptr)))
+	runtime.KeepAlive(bh)
+	return version
 }
 
 // Nonce returns the nonce.
 func (bh *BlockHeader) Nonce() uint32 {
-	return uint32(C.btck_block_header_get_nonce((*C.btck_BlockHeader)(bh.ptr)))
+	nonce := uint32(C.btck_block_header_get_nonce((*C.btck_BlockHeader)(bh.ptr)))
+	runtime.KeepAlive(bh)
+	return nonce
 }
 
 // Bytes returns the consensus serialized representation of the block header.
@@ -93,10 +109,12 @@ func (bh *BlockHeader) Nonce() uint32 {
 // Returns an error if the serialization fails.
 func (bh *BlockHeader) Bytes() ([80]byte, error) {
 	var buf [80]byte
-	if C.btck_block_header_to_bytes(
+	result := C.btck_block_header_to_bytes(
 		(*C.btck_BlockHeader)(bh.ptr),
 		(*C.uchar)(unsafe.Pointer(&buf[0])),
-	) != 0 {
+	)
+	runtime.KeepAlive(bh)
+	if result != 0 {
 		return [80]byte{}, &SerializationError{"Failed to serialize block header"}
 	}
 	return buf, nil

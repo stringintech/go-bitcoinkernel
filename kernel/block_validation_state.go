@@ -4,7 +4,10 @@ package kernel
 #include "bitcoinkernel.h"
 */
 import "C"
-import "unsafe"
+import (
+	"runtime"
+	"unsafe"
+)
 
 type blockValidationStateCFuncs struct{}
 
@@ -84,7 +87,9 @@ var _ BlockValidationStateLike = (*BlockValidationStateView)(nil)
 
 // Copy creates a copy of the block validation state.
 func (s *blockValidationStateApi) Copy() *BlockValidationState {
-	return newBlockValidationState(s.ptr(), false)
+	state := newBlockValidationState(s.ptr(), false)
+	runtime.KeepAlive(s)
+	return state
 }
 
 // ValidationMode returns whether the block is valid, invalid, or encountered an error.
@@ -95,6 +100,7 @@ func (s *blockValidationStateApi) Copy() *BlockValidationState {
 //   - ValidationStateError: Internal error during validation
 func (s *blockValidationStateApi) ValidationMode() ValidationMode {
 	mode := C.btck_block_validation_state_get_validation_mode(s.ptr())
+	runtime.KeepAlive(s)
 	return ValidationMode(mode)
 }
 
@@ -104,6 +110,7 @@ func (s *blockValidationStateApi) ValidationMode() ValidationMode {
 // consensus violations, invalid headers, or missing previous blocks.
 func (s *blockValidationStateApi) ValidationResult() BlockValidationResult {
 	result := C.btck_block_validation_state_get_block_validation_result(s.ptr())
+	runtime.KeepAlive(s)
 	return BlockValidationResult(result)
 }
 

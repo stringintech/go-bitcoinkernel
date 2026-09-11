@@ -4,6 +4,7 @@ package kernel
 #include "bitcoinkernel.h"
 */
 import "C"
+import "runtime"
 
 // BlockTreeEntry represents a pointer to an element in the block index currently
 // in memory of the chainstate manager.
@@ -20,12 +21,15 @@ type BlockTreeEntry struct {
 
 // Height returns the height of this block in the block tree.
 func (bi *BlockTreeEntry) Height() int32 {
-	return int32(C.btck_block_tree_entry_get_height(bi.ptr))
+	height := int32(C.btck_block_tree_entry_get_height(bi.ptr))
+	runtime.KeepAlive(bi)
+	return height
 }
 
 // Hash returns the block hash associated with this block tree entry.
 func (bi *BlockTreeEntry) Hash() *BlockHashView {
 	ptr := C.btck_block_tree_entry_get_block_hash(bi.ptr)
+	runtime.KeepAlive(bi)
 	return newBlockHashView(check(ptr), bi.owner)
 }
 
@@ -35,6 +39,7 @@ func (bi *BlockTreeEntry) Hash() *BlockHashView {
 // pointer valid for the lifetime of the chainstate manager.
 func (bi *BlockTreeEntry) Previous() *BlockTreeEntry {
 	ptr := C.btck_block_tree_entry_get_previous(bi.ptr)
+	runtime.KeepAlive(bi)
 	if ptr == nil {
 		return nil
 	}
@@ -48,7 +53,10 @@ func (bi *BlockTreeEntry) Equals(other *BlockTreeEntry) bool {
 	if other == nil {
 		return false
 	}
-	return C.btck_block_tree_entry_equals(bi.ptr, other.ptr) != 0
+	equal := C.btck_block_tree_entry_equals(bi.ptr, other.ptr) != 0
+	runtime.KeepAlive(bi)
+	runtime.KeepAlive(other)
+	return equal
 }
 
 // Ancestor returns the ancestor block tree entry at the given height.
@@ -59,10 +67,13 @@ func (bi *BlockTreeEntry) Ancestor(height int32) *BlockTreeEntry {
 		return nil
 	}
 	ptr := C.btck_block_tree_entry_get_ancestor(bi.ptr, C.int32_t(height))
+	runtime.KeepAlive(bi)
 	return &BlockTreeEntry{ptr: check(ptr), owner: bi.owner}
 }
 
 // GetHeader returns the block header associated with this block tree entry.
 func (bi *BlockTreeEntry) GetHeader() *BlockHeader {
-	return newBlockHeader(C.btck_block_tree_entry_get_block_header(bi.ptr), true)
+	header := newBlockHeader(C.btck_block_tree_entry_get_block_header(bi.ptr), true)
+	runtime.KeepAlive(bi)
+	return header
 }

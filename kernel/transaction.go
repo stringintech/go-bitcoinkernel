@@ -6,6 +6,7 @@ package kernel
 import "C"
 import (
 	"iter"
+	"runtime"
 	"unsafe"
 )
 
@@ -102,7 +103,9 @@ var _ TransactionLike = (*TransactionView)(nil)
 // Transactions are reference-counted internally, so this operation is efficient and does
 // not duplicate the underlying data.
 func (t *transactionApi) Copy() *Transaction {
-	return newTransaction(t.ptr(), false)
+	tx := newTransaction(t.ptr(), false)
+	runtime.KeepAlive(t)
+	return tx
 }
 
 // Bytes returns the consensus serialized representation of the transaction.
@@ -112,6 +115,7 @@ func (t *transactionApi) Bytes() ([]byte, error) {
 	bytes, ok := writeToBytes(func(writer C.btck_WriteBytes, userData unsafe.Pointer) C.int {
 		return C.btck_transaction_to_bytes(t.ptr(), writer, userData)
 	})
+	runtime.KeepAlive(t)
 	if !ok {
 		return nil, &SerializationError{"Failed to serialize transaction"}
 	}
@@ -120,18 +124,23 @@ func (t *transactionApi) Bytes() ([]byte, error) {
 
 // GetLockTime returns the transaction's nLockTime value.
 func (t *transactionApi) GetLockTime() uint32 {
-	return uint32(C.btck_transaction_get_locktime(t.ptr()))
+	lockTime := uint32(C.btck_transaction_get_locktime(t.ptr()))
+	runtime.KeepAlive(t)
+	return lockTime
 }
 
 // GetTxid returns the txid for this transaction.
 func (t *transactionApi) GetTxid() *TxidView {
 	ptr := C.btck_transaction_get_txid(t.ptr())
+	runtime.KeepAlive(t)
 	return newTxidView(check(ptr), t.owner)
 }
 
 // CountInputs returns the number of inputs in the transaction.
 func (t *transactionApi) CountInputs() uint64 {
-	return uint64(C.btck_transaction_count_inputs(t.ptr()))
+	count := uint64(C.btck_transaction_count_inputs(t.ptr()))
+	runtime.KeepAlive(t)
+	return count
 }
 
 // GetInput retrieves the input at the specified index.
@@ -147,6 +156,7 @@ func (t *transactionApi) GetInput(index uint64) (*TransactionInputView, error) {
 		return nil, ErrKernelIndexOutOfBounds
 	}
 	ptr := C.btck_transaction_get_input_at(t.ptr(), C.size_t(index))
+	runtime.KeepAlive(t)
 	return newTransactionInputView(check(ptr), t.owner), nil
 }
 
@@ -223,7 +233,9 @@ func (t *transactionApi) iterInputs(from, to uint64, yield func(*TransactionInpu
 
 // CountOutputs returns the number of outputs in the transaction.
 func (t *transactionApi) CountOutputs() uint64 {
-	return uint64(C.btck_transaction_count_outputs(t.ptr()))
+	count := uint64(C.btck_transaction_count_outputs(t.ptr()))
+	runtime.KeepAlive(t)
+	return count
 }
 
 // GetOutput retrieves the output at the specified index.
@@ -239,6 +251,7 @@ func (t *transactionApi) GetOutput(index uint64) (*TransactionOutputView, error)
 		return nil, ErrKernelIndexOutOfBounds
 	}
 	ptr := C.btck_transaction_get_output_at(t.ptr(), C.size_t(index))
+	runtime.KeepAlive(t)
 	return newTransactionOutputView(check(ptr), t.owner), nil
 }
 

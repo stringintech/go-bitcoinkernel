@@ -5,6 +5,7 @@ package kernel
 */
 import "C"
 import (
+	"runtime"
 	"unsafe"
 )
 
@@ -84,7 +85,9 @@ var _ ScriptPubkeyLike = (*ScriptPubkeyView)(nil)
 
 // Copy creates a copy of the script pubkey.
 func (s *scriptPubkeyApi) Copy() *ScriptPubkey {
-	return newScriptPubkey(s.ptr(), false)
+	script := newScriptPubkey(s.ptr(), false)
+	runtime.KeepAlive(s)
+	return script
 }
 
 // Bytes returns the serialized representation of the script pubkey.
@@ -94,6 +97,7 @@ func (s *scriptPubkeyApi) Bytes() ([]byte, error) {
 	bytes, ok := writeToBytes(func(writer C.btck_WriteBytes, user_data unsafe.Pointer) C.int {
 		return C.btck_script_pubkey_to_bytes(s.ptr(), writer, user_data)
 	})
+	runtime.KeepAlive(s)
 	if !ok {
 		return nil, &SerializationError{"Failed to serialize script pubkey"}
 	}
@@ -142,6 +146,9 @@ func (s *scriptPubkeyApi) Verify(amount int64, txTo TransactionLike, precomputed
 		C.btck_ScriptVerificationFlags(flags),
 		&cStatus,
 	)
+	runtime.KeepAlive(s)
+	runtime.KeepAlive(txTo)
+	runtime.KeepAlive(precomputedTxData)
 
 	// Check for errors that prevented verification
 	if cStatus == C.btck_ScriptVerifyStatus_ERROR_INVALID_FLAGS_COMBINATION {
