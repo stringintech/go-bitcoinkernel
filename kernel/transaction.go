@@ -32,6 +32,7 @@ func newTransaction(ptr *C.btck_Transaction, fromOwned bool) *Transaction {
 			ptr: func() *C.btck_Transaction {
 				return (*C.btck_Transaction)(h.ptr)
 			},
+			owner: h,
 		},
 	}
 }
@@ -54,18 +55,20 @@ type TransactionView struct {
 	transactionApi
 }
 
-func newTransactionView(ptr *C.btck_Transaction) *TransactionView {
+func newTransactionView(ptr *C.btck_Transaction, owner cResourceHandle) *TransactionView {
 	return &TransactionView{
 		transactionApi: transactionApi{
 			ptr: func() *C.btck_Transaction {
 				return ptr
 			},
+			owner: owner,
 		},
 	}
 }
 
 type transactionApi struct {
-	ptr func() *C.btck_Transaction
+	ptr   func() *C.btck_Transaction
+	owner cResourceHandle
 }
 
 func (t *transactionApi) cPtr() *C.btck_Transaction {
@@ -123,7 +126,7 @@ func (t *transactionApi) GetLockTime() uint32 {
 // GetTxid returns the txid for this transaction.
 func (t *transactionApi) GetTxid() *TxidView {
 	ptr := C.btck_transaction_get_txid(t.ptr())
-	return newTxidView(check(ptr))
+	return newTxidView(check(ptr), t.owner)
 }
 
 // CountInputs returns the number of inputs in the transaction.
@@ -144,7 +147,7 @@ func (t *transactionApi) GetInput(index uint64) (*TransactionInputView, error) {
 		return nil, ErrKernelIndexOutOfBounds
 	}
 	ptr := C.btck_transaction_get_input_at(t.ptr(), C.size_t(index))
-	return newTransactionInputView(check(ptr)), nil
+	return newTransactionInputView(check(ptr), t.owner), nil
 }
 
 // Inputs returns an iterator over all inputs in the transaction.
@@ -236,7 +239,7 @@ func (t *transactionApi) GetOutput(index uint64) (*TransactionOutputView, error)
 		return nil, ErrKernelIndexOutOfBounds
 	}
 	ptr := C.btck_transaction_get_output_at(t.ptr(), C.size_t(index))
-	return newTransactionOutputView(check(ptr)), nil
+	return newTransactionOutputView(check(ptr), t.owner), nil
 }
 
 // Outputs returns an iterator over all outputs in the transaction.

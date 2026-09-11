@@ -22,7 +22,7 @@ type ValidationInterfaceCallbacks struct {
 func go_validation_interface_block_checked_bridge(user_data unsafe.Pointer, block *C.btck_Block, state *C.btck_BlockValidationState) {
 	callbacks := cgoHandleFromPointer(user_data).Value().(*ValidationInterfaceCallbacks)
 	if callbacks.OnBlockChecked != nil {
-		callbacks.OnBlockChecked(newBlock(block, true), newBlockValidationStateView(state))
+		callbacks.OnBlockChecked(newBlock(block, true), newBlockValidationStateView(state, nil))
 	}
 }
 

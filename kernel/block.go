@@ -91,7 +91,7 @@ func (b *Block) GetTransactionAt(index uint64) (*TransactionView, error) {
 		return nil, ErrKernelIndexOutOfBounds
 	}
 	ptr := C.btck_block_get_transaction_at((*C.btck_Block)(b.ptr), C.size_t(index))
-	return newTransactionView(check(ptr)), nil
+	return newTransactionView(check(ptr), b.handle), nil
 }
 
 // Transactions returns an iterator over all transactions in the block.

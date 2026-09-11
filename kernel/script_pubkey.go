@@ -31,6 +31,7 @@ func newScriptPubkey(ptr *C.btck_ScriptPubkey, fromOwned bool) *ScriptPubkey {
 			ptr: func() *C.btck_ScriptPubkey {
 				return (*C.btck_ScriptPubkey)(h.ptr)
 			},
+			owner: h,
 		},
 	}
 }
@@ -50,18 +51,20 @@ type ScriptPubkeyView struct {
 	scriptPubkeyApi
 }
 
-func newScriptPubkeyView(ptr *C.btck_ScriptPubkey) *ScriptPubkeyView {
+func newScriptPubkeyView(ptr *C.btck_ScriptPubkey, owner cResourceHandle) *ScriptPubkeyView {
 	return &ScriptPubkeyView{
 		scriptPubkeyApi: scriptPubkeyApi{
 			ptr: func() *C.btck_ScriptPubkey {
 				return ptr
 			},
+			owner: owner,
 		},
 	}
 }
 
 type scriptPubkeyApi struct {
-	ptr func() *C.btck_ScriptPubkey
+	ptr   func() *C.btck_ScriptPubkey
+	owner cResourceHandle
 }
 
 func (s *scriptPubkeyApi) cPtr() *C.btck_ScriptPubkey {

@@ -14,7 +14,8 @@ import "C"
 // a parent, thus forming a tree. Each entry corresponds to a single block and may
 // be used to retrieve its data and validation status.
 type BlockTreeEntry struct {
-	ptr *C.btck_BlockTreeEntry
+	ptr   *C.btck_BlockTreeEntry
+	owner cResourceHandle
 }
 
 // Height returns the height of this block in the block tree.
@@ -25,7 +26,7 @@ func (bi *BlockTreeEntry) Height() int32 {
 // Hash returns the block hash associated with this block tree entry.
 func (bi *BlockTreeEntry) Hash() *BlockHashView {
 	ptr := C.btck_block_tree_entry_get_block_hash(bi.ptr)
-	return newBlockHashView(check(ptr))
+	return newBlockHashView(check(ptr), bi.owner)
 }
 
 // Previous returns the previous block tree entry in the chain.
@@ -37,7 +38,7 @@ func (bi *BlockTreeEntry) Previous() *BlockTreeEntry {
 	if ptr == nil {
 		return nil
 	}
-	prevIndex := &BlockTreeEntry{ptr: ptr}
+	prevIndex := &BlockTreeEntry{ptr: ptr, owner: bi.owner}
 	return prevIndex
 }
 
@@ -58,7 +59,7 @@ func (bi *BlockTreeEntry) Ancestor(height int32) *BlockTreeEntry {
 		return nil
 	}
 	ptr := C.btck_block_tree_entry_get_ancestor(bi.ptr, C.int32_t(height))
-	return &BlockTreeEntry{ptr: check(ptr)}
+	return &BlockTreeEntry{ptr: check(ptr), owner: bi.owner}
 }
 
 // GetHeader returns the block header associated with this block tree entry.

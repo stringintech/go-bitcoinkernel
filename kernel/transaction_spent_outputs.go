@@ -36,6 +36,7 @@ func newTransactionSpentOutputs(ptr *C.btck_TransactionSpentOutputs, fromOwned b
 			ptr: func() *C.btck_TransactionSpentOutputs {
 				return (*C.btck_TransactionSpentOutputs)(h.ptr)
 			},
+			owner: h,
 		},
 	}
 }
@@ -44,18 +45,20 @@ type TransactionSpentOutputsView struct {
 	transactionSpentOutputsApi
 }
 
-func newTransactionSpentOutputsView(ptr *C.btck_TransactionSpentOutputs) *TransactionSpentOutputsView {
+func newTransactionSpentOutputsView(ptr *C.btck_TransactionSpentOutputs, owner cResourceHandle) *TransactionSpentOutputsView {
 	return &TransactionSpentOutputsView{
 		transactionSpentOutputsApi: transactionSpentOutputsApi{
 			ptr: func() *C.btck_TransactionSpentOutputs {
 				return ptr
 			},
+			owner: owner,
 		},
 	}
 }
 
 type transactionSpentOutputsApi struct {
-	ptr func() *C.btck_TransactionSpentOutputs
+	ptr   func() *C.btck_TransactionSpentOutputs
+	owner cResourceHandle
 }
 
 func (t *transactionSpentOutputsApi) cPtr() *C.btck_TransactionSpentOutputs {
@@ -99,7 +102,7 @@ func (t *transactionSpentOutputsApi) GetCoinAt(index uint64) (*CoinView, error) 
 		return nil, ErrKernelIndexOutOfBounds
 	}
 	ptr := C.btck_transaction_spent_outputs_get_coin_at(t.ptr(), C.size_t(index))
-	return newCoinView(check(ptr)), nil
+	return newCoinView(check(ptr), t.owner), nil
 }
 
 // Coins returns an iterator over all coins in the transaction spent outputs.

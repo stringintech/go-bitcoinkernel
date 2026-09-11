@@ -65,7 +65,7 @@ func (bh *BlockHeader) Hash() *BlockHash {
 // PrevHash returns the hash of the previous block in the chain.
 func (bh *BlockHeader) PrevHash() *BlockHashView {
 	ptr := C.btck_block_header_get_prev_hash((*C.btck_BlockHeader)(bh.ptr))
-	return newBlockHashView(check(ptr))
+	return newBlockHashView(check(ptr), bh.handle)
 }
 
 // Timestamp returns the block timestamp.

@@ -32,6 +32,7 @@ func newTransactionInput(ptr *C.btck_TransactionInput, fromOwned bool) *Transact
 			ptr: func() *C.btck_TransactionInput {
 				return (*C.btck_TransactionInput)(h.ptr)
 			},
+			owner: h,
 		},
 	}
 }
@@ -41,18 +42,20 @@ type TransactionInputView struct {
 	transactionInputApi
 }
 
-func newTransactionInputView(ptr *C.btck_TransactionInput) *TransactionInputView {
+func newTransactionInputView(ptr *C.btck_TransactionInput, owner cResourceHandle) *TransactionInputView {
 	return &TransactionInputView{
 		transactionInputApi: transactionInputApi{
 			ptr: func() *C.btck_TransactionInput {
 				return ptr
 			},
+			owner: owner,
 		},
 	}
 }
 
 type transactionInputApi struct {
-	ptr func() *C.btck_TransactionInput
+	ptr   func() *C.btck_TransactionInput
+	owner cResourceHandle
 }
 
 func (t *transactionInputApi) cPtr() *C.btck_TransactionInput {
@@ -78,7 +81,7 @@ func (t *transactionInputApi) Copy() *TransactionInput {
 // GetOutPoint returns the transaction out point.
 func (t *transactionInputApi) GetOutPoint() *TransactionOutPointView {
 	ptr := C.btck_transaction_input_get_out_point(t.ptr())
-	return newTransactionOutPointView(check(ptr))
+	return newTransactionOutPointView(check(ptr), t.owner)
 }
 
 // GetSequence returns the transaction input's nSequence value.

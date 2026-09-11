@@ -55,7 +55,7 @@ func (bso *BlockSpentOutputs) GetTransactionSpentOutputsAt(index uint64) (*Trans
 		return nil, ErrKernelIndexOutOfBounds
 	}
 	ptr := C.btck_block_spent_outputs_get_transaction_spent_outputs_at((*C.btck_BlockSpentOutputs)(bso.ptr), C.size_t(index))
-	return newTransactionSpentOutputsView(check(ptr)), nil
+	return newTransactionSpentOutputsView(check(ptr), bso.handle), nil
 }
 
 // Copy creates a shallow copy of the block spent outputs by incrementing its reference count.

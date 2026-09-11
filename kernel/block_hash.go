@@ -33,6 +33,7 @@ func newBlockHash(ptr *C.btck_BlockHash, fromOwned bool) *BlockHash {
 			ptr: func() *C.btck_BlockHash {
 				return (*C.btck_BlockHash)(h.ptr)
 			},
+			owner: h,
 		},
 	}
 }
@@ -42,18 +43,20 @@ type BlockHashView struct {
 	blockHashApi
 }
 
-func newBlockHashView(ptr *C.btck_BlockHash) *BlockHashView {
+func newBlockHashView(ptr *C.btck_BlockHash, owner cResourceHandle) *BlockHashView {
 	return &BlockHashView{
 		blockHashApi: blockHashApi{
 			ptr: func() *C.btck_BlockHash {
 				return ptr
 			},
+			owner: owner,
 		},
 	}
 }
 
 type blockHashApi struct {
-	ptr func() *C.btck_BlockHash
+	ptr   func() *C.btck_BlockHash
+	owner cResourceHandle
 }
 
 func (bh *blockHashApi) cPtr() *C.btck_BlockHash {

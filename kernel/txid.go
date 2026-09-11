@@ -32,6 +32,7 @@ func newTxid(ptr *C.btck_Txid, fromOwned bool) *Txid {
 			ptr: func() *C.btck_Txid {
 				return (*C.btck_Txid)(h.ptr)
 			},
+			owner: h,
 		},
 	}
 }
@@ -40,18 +41,20 @@ type TxidView struct {
 	txidApi
 }
 
-func newTxidView(ptr *C.btck_Txid) *TxidView {
+func newTxidView(ptr *C.btck_Txid, owner cResourceHandle) *TxidView {
 	return &TxidView{
 		txidApi: txidApi{
 			ptr: func() *C.btck_Txid {
 				return ptr
 			},
+			owner: owner,
 		},
 	}
 }
 
 type txidApi struct {
-	ptr func() *C.btck_Txid
+	ptr   func() *C.btck_Txid
+	owner cResourceHandle
 }
 
 func (t *txidApi) cPtr() *C.btck_Txid {

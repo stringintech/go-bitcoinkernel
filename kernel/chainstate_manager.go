@@ -169,7 +169,10 @@ func (cm *ChainstateManager) ProcessBlockHeader(header *BlockHeader) (*BlockVali
 // from it is only consistent until new data is processed. It is the caller's responsibility
 // to guard against these inconsistencies.
 func (cm *ChainstateManager) GetActiveChain() *Chain {
-	return &Chain{C.btck_chainstate_manager_get_active_chain((*C.btck_ChainstateManager)(cm.ptr))}
+	return &Chain{
+		ptr:   C.btck_chainstate_manager_get_active_chain((*C.btck_ChainstateManager)(cm.ptr)),
+		owner: cm.uniqueHandle,
+	}
 }
 
 // GetBlockTreeEntryByHash retrieves a block tree entry by its block hash.
@@ -185,7 +188,7 @@ func (cm *ChainstateManager) GetBlockTreeEntryByHash(blockHash BlockHashLike) *B
 	if ptr == nil {
 		return nil
 	}
-	return &BlockTreeEntry{ptr: ptr}
+	return &BlockTreeEntry{ptr: ptr, owner: cm.uniqueHandle}
 }
 
 // ImportBlocks triggers a reindex and/or imports block files from the filesystem.

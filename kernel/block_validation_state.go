@@ -33,6 +33,7 @@ func newBlockValidationState(ptr *C.btck_BlockValidationState, fromOwned bool) *
 			ptr: func() *C.btck_BlockValidationState {
 				return (*C.btck_BlockValidationState)(h.ptr)
 			},
+			owner: h,
 		},
 	}
 }
@@ -50,18 +51,20 @@ type BlockValidationStateView struct {
 	blockValidationStateApi
 }
 
-func newBlockValidationStateView(ptr *C.btck_BlockValidationState) *BlockValidationStateView {
+func newBlockValidationStateView(ptr *C.btck_BlockValidationState, owner cResourceHandle) *BlockValidationStateView {
 	return &BlockValidationStateView{
 		blockValidationStateApi: blockValidationStateApi{
 			ptr: func() *C.btck_BlockValidationState {
 				return ptr
 			},
+			owner: owner,
 		},
 	}
 }
 
 type blockValidationStateApi struct {
-	ptr func() *C.btck_BlockValidationState
+	ptr   func() *C.btck_BlockValidationState
+	owner cResourceHandle
 }
 
 func (s *blockValidationStateApi) cPtr() *C.btck_BlockValidationState {

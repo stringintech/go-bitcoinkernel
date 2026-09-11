@@ -6,21 +6,25 @@ import (
 	"unsafe"
 )
 
-type destroyableFuncs interface {
+type cResourceFuncs interface {
 	destroy(ptr unsafe.Pointer)
 }
 
-type copyableFuncs interface {
-	destroyableFuncs
+type copyableCResourceFuncs interface {
+	cResourceFuncs
 	copy(ptr unsafe.Pointer) unsafe.Pointer
+}
+
+type cResourceHandle interface {
+	destroy()
 }
 
 type uniqueHandle struct {
 	ptr   unsafe.Pointer
-	funcs destroyableFuncs
+	funcs cResourceFuncs
 }
 
-func newUniqueHandle(ptr unsafe.Pointer, funcs destroyableFuncs) *uniqueHandle {
+func newUniqueHandle(ptr unsafe.Pointer, funcs cResourceFuncs) *uniqueHandle {
 	if ptr == nil {
 		panic("ptr must be provided to create handle")
 	}
@@ -49,10 +53,10 @@ func (h *uniqueHandle) Destroy() {
 
 type handle struct {
 	ptr   unsafe.Pointer
-	funcs copyableFuncs
+	funcs copyableCResourceFuncs
 }
 
-func newHandle(ptr unsafe.Pointer, funcs copyableFuncs, fromOwned bool) *handle {
+func newHandle(ptr unsafe.Pointer, funcs copyableCResourceFuncs, fromOwned bool) *handle {
 	if ptr == nil {
 		panic("ptr must be provided to create handle")
 	}

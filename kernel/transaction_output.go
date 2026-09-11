@@ -31,6 +31,7 @@ func newTransactionOutput(ptr *C.btck_TransactionOutput, fromOwned bool) *Transa
 			ptr: func() *C.btck_TransactionOutput {
 				return (*C.btck_TransactionOutput)(h.ptr)
 			},
+			owner: h,
 		},
 	}
 }
@@ -49,18 +50,20 @@ type TransactionOutputView struct {
 	transactionOutputApi
 }
 
-func newTransactionOutputView(ptr *C.btck_TransactionOutput) *TransactionOutputView {
+func newTransactionOutputView(ptr *C.btck_TransactionOutput, owner cResourceHandle) *TransactionOutputView {
 	return &TransactionOutputView{
 		transactionOutputApi: transactionOutputApi{
 			ptr: func() *C.btck_TransactionOutput {
 				return ptr
 			},
+			owner: owner,
 		},
 	}
 }
 
 type transactionOutputApi struct {
-	ptr func() *C.btck_TransactionOutput
+	ptr   func() *C.btck_TransactionOutput
+	owner cResourceHandle
 }
 
 func (t *transactionOutputApi) cPtr() *C.btck_TransactionOutput {
@@ -89,7 +92,7 @@ func (t *transactionOutputApi) Copy() *TransactionOutput {
 // this transaction output.
 func (t *transactionOutputApi) ScriptPubkey() *ScriptPubkeyView {
 	ptr := C.btck_transaction_output_get_script_pubkey(t.ptr())
-	return newScriptPubkeyView(check(ptr))
+	return newScriptPubkeyView(check(ptr), t.owner)
 }
 
 // Amount returns the amount in the output

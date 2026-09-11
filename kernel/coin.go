@@ -33,6 +33,7 @@ func newCoin(ptr *C.btck_Coin, fromOwned bool) *Coin {
 			ptr: func() *C.btck_Coin {
 				return (*C.btck_Coin)(h.ptr)
 			},
+			owner: h,
 		},
 	}
 }
@@ -43,18 +44,20 @@ type CoinView struct {
 	coinApi
 }
 
-func newCoinView(ptr *C.btck_Coin) *CoinView {
+func newCoinView(ptr *C.btck_Coin, owner cResourceHandle) *CoinView {
 	return &CoinView{
 		coinApi: coinApi{
 			ptr: func() *C.btck_Coin {
 				return ptr
 			},
+			owner: owner,
 		},
 	}
 }
 
 type coinApi struct {
-	ptr func() *C.btck_Coin
+	ptr   func() *C.btck_Coin
+	owner cResourceHandle
 }
 
 func (c *coinApi) cPtr() *C.btck_Coin {
@@ -84,7 +87,7 @@ func (c *coinApi) Copy() *Coin {
 // lifetime of this coin.
 func (c *coinApi) GetOutput() *TransactionOutputView {
 	ptr := C.btck_coin_get_output(c.ptr())
-	return newTransactionOutputView(check(ptr))
+	return newTransactionOutputView(check(ptr), c.owner)
 }
 
 // ConfirmationHeight returns the block height where the transaction that created this coin was included in.

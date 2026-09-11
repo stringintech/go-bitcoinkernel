@@ -13,7 +13,8 @@ import "iter"
 // retrieved from this chain is only consistent up to the point when new data
 // is processed in the chainstate manager.
 type Chain struct {
-	ptr *C.btck_Chain
+	ptr   *C.btck_Chain
+	owner cResourceHandle
 }
 
 // GetByHeight retrieves a block tree entry by its height in the currently active chain.
@@ -33,7 +34,7 @@ func (c *Chain) GetByHeight(height int32) *BlockTreeEntry {
 	if ptr == nil {
 		return nil
 	}
-	return &BlockTreeEntry{ptr}
+	return &BlockTreeEntry{ptr: ptr, owner: c.owner}
 }
 
 // Contains checks whether the given block tree entry is part of this chain.

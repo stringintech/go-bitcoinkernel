@@ -32,6 +32,7 @@ func newTransactionOutPoint(ptr *C.btck_TransactionOutPoint, fromOwned bool) *Tr
 			ptr: func() *C.btck_TransactionOutPoint {
 				return (*C.btck_TransactionOutPoint)(h.ptr)
 			},
+			owner: h,
 		},
 	}
 }
@@ -41,18 +42,20 @@ type TransactionOutPointView struct {
 	transactionOutPointApi
 }
 
-func newTransactionOutPointView(ptr *C.btck_TransactionOutPoint) *TransactionOutPointView {
+func newTransactionOutPointView(ptr *C.btck_TransactionOutPoint, owner cResourceHandle) *TransactionOutPointView {
 	return &TransactionOutPointView{
 		transactionOutPointApi: transactionOutPointApi{
 			ptr: func() *C.btck_TransactionOutPoint {
 				return ptr
 			},
+			owner: owner,
 		},
 	}
 }
 
 type transactionOutPointApi struct {
-	ptr func() *C.btck_TransactionOutPoint
+	ptr   func() *C.btck_TransactionOutPoint
+	owner cResourceHandle
 }
 
 func (t *transactionOutPointApi) cPtr() *C.btck_TransactionOutPoint {
@@ -83,5 +86,5 @@ func (t *transactionOutPointApi) GetIndex() uint32 {
 // GetTxid returns the txid from the out point.
 func (t *transactionOutPointApi) GetTxid() *TxidView {
 	ptr := C.btck_transaction_out_point_get_txid(t.ptr())
-	return newTxidView(check(ptr))
+	return newTxidView(check(ptr), t.owner)
 }
