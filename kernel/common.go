@@ -6,21 +6,32 @@ import (
 	"unsafe"
 )
 
-type destroyableFuncs interface {
+type cResourceFuncs interface {
 	destroy(ptr unsafe.Pointer)
 }
 
-type copyableFuncs interface {
-	destroyableFuncs
+type copyableCResourceFuncs interface {
+	cResourceFuncs
 	copy(ptr unsafe.Pointer) unsafe.Pointer
+}
+
+// cResourceHandle is a finalizable handle that frees a C object.
+//
+// API types store one in their owner field. Owned types store their own handle,
+// views store their parent's, so a reachable value keeps its owner reachable.
+// Methods that pass a derived C pointer to C call runtime.KeepAlive on the
+// owning value after the call, since the GC cannot see C's use of the pointer
+// and could otherwise treat the value as unreachable mid-call.
+type cResourceHandle interface {
+	destroy()
 }
 
 type uniqueHandle struct {
 	ptr   unsafe.Pointer
-	funcs destroyableFuncs
+	funcs cResourceFuncs
 }
 
-func newUniqueHandle(ptr unsafe.Pointer, funcs destroyableFuncs) *uniqueHandle {
+func newUniqueHandle(ptr unsafe.Pointer, funcs cResourceFuncs) *uniqueHandle {
 	if ptr == nil {
 		panic("ptr must be provided to create handle")
 	}
@@ -49,10 +60,14 @@ func (h *uniqueHandle) Destroy() {
 
 type handle struct {
 	ptr   unsafe.Pointer
-	funcs copyableFuncs
+	funcs copyableCResourceFuncs
 }
 
-func newHandle(ptr unsafe.Pointer, funcs copyableFuncs, fromOwned bool) *handle {
+// newHandle wraps ptr in a finalizable handle. If fromOwned is true, the handle
+// takes ownership of ptr, which must be a C object nobody else frees. If it is
+// false, ptr is borrowed and newHandle stores a C copy of it. The caller must
+// keep the source of ptr reachable until newHandle returns.
+func newHandle(ptr unsafe.Pointer, funcs copyableCResourceFuncs, fromOwned bool) *handle {
 	if ptr == nil {
 		panic("ptr must be provided to create handle")
 	}

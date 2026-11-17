@@ -5,6 +5,7 @@ package kernel
 */
 import "C"
 import (
+	"runtime"
 	"unsafe"
 )
 
@@ -31,6 +32,7 @@ func newTransactionOutput(ptr *C.btck_TransactionOutput, fromOwned bool) *Transa
 			ptr: func() *C.btck_TransactionOutput {
 				return (*C.btck_TransactionOutput)(h.ptr)
 			},
+			owner: h,
 		},
 	}
 }
@@ -42,6 +44,7 @@ func newTransactionOutput(ptr *C.btck_TransactionOutput, fromOwned bool) *Transa
 //   - amount: The amount associated with the script pubkey for this output
 func NewTransactionOutput(scriptPubkey ScriptPubkeyLike, amount int64) *TransactionOutput {
 	ptr := C.btck_transaction_output_create(scriptPubkey.cPtr(), C.int64_t(amount))
+	runtime.KeepAlive(scriptPubkey)
 	return newTransactionOutput(check(ptr), true)
 }
 
@@ -49,18 +52,20 @@ type TransactionOutputView struct {
 	transactionOutputApi
 }
 
-func newTransactionOutputView(ptr *C.btck_TransactionOutput) *TransactionOutputView {
+func newTransactionOutputView(ptr *C.btck_TransactionOutput, owner cResourceHandle) *TransactionOutputView {
 	return &TransactionOutputView{
 		transactionOutputApi: transactionOutputApi{
 			ptr: func() *C.btck_TransactionOutput {
 				return ptr
 			},
+			owner: owner,
 		},
 	}
 }
 
 type transactionOutputApi struct {
-	ptr func() *C.btck_TransactionOutput
+	ptr   func() *C.btck_TransactionOutput
+	owner cResourceHandle
 }
 
 func (t *transactionOutputApi) cPtr() *C.btck_TransactionOutput {
@@ -80,7 +85,9 @@ var _ TransactionOutputLike = (*TransactionOutputView)(nil)
 
 // Copy creates a copy of the transaction output.
 func (t *transactionOutputApi) Copy() *TransactionOutput {
-	return newTransactionOutput(t.ptr(), false)
+	output := newTransactionOutput(t.ptr(), false)
+	runtime.KeepAlive(t)
+	return output
 }
 
 // ScriptPubkey returns the script pubkey of this output.
@@ -89,10 +96,13 @@ func (t *transactionOutputApi) Copy() *TransactionOutput {
 // this transaction output.
 func (t *transactionOutputApi) ScriptPubkey() *ScriptPubkeyView {
 	ptr := C.btck_transaction_output_get_script_pubkey(t.ptr())
-	return newScriptPubkeyView(check(ptr))
+	runtime.KeepAlive(t)
+	return newScriptPubkeyView(check(ptr), t.owner)
 }
 
 // Amount returns the amount in the output
 func (t *transactionOutputApi) Amount() int64 {
-	return int64(C.btck_transaction_output_get_amount(t.ptr()))
+	amount := int64(C.btck_transaction_output_get_amount(t.ptr()))
+	runtime.KeepAlive(t)
+	return amount
 }

@@ -6,6 +6,7 @@ package kernel
 import "C"
 import (
 	"iter"
+	"runtime"
 	"unsafe"
 )
 
@@ -36,6 +37,7 @@ func newTransactionSpentOutputs(ptr *C.btck_TransactionSpentOutputs, fromOwned b
 			ptr: func() *C.btck_TransactionSpentOutputs {
 				return (*C.btck_TransactionSpentOutputs)(h.ptr)
 			},
+			owner: h,
 		},
 	}
 }
@@ -44,18 +46,20 @@ type TransactionSpentOutputsView struct {
 	transactionSpentOutputsApi
 }
 
-func newTransactionSpentOutputsView(ptr *C.btck_TransactionSpentOutputs) *TransactionSpentOutputsView {
+func newTransactionSpentOutputsView(ptr *C.btck_TransactionSpentOutputs, owner cResourceHandle) *TransactionSpentOutputsView {
 	return &TransactionSpentOutputsView{
 		transactionSpentOutputsApi: transactionSpentOutputsApi{
 			ptr: func() *C.btck_TransactionSpentOutputs {
 				return ptr
 			},
+			owner: owner,
 		},
 	}
 }
 
 type transactionSpentOutputsApi struct {
-	ptr func() *C.btck_TransactionSpentOutputs
+	ptr   func() *C.btck_TransactionSpentOutputs
+	owner cResourceHandle
 }
 
 func (t *transactionSpentOutputsApi) cPtr() *C.btck_TransactionSpentOutputs {
@@ -78,12 +82,16 @@ var _ TransactionSpentOutputsLike = (*TransactionSpentOutputsView)(nil)
 
 // Copy creates a copy of the transaction spent outputs.
 func (t *transactionSpentOutputsApi) Copy() *TransactionSpentOutputs {
-	return newTransactionSpentOutputs(t.ptr(), false)
+	spentOutputs := newTransactionSpentOutputs(t.ptr(), false)
+	runtime.KeepAlive(t)
+	return spentOutputs
 }
 
 // Count returns the number of previous transaction outputs contained in the transaction spent outputs data.
 func (t *transactionSpentOutputsApi) Count() uint64 {
-	return uint64(C.btck_transaction_spent_outputs_count(t.ptr()))
+	count := uint64(C.btck_transaction_spent_outputs_count(t.ptr()))
+	runtime.KeepAlive(t)
+	return count
 }
 
 // GetCoinAt returns a coin contained in the transaction spent outputs at a
@@ -99,7 +107,8 @@ func (t *transactionSpentOutputsApi) GetCoinAt(index uint64) (*CoinView, error) 
 		return nil, ErrKernelIndexOutOfBounds
 	}
 	ptr := C.btck_transaction_spent_outputs_get_coin_at(t.ptr(), C.size_t(index))
-	return newCoinView(check(ptr)), nil
+	runtime.KeepAlive(t)
+	return newCoinView(check(ptr), t.owner), nil
 }
 
 // Coins returns an iterator over all coins in the transaction spent outputs.

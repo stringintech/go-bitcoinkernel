@@ -4,7 +4,10 @@ package kernel
 #include "bitcoinkernel.h"
 */
 import "C"
-import "unsafe"
+import (
+	"runtime"
+	"unsafe"
+)
 
 type blockValidationStateCFuncs struct{}
 
@@ -33,6 +36,7 @@ func newBlockValidationState(ptr *C.btck_BlockValidationState, fromOwned bool) *
 			ptr: func() *C.btck_BlockValidationState {
 				return (*C.btck_BlockValidationState)(h.ptr)
 			},
+			owner: h,
 		},
 	}
 }
@@ -50,18 +54,20 @@ type BlockValidationStateView struct {
 	blockValidationStateApi
 }
 
-func newBlockValidationStateView(ptr *C.btck_BlockValidationState) *BlockValidationStateView {
+func newBlockValidationStateView(ptr *C.btck_BlockValidationState, owner cResourceHandle) *BlockValidationStateView {
 	return &BlockValidationStateView{
 		blockValidationStateApi: blockValidationStateApi{
 			ptr: func() *C.btck_BlockValidationState {
 				return ptr
 			},
+			owner: owner,
 		},
 	}
 }
 
 type blockValidationStateApi struct {
-	ptr func() *C.btck_BlockValidationState
+	ptr   func() *C.btck_BlockValidationState
+	owner cResourceHandle
 }
 
 func (s *blockValidationStateApi) cPtr() *C.btck_BlockValidationState {
@@ -81,7 +87,9 @@ var _ BlockValidationStateLike = (*BlockValidationStateView)(nil)
 
 // Copy creates a copy of the block validation state.
 func (s *blockValidationStateApi) Copy() *BlockValidationState {
-	return newBlockValidationState(s.ptr(), false)
+	state := newBlockValidationState(s.ptr(), false)
+	runtime.KeepAlive(s)
+	return state
 }
 
 // ValidationMode returns whether the block is valid, invalid, or encountered an error.
@@ -92,6 +100,7 @@ func (s *blockValidationStateApi) Copy() *BlockValidationState {
 //   - ValidationStateError: Internal error during validation
 func (s *blockValidationStateApi) ValidationMode() ValidationMode {
 	mode := C.btck_block_validation_state_get_validation_mode(s.ptr())
+	runtime.KeepAlive(s)
 	return ValidationMode(mode)
 }
 
@@ -101,6 +110,7 @@ func (s *blockValidationStateApi) ValidationMode() ValidationMode {
 // consensus violations, invalid headers, or missing previous blocks.
 func (s *blockValidationStateApi) ValidationResult() BlockValidationResult {
 	result := C.btck_block_validation_state_get_block_validation_result(s.ptr())
+	runtime.KeepAlive(s)
 	return BlockValidationResult(result)
 }
 

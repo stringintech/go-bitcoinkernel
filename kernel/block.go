@@ -6,6 +6,7 @@ package kernel
 import "C"
 import (
 	"iter"
+	"runtime"
 	"unsafe"
 )
 
@@ -44,12 +45,16 @@ func NewBlock(rawBlock []byte) (*Block, error) {
 
 // Hash calculates and returns the hash of this block.
 func (b *Block) Hash() *BlockHash {
-	return newBlockHash(C.btck_block_get_hash((*C.btck_Block)(b.ptr)), true)
+	hash := newBlockHash(C.btck_block_get_hash((*C.btck_Block)(b.ptr)), true)
+	runtime.KeepAlive(b)
+	return hash
 }
 
 // GetHeader extracts the block header from this block.
 func (b *Block) GetHeader() *BlockHeader {
-	return newBlockHeader(C.btck_block_get_header((*C.btck_Block)(b.ptr)), true)
+	header := newBlockHeader(C.btck_block_get_header((*C.btck_Block)(b.ptr)), true)
+	runtime.KeepAlive(b)
+	return header
 }
 
 // Bytes returns the consensus serialized representation of the block.
@@ -59,6 +64,7 @@ func (b *Block) Bytes() ([]byte, error) {
 	bytes, ok := writeToBytes(func(writer C.btck_WriteBytes, userData unsafe.Pointer) C.int {
 		return C.btck_block_to_bytes((*C.btck_Block)(b.ptr), writer, userData)
 	})
+	runtime.KeepAlive(b)
 	if !ok {
 		return nil, &SerializationError{"Failed to serialize block"}
 	}
@@ -70,12 +76,16 @@ func (b *Block) Bytes() ([]byte, error) {
 // Blocks are reference-counted internally,
 // so this operation is efficient and does not duplicate the underlying data.
 func (b *Block) Copy() *Block {
-	return newBlock((*C.btck_Block)(b.ptr), false)
+	block := newBlock((*C.btck_Block)(b.ptr), false)
+	runtime.KeepAlive(b)
+	return block
 }
 
 // CountTransactions returns the number of transactions contained in the block.
 func (b *Block) CountTransactions() uint64 {
-	return uint64(C.btck_block_count_transactions((*C.btck_Block)(b.ptr)))
+	count := uint64(C.btck_block_count_transactions((*C.btck_Block)(b.ptr)))
+	runtime.KeepAlive(b)
+	return count
 }
 
 // GetTransactionAt retrieves the transaction at the specified index.
@@ -91,7 +101,8 @@ func (b *Block) GetTransactionAt(index uint64) (*TransactionView, error) {
 		return nil, ErrKernelIndexOutOfBounds
 	}
 	ptr := C.btck_block_get_transaction_at((*C.btck_Block)(b.ptr), C.size_t(index))
-	return newTransactionView(check(ptr)), nil
+	runtime.KeepAlive(b)
+	return newTransactionView(check(ptr), b.handle), nil
 }
 
 // Transactions returns an iterator over all transactions in the block.

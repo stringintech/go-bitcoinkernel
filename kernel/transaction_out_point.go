@@ -5,6 +5,7 @@ package kernel
 */
 import "C"
 import (
+	"runtime"
 	"unsafe"
 )
 
@@ -32,6 +33,7 @@ func newTransactionOutPoint(ptr *C.btck_TransactionOutPoint, fromOwned bool) *Tr
 			ptr: func() *C.btck_TransactionOutPoint {
 				return (*C.btck_TransactionOutPoint)(h.ptr)
 			},
+			owner: h,
 		},
 	}
 }
@@ -41,18 +43,20 @@ type TransactionOutPointView struct {
 	transactionOutPointApi
 }
 
-func newTransactionOutPointView(ptr *C.btck_TransactionOutPoint) *TransactionOutPointView {
+func newTransactionOutPointView(ptr *C.btck_TransactionOutPoint, owner cResourceHandle) *TransactionOutPointView {
 	return &TransactionOutPointView{
 		transactionOutPointApi: transactionOutPointApi{
 			ptr: func() *C.btck_TransactionOutPoint {
 				return ptr
 			},
+			owner: owner,
 		},
 	}
 }
 
 type transactionOutPointApi struct {
-	ptr func() *C.btck_TransactionOutPoint
+	ptr   func() *C.btck_TransactionOutPoint
+	owner cResourceHandle
 }
 
 func (t *transactionOutPointApi) cPtr() *C.btck_TransactionOutPoint {
@@ -72,16 +76,21 @@ var _ TransactionOutPointLike = (*TransactionOutPointView)(nil)
 
 // Copy creates a copy of the transaction out point.
 func (t *transactionOutPointApi) Copy() *TransactionOutPoint {
-	return newTransactionOutPoint(t.ptr(), false)
+	outPoint := newTransactionOutPoint(t.ptr(), false)
+	runtime.KeepAlive(t)
+	return outPoint
 }
 
 // GetIndex returns the output position from the transaction out point.
 func (t *transactionOutPointApi) GetIndex() uint32 {
-	return uint32(C.btck_transaction_out_point_get_index(t.ptr()))
+	index := uint32(C.btck_transaction_out_point_get_index(t.ptr()))
+	runtime.KeepAlive(t)
+	return index
 }
 
 // GetTxid returns the txid from the out point.
 func (t *transactionOutPointApi) GetTxid() *TxidView {
 	ptr := C.btck_transaction_out_point_get_txid(t.ptr())
-	return newTxidView(check(ptr))
+	runtime.KeepAlive(t)
+	return newTxidView(check(ptr), t.owner)
 }

@@ -6,6 +6,7 @@ package kernel
 */
 import "C"
 import (
+	"runtime"
 	"unsafe"
 )
 
@@ -17,6 +18,13 @@ func (chainstateManagerCFuncs) destroy(ptr unsafe.Pointer) {
 
 // ChainstateManager is the central object for doing validation tasks as well as
 // retrieving data from the chain.
+//
+// Call Destroy explicitly when done. Destroy flushes the chainstate to disk
+// before freeing the manager. Finalizers do not run at program exit, so relying
+// on the garbage collector skips the final flush, and blocks processed since
+// the chainstate was last written to disk must be processed again on the next
+// start. Notification callbacks, such as a fatal error raised while flushing,
+// may run during Destroy.
 type ChainstateManager struct {
 	*uniqueHandle
 }
@@ -58,6 +66,7 @@ func NewChainstateManager(context *Context, dataDir, blocksDir string, options .
 	// Create the options
 	optsPtr := C.btck_chainstate_manager_options_create((*C.btck_Context)(context.ptr), cDataDir, C.size_t(len(dataDir)),
 		cBlocksDir, C.size_t(len(blocksDir)))
+	runtime.KeepAlive(context)
 	if optsPtr == nil {
 		return nil, &InternalError{"Failed to create chainstate manager options"}
 	}
@@ -86,6 +95,8 @@ func NewChainstateManager(context *Context, dataDir, blocksDir string, options .
 // Returns an error if the block cannot be read from disk.
 func (cm *ChainstateManager) ReadBlock(blockTreeEntry *BlockTreeEntry) (*Block, error) {
 	ptr := C.btck_block_read((*C.btck_ChainstateManager)(cm.ptr), blockTreeEntry.ptr)
+	runtime.KeepAlive(cm)
+	runtime.KeepAlive(blockTreeEntry)
 	if ptr == nil {
 		return nil, &InternalError{"Failed to read block"}
 	}
@@ -100,6 +111,8 @@ func (cm *ChainstateManager) ReadBlock(blockTreeEntry *BlockTreeEntry) (*Block, 
 // Returns an error if the undo data cannot be read from disk.
 func (cm *ChainstateManager) ReadBlockSpentOutputs(blockTreeEntry *BlockTreeEntry) (*BlockSpentOutputs, error) {
 	ptr := C.btck_block_spent_outputs_read((*C.btck_ChainstateManager)(cm.ptr), blockTreeEntry.ptr)
+	runtime.KeepAlive(cm)
+	runtime.KeepAlive(blockTreeEntry)
 	if ptr == nil {
 		return nil, &InternalError{"Failed to read block spent outputs"}
 	}
@@ -124,6 +137,8 @@ func (cm *ChainstateManager) ReadBlockSpentOutputs(blockTreeEntry *BlockTreeEntr
 func (cm *ChainstateManager) ProcessBlock(block *Block) (ok bool, newBlock bool) {
 	var newBlockInt C.int
 	result := C.btck_chainstate_manager_process_block((*C.btck_ChainstateManager)(cm.ptr), (*C.btck_Block)(block.ptr), &newBlockInt)
+	runtime.KeepAlive(cm)
+	runtime.KeepAlive(block)
 	ok = result == 0
 	newBlock = newBlockInt == 1
 	return
@@ -154,6 +169,8 @@ func (cm *ChainstateManager) ProcessBlockHeader(header *BlockHeader) (*BlockVali
 		(*C.btck_ChainstateManager)(cm.ptr),
 		(*C.btck_BlockHeader)(header.ptr),
 	)
+	runtime.KeepAlive(cm)
+	runtime.KeepAlive(header)
 	if statePtr == nil {
 		return nil, &InternalError{"Failed to process block header"}
 	}
@@ -169,7 +186,12 @@ func (cm *ChainstateManager) ProcessBlockHeader(header *BlockHeader) (*BlockVali
 // from it is only consistent until new data is processed. It is the caller's responsibility
 // to guard against these inconsistencies.
 func (cm *ChainstateManager) GetActiveChain() *Chain {
-	return &Chain{C.btck_chainstate_manager_get_active_chain((*C.btck_ChainstateManager)(cm.ptr))}
+	ptr := C.btck_chainstate_manager_get_active_chain((*C.btck_ChainstateManager)(cm.ptr))
+	runtime.KeepAlive(cm)
+	return &Chain{
+		ptr:   ptr,
+		owner: cm.uniqueHandle,
+	}
 }
 
 // GetBlockTreeEntryByHash retrieves a block tree entry by its block hash.
@@ -182,10 +204,12 @@ func (cm *ChainstateManager) GetActiveChain() *Chain {
 // manager.
 func (cm *ChainstateManager) GetBlockTreeEntryByHash(blockHash BlockHashLike) *BlockTreeEntry {
 	ptr := C.btck_chainstate_manager_get_block_tree_entry_by_hash((*C.btck_ChainstateManager)(cm.ptr), blockHash.cPtr())
+	runtime.KeepAlive(cm)
+	runtime.KeepAlive(blockHash)
 	if ptr == nil {
 		return nil
 	}
-	return &BlockTreeEntry{ptr: ptr}
+	return &BlockTreeEntry{ptr: ptr, owner: cm.uniqueHandle}
 }
 
 // ImportBlocks triggers a reindex and/or imports block files from the filesystem.
@@ -221,6 +245,7 @@ func (cm *ChainstateManager) ImportBlocks(blockFilePaths []string) error {
 		cLensPtr,
 		C.size_t(len(blockFilePaths)),
 	)
+	runtime.KeepAlive(cm)
 	if success != 0 {
 		return &InternalError{"Failed to import blocks"}
 	}

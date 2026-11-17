@@ -6,6 +6,7 @@ package kernel
 import "C"
 import (
 	"encoding/hex"
+	"runtime"
 	"unsafe"
 )
 
@@ -33,6 +34,7 @@ func newBlockHash(ptr *C.btck_BlockHash, fromOwned bool) *BlockHash {
 			ptr: func() *C.btck_BlockHash {
 				return (*C.btck_BlockHash)(h.ptr)
 			},
+			owner: h,
 		},
 	}
 }
@@ -42,18 +44,20 @@ type BlockHashView struct {
 	blockHashApi
 }
 
-func newBlockHashView(ptr *C.btck_BlockHash) *BlockHashView {
+func newBlockHashView(ptr *C.btck_BlockHash, owner cResourceHandle) *BlockHashView {
 	return &BlockHashView{
 		blockHashApi: blockHashApi{
 			ptr: func() *C.btck_BlockHash {
 				return ptr
 			},
+			owner: owner,
 		},
 	}
 }
 
 type blockHashApi struct {
-	ptr func() *C.btck_BlockHash
+	ptr   func() *C.btck_BlockHash
+	owner cResourceHandle
 }
 
 func (bh *blockHashApi) cPtr() *C.btck_BlockHash {
@@ -85,12 +89,15 @@ func NewBlockHash(hashBytes [32]byte) *BlockHash {
 func (bh *blockHashApi) Bytes() [32]byte {
 	var output [32]C.uchar
 	C.btck_block_hash_to_bytes(bh.ptr(), &output[0])
+	runtime.KeepAlive(bh)
 	return *(*[32]byte)(unsafe.Pointer(&output[0]))
 }
 
 // Copy creates a copy of the block hash.
 func (bh *blockHashApi) Copy() *BlockHash {
-	return newBlockHash(bh.ptr(), false)
+	hash := newBlockHash(bh.ptr(), false)
+	runtime.KeepAlive(bh)
+	return hash
 }
 
 // Equals checks if two block hashes are equal.
@@ -100,7 +107,10 @@ func (bh *blockHashApi) Copy() *BlockHash {
 //
 // Returns true if the block hashes are equal.
 func (bh *blockHashApi) Equals(other BlockHashLike) bool {
-	return C.btck_block_hash_equals(bh.ptr(), other.cPtr()) != 0
+	equal := C.btck_block_hash_equals(bh.ptr(), other.cPtr()) != 0
+	runtime.KeepAlive(bh)
+	runtime.KeepAlive(other)
+	return equal
 }
 
 // String returns the block hash as a hex string in display order (reversed).

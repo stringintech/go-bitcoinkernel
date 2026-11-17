@@ -6,6 +6,7 @@ package kernel
 import "C"
 import (
 	"encoding/hex"
+	"runtime"
 	"unsafe"
 )
 
@@ -32,6 +33,7 @@ func newTxid(ptr *C.btck_Txid, fromOwned bool) *Txid {
 			ptr: func() *C.btck_Txid {
 				return (*C.btck_Txid)(h.ptr)
 			},
+			owner: h,
 		},
 	}
 }
@@ -40,18 +42,20 @@ type TxidView struct {
 	txidApi
 }
 
-func newTxidView(ptr *C.btck_Txid) *TxidView {
+func newTxidView(ptr *C.btck_Txid, owner cResourceHandle) *TxidView {
 	return &TxidView{
 		txidApi: txidApi{
 			ptr: func() *C.btck_Txid {
 				return ptr
 			},
+			owner: owner,
 		},
 	}
 }
 
 type txidApi struct {
-	ptr func() *C.btck_Txid
+	ptr   func() *C.btck_Txid
+	owner cResourceHandle
 }
 
 func (t *txidApi) cPtr() *C.btck_Txid {
@@ -72,18 +76,24 @@ var _ TxidLike = (*TxidView)(nil)
 
 // Copy creates a copy of the txid.
 func (t *txidApi) Copy() *Txid {
-	return newTxid(t.ptr(), false)
+	txid := newTxid(t.ptr(), false)
+	runtime.KeepAlive(t)
+	return txid
 }
 
 // Equals checks if two txids are equal.
 func (t *txidApi) Equals(other TxidLike) bool {
-	return C.btck_txid_equals(t.ptr(), other.cPtr()) != 0
+	equal := C.btck_txid_equals(t.ptr(), other.cPtr()) != 0
+	runtime.KeepAlive(t)
+	runtime.KeepAlive(other)
+	return equal
 }
 
 // Bytes returns the 32-byte representation of the txid.
 func (t *txidApi) Bytes() [32]byte {
 	var output [32]C.uchar
 	C.btck_txid_to_bytes(t.ptr(), &output[0])
+	runtime.KeepAlive(t)
 	return *(*[32]byte)(unsafe.Pointer(&output[0]))
 }
 

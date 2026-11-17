@@ -22,6 +22,9 @@
 // and TransactionView. Owned types hold a reference to an underlying C resource and
 // provide Destroy. View types are non-owned pointers returned from another object or
 // callback, and remain valid only while the object that produced them remains valid.
+// A view returned from another object keeps that object reachable, so it stays
+// valid even after the caller drops its reference to that object. Calling Destroy on that
+// object still invalidates its views.
 //
 // Methods shared by an owned type and its view type are exposed through sealed
 // interfaces named with the Like suffix, such as TransactionLike and TxidLike. These

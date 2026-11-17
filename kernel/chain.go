@@ -4,7 +4,10 @@ package kernel
 #include "bitcoinkernel.h"
 */
 import "C"
-import "iter"
+import (
+	"iter"
+	"runtime"
+)
 
 // Chain represents the currently known best-chain associated with a chainstate.
 //
@@ -13,7 +16,8 @@ import "iter"
 // retrieved from this chain is only consistent up to the point when new data
 // is processed in the chainstate manager.
 type Chain struct {
-	ptr *C.btck_Chain
+	ptr   *C.btck_Chain
+	owner cResourceHandle
 }
 
 // GetByHeight retrieves a block tree entry by its height in the currently active chain.
@@ -30,22 +34,28 @@ type Chain struct {
 //	tip := chain.GetByHeight(chain.GetHeight())
 func (c *Chain) GetByHeight(height int32) *BlockTreeEntry {
 	ptr := C.btck_chain_get_by_height(c.ptr, C.int(height))
+	runtime.KeepAlive(c)
 	if ptr == nil {
 		return nil
 	}
-	return &BlockTreeEntry{ptr}
+	return &BlockTreeEntry{ptr: ptr, owner: c.owner}
 }
 
 // Contains checks whether the given block tree entry is part of this chain.
 //
 // Returns true if the block tree entry is in the currently active chain, false otherwise.
 func (c *Chain) Contains(blockTreeEntry *BlockTreeEntry) bool {
-	return C.btck_chain_contains(c.ptr, blockTreeEntry.ptr) != 0
+	contains := C.btck_chain_contains(c.ptr, blockTreeEntry.ptr) != 0
+	runtime.KeepAlive(c)
+	runtime.KeepAlive(blockTreeEntry)
+	return contains
 }
 
 // GetHeight returns the height of the chain's tip.
 func (c *Chain) GetHeight() int32 {
-	return int32(C.btck_chain_get_height(c.ptr))
+	height := int32(C.btck_chain_get_height(c.ptr))
+	runtime.KeepAlive(c)
+	return height
 }
 
 // Entries returns an iterator over all block tree entries in the chain.

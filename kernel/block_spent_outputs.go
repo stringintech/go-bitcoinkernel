@@ -6,6 +6,7 @@ package kernel
 import "C"
 import (
 	"iter"
+	"runtime"
 	"unsafe"
 )
 
@@ -38,7 +39,9 @@ func newBlockSpentOutputs(ptr *C.btck_BlockSpentOutputs, fromOwned bool) *BlockS
 
 // Count returns the number of transaction spent outputs contained in this block's spent outputs.
 func (bso *BlockSpentOutputs) Count() uint64 {
-	return uint64(C.btck_block_spent_outputs_count((*C.btck_BlockSpentOutputs)(bso.ptr)))
+	count := uint64(C.btck_block_spent_outputs_count((*C.btck_BlockSpentOutputs)(bso.ptr)))
+	runtime.KeepAlive(bso)
+	return count
 }
 
 // GetTransactionSpentOutputsAt retrieves the spent outputs for a specific transaction.
@@ -55,7 +58,8 @@ func (bso *BlockSpentOutputs) GetTransactionSpentOutputsAt(index uint64) (*Trans
 		return nil, ErrKernelIndexOutOfBounds
 	}
 	ptr := C.btck_block_spent_outputs_get_transaction_spent_outputs_at((*C.btck_BlockSpentOutputs)(bso.ptr), C.size_t(index))
-	return newTransactionSpentOutputsView(check(ptr)), nil
+	runtime.KeepAlive(bso)
+	return newTransactionSpentOutputsView(check(ptr), bso.handle), nil
 }
 
 // Copy creates a shallow copy of the block spent outputs by incrementing its reference count.
@@ -63,7 +67,9 @@ func (bso *BlockSpentOutputs) GetTransactionSpentOutputsAt(index uint64) (*Trans
 // The block spent outputs is reference-counted internally, so this operation is efficient
 // and does not duplicate the underlying data.
 func (bso *BlockSpentOutputs) Copy() *BlockSpentOutputs {
-	return newBlockSpentOutputs((*C.btck_BlockSpentOutputs)(bso.ptr), false)
+	spentOutputs := newBlockSpentOutputs((*C.btck_BlockSpentOutputs)(bso.ptr), false)
+	runtime.KeepAlive(bso)
+	return spentOutputs
 }
 
 // TransactionsSpentOutputs returns an iterator over all transaction spent outputs in the block.
