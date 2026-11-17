@@ -18,6 +18,13 @@ func (chainstateManagerCFuncs) destroy(ptr unsafe.Pointer) {
 
 // ChainstateManager is the central object for doing validation tasks as well as
 // retrieving data from the chain.
+//
+// Call Destroy explicitly when done. Destroy flushes the chainstate to disk
+// before freeing the manager. Finalizers do not run at program exit, so relying
+// on the garbage collector skips the final flush, and blocks processed since
+// the chainstate was last written to disk must be processed again on the next
+// start. Notification callbacks, such as a fatal error raised while flushing,
+// may run during Destroy.
 type ChainstateManager struct {
 	*uniqueHandle
 }
