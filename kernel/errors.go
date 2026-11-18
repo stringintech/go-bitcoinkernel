@@ -12,8 +12,9 @@ var (
 )
 
 // check panics if ptr is nil, otherwise returns ptr unchanged; used when C calls are not expected to return null
-func check[T any](ptr T) T {
-	if any(ptr) == nil {
+func check[T comparable](ptr T) T {
+	var zero T
+	if ptr == zero {
 		panic(ErrKernelInstantiate)
 	}
 	return ptr
