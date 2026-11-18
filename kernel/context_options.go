@@ -14,7 +14,7 @@ extern void go_notify_warning_unset_bridge(void* user_data, btck_Warning warning
 extern void go_notify_flush_error_bridge(void* user_data, const char* message, size_t message_len);
 extern void go_notify_fatal_error_bridge(void* user_data, const char* message, size_t message_len);
 extern void go_validation_interface_block_checked_bridge(void* user_data, btck_Block* block, const btck_BlockValidationState* state);
-extern void go_validation_interface_pow_valid_block_bridge(void* user_data, const btck_BlockTreeEntry* entry, btck_Block* block);
+extern void go_validation_interface_pow_valid_block_bridge(void* user_data, btck_Block* block, const btck_BlockTreeEntry* entry);
 extern void go_validation_interface_block_connected_bridge(void* user_data, btck_Block* block, const btck_BlockTreeEntry* entry);
 extern void go_validation_interface_block_disconnected_bridge(void* user_data, btck_Block* block, const btck_BlockTreeEntry* entry);
 
